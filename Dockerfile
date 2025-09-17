@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar TODAS as dependências (incluindo dev para build)
-RUN npm install
+RUN npm ci
 
 # Copiar código fonte
 COPY . .
@@ -14,8 +14,8 @@ COPY . .
 # Build da aplicação (agora tem acesso às dev dependencies)
 RUN npm run build
 
-# Limpar dev dependencies após build (economia de espaço)
-RUN npm prune --omit=dev
+# Limpar dev dependencies para economizar espaço
+RUN npm prune --production
 
 # Expor porta
 EXPOSE 10000
