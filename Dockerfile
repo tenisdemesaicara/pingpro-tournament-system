@@ -2,11 +2,11 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copiar package files
+# Copiar package files primeiro
 COPY package*.json ./
 
 # Instalar dependências
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copiar código fonte
 COPY . .
@@ -14,11 +14,8 @@ COPY . .
 # Build da aplicação
 RUN npm run build
 
-# Aplicar schema do banco
-RUN npm run db:push --force || true
-
-# Expor porta
-EXPOSE 5000
+# Expor porta padrão do Render
+EXPOSE 10000
 
 # Comando de inicialização
 CMD ["npm", "start"]
