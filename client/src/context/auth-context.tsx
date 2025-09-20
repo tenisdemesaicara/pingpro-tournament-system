@@ -21,16 +21,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const checkAuth = async () => {
-    // Não fazer verificação de auth em rotas públicas
+    // Definir rotas que não precisam de autenticação
     const currentPath = window.location.pathname;
-    const isPublicRoute = currentPath.startsWith('/public/') || 
-                         currentPath.startsWith('/consent/') ||
-                         currentPath.startsWith('/cadastro-') ||
-                         currentPath.startsWith('/self-registration') ||
-                         currentPath.startsWith('/tournament/') ||
-                         currentPath === '/';
+    const publicRoutes = [
+      '/consent/',
+      '/cadastro-',
+      '/self-registration',
+      '/tournament/',
+      '/simple-register/',
+      '/register/tournament/'
+    ];
 
-    if (isPublicRoute && !currentPath.startsWith('/admin/')) {
+    const isPublicRoute = publicRoutes.some(route => currentPath.startsWith(route));
+
+    if (isPublicRoute) {
       setUser(null);
       setIsLoading(false);
       return;
