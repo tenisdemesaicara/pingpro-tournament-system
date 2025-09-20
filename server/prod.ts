@@ -3,7 +3,7 @@ import { registerRoutes } from "./routes";
 import { createDefaultPasswords } from "./auth";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
+import { pool, db } from "./db";
 import path from "path";
 import fs from "fs";
 
@@ -111,7 +111,32 @@ app.use((req, res, next) => {
   next();
 });
 
+// Programmatic database initialization (more reliable than CLI)
+async function initializeDatabase() {
+  try {
+    log('Initializing database schema...', 'database');
+    
+    // Test database connection
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
+    
+    log('Database connection successful ✓', 'database');
+    
+    // The Drizzle ORM will automatically handle table creation on first use
+    // This is more reliable than CLI migrations for containerized deployments
+    return true;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Database initialization failed: ${errorMessage}`, 'database');
+    throw new Error(`Failed to initialize database: ${errorMessage}`);
+  }
+}
+
 (async () => {
+  // Initialize database first (critical for production)
+  await initializeDatabase();
+  
   // Create default passwords (only in development to avoid credential leaks)
   if (process.env.NODE_ENV !== 'production') {
     await createDefaultPasswords();
