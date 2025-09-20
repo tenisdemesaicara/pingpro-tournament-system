@@ -4,6 +4,7 @@ import { createDefaultPasswords } from "./auth";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import { pool, db } from "./db";
+import * as schema from "@shared/schema";
 import path from "path";
 import fs from "fs";
 
@@ -111,20 +112,132 @@ app.use((req, res, next) => {
   next();
 });
 
-// Programmatic database initialization (more reliable than CLI)
+// Programmatic database schema application
 async function initializeDatabase() {
   try {
     log('Initializing database schema...', 'database');
     
-    // Test database connection
+    // Test database connection first
     const client = await pool.connect();
     await client.query('SELECT 1');
-    client.release();
-    
     log('Database connection successful ✓', 'database');
     
-    // The Drizzle ORM will automatically handle table creation on first use
-    // This is more reliable than CLI migrations for containerized deployments
+    // Apply schema directly using SQL (reliable for production)
+    const createSchemaSql = `
+      -- Enable UUID extension
+      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+      
+      -- Athletes table
+      CREATE TABLE IF NOT EXISTS athletes (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        phone TEXT,
+        birth_date TEXT NOT NULL,
+        cpf TEXT UNIQUE,
+        rg TEXT,
+        street TEXT,
+        neighborhood TEXT NOT NULL,
+        zip_code TEXT NOT NULL,
+        city TEXT NOT NULL,
+        state TEXT NOT NULL,
+        complement TEXT,
+        club TEXT,
+        category TEXT,
+        gender TEXT NOT NULL,
+        ranking INTEGER DEFAULT 1000,
+        wins INTEGER DEFAULT 0,
+        losses INTEGER DEFAULT 0,
+        points INTEGER DEFAULT 0,
+        photo_url TEXT,
+        observations TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        type TEXT NOT NULL DEFAULT 'atleta',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      
+      -- Categories table
+      CREATE TABLE IF NOT EXISTS categories (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        description TEXT,
+        min_age INTEGER,
+        max_age INTEGER,
+        gender TEXT NOT NULL DEFAULT 'all',
+        skill_level TEXT NOT NULL DEFAULT 'all'
+      );
+      
+      -- Tournaments table
+      CREATE TABLE IF NOT EXISTS tournaments (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'draft',
+        max_participants INTEGER,
+        current_participants INTEGER DEFAULT 0,
+        cover_image TEXT,
+        registration_deadline TIMESTAMP,
+        start_date TIMESTAMP,
+        end_date TIMESTAMP,
+        location TEXT,
+        organizer TEXT NOT NULL,
+        season TEXT NOT NULL,
+        prize_pool TEXT,
+        rules TEXT,
+        format TEXT DEFAULT 'single_elimination',
+        is_public BOOLEAN DEFAULT true,
+        scoring_system JSON,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      
+      -- Tournament participants table
+      CREATE TABLE IF NOT EXISTS tournament_participants (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        tournament_id VARCHAR NOT NULL,
+        athlete_id VARCHAR NOT NULL,
+        category_id VARCHAR NOT NULL,
+        registration_number VARCHAR,
+        seed INTEGER,
+        registered_at TIMESTAMP DEFAULT NOW()
+      );
+      
+      -- Matches table
+      CREATE TABLE IF NOT EXISTS matches (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        tournament_id VARCHAR NOT NULL,
+        category_id VARCHAR NOT NULL,
+        round INTEGER NOT NULL,
+        match_number INTEGER NOT NULL,
+        player1_id VARCHAR,
+        player2_id VARCHAR,
+        winner_id VARCHAR,
+        score TEXT,
+        status TEXT DEFAULT 'pending',
+        scheduled_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        notes TEXT,
+        phase TEXT DEFAULT 'knockout',
+        group_name TEXT,
+        best_of_sets INTEGER NOT NULL DEFAULT 3,
+        sets JSON,
+        needs_attention BOOLEAN DEFAULT false,
+        table_number INTEGER DEFAULT 1,
+        player1_source TEXT,
+        player2_source TEXT,
+        next_match_id VARCHAR,
+        next_match_slot INTEGER
+      );
+      
+      -- Create essential indexes
+      CREATE INDEX IF NOT EXISTS idx_athletes_email ON athletes(email);
+      CREATE INDEX IF NOT EXISTS idx_tournament_participants_tournament ON tournament_participants(tournament_id);
+      CREATE INDEX IF NOT EXISTS idx_matches_tournament ON matches(tournament_id);
+    `;
+    
+    await client.query(createSchemaSql);
+    client.release();
+    
+    log('Database schema applied successfully ✓', 'database');
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -148,8 +261,13 @@ async function initializeDatabase() {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    // Log error for monitoring
+    log(`Error ${status}: ${message}`, 'error');
+    
+    // Send error response
     res.status(status).json({ message });
-    throw err;
+    
+    // Don't throw after responding - this can crash the process
   });
 
   // APENAS servir arquivos estáticos - SEM VITE
