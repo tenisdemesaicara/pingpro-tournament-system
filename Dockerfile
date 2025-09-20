@@ -23,9 +23,5 @@ RUN npm prune --production
 # Expor porta
 EXPOSE 5000
 
-# Copiar script de startup
-COPY start-production.sh ./
-RUN chmod +x start-production.sh
-
-# Comando de inicialização (com migrations no startup)
-CMD ["./start-production.sh"]
+# Comando de inicialização (com migrations programáticas)
+CMD ["node", "dist/prod.js"]
