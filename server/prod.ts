@@ -288,17 +288,31 @@ async function initializeDatabase() {
     await client.query(additionalTablesSQL);
     log('✓ Additional tables created (external_links, consents)', 'database');
     
-    // Step 5: Indexes
-    const indexesSQL = `
-      CREATE INDEX IF NOT EXISTS idx_athletes_email ON athletes(email);
-      CREATE INDEX IF NOT EXISTS idx_tournament_participants_tournament ON tournament_participants(tournament_id);
-      CREATE INDEX IF NOT EXISTS idx_matches_tournament ON matches(tournament_id);
-      CREATE INDEX IF NOT EXISTS idx_tournament_categories_tournament ON tournament_categories(tournament_id);
-      CREATE INDEX IF NOT EXISTS idx_external_links_code ON external_links(short_code);
-      CREATE INDEX IF NOT EXISTS idx_consents_tournament ON consents(tournament_id);
-    `;
-    await client.query(indexesSQL);
-    log('✓ Database indexes created', 'database');
+    // Step 5: Indexes (create them one by one to isolate errors)
+    try {
+      await client.query('CREATE INDEX IF NOT EXISTS idx_athletes_email ON athletes(email);');
+      log('✓ Athletes email index created', 'database');
+      
+      await client.query('CREATE INDEX IF NOT EXISTS idx_tournament_participants_tournament ON tournament_participants(tournament_id);');
+      log('✓ Tournament participants index created', 'database');
+      
+      await client.query('CREATE INDEX IF NOT EXISTS idx_matches_tournament ON matches(tournament_id);');
+      log('✓ Matches tournament index created', 'database');
+      
+      await client.query('CREATE INDEX IF NOT EXISTS idx_tournament_categories_tournament ON tournament_categories(tournament_id);');
+      log('✓ Tournament categories index created', 'database');
+      
+      await client.query('CREATE INDEX IF NOT EXISTS idx_external_links_code ON external_links(short_code);');
+      log('✓ External links index created', 'database');
+      
+      await client.query('CREATE INDEX IF NOT EXISTS idx_consents_tournament ON consents(tournament_id);');
+      log('✓ Consents tournament index created', 'database');
+      
+      log('✓ All database indexes created successfully', 'database');
+    } catch (indexError) {
+      log(`Index creation warning: ${indexError.message} (continuing anyway)`, 'database');
+      // Don't fail the entire initialization for index issues
+    }
     client.release();
     
     log('Database schema applied successfully ✓', 'database');
