@@ -17,11 +17,11 @@ RUN npm run build
 # Build do servidor de produção (SEM VITE)
 RUN npx esbuild server/prod.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --outbase=server
 
-# Limpar dev dependencies após o build
-RUN npm prune --production
-
-# Aplicar schema do banco
+# Aplicar schema do banco (ANTES do prune para manter drizzle-kit)
 RUN npm run db:push --force || true
+
+# Limpar dev dependencies após o build (migrations já aplicadas)
+RUN npm prune --production
 
 # Expor porta
 EXPOSE 5000
