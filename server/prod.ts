@@ -310,7 +310,8 @@ async function initializeDatabase() {
       
       log('✓ All database indexes created successfully', 'database');
     } catch (indexError) {
-      log(`Index creation warning: ${indexError.message} (continuing anyway)`, 'database');
+      const errorMessage = indexError instanceof Error ? indexError.message : String(indexError);
+      log(`Index creation warning: ${errorMessage} (continuing anyway)`, 'database');
       // Don't fail the entire initialization for index issues
     }
     client.release();
