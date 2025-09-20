@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { serveStatic, log } from "./static";
 import { createDefaultPasswords } from "./auth";
 import session from "express-session";
 
@@ -79,6 +79,8 @@ app.use((req, res, next) => {
   });
 
   if (app.get("env") === "development") {
+    // Import dinâmico do vite apenas em desenvolvimento
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     serveStatic(app);
