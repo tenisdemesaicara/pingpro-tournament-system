@@ -44,19 +44,30 @@ declare module 'express-session' {
 }
 
 const app = express();
+
+// Configure trust proxy for production (behind Render proxy)
+app.set('trust proxy', 1);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
-// Configuração de sessão
+// Secure session configuration for production
+const isProduction = process.env.NODE_ENV === 'production';
+const sessionSecret = process.env.SESSION_SECRET;
+
+if (!sessionSecret) {
+  throw new Error('SESSION_SECRET environment variable is required for production');
+}
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'dev-secret-key-change-in-production',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: isProduction, // HTTPS only in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 horas
-    sameSite: 'lax'
+    sameSite: isProduction ? 'strict' : 'lax'
   }
 }));
 
@@ -91,7 +102,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Mostrar credenciais administrativas
+  // Create default passwords (only show credentials in development)
   await createDefaultPasswords();
 
   const server = await registerRoutes(app);
