@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { createDefaultPasswords } from "./auth";
 import session from "express-session";
+import ConnectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 import path from "path";
 import fs from "fs";
 
@@ -59,7 +61,15 @@ if (!sessionSecret) {
   throw new Error('SESSION_SECRET environment variable is required for production');
 }
 
+// Configure PostgreSQL session store for production
+const PgStore = ConnectPgSimple(session);
+
 app.use(session({
+  store: new PgStore({
+    pool: pool, // Use same database pool
+    tableName: 'session', // Session table name
+    createTableIfMissing: true // Auto-create session table
+  }),
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
@@ -102,8 +112,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Create default passwords (only show credentials in development)
-  await createDefaultPasswords();
+  // Create default passwords (only in development to avoid credential leaks)
+  if (process.env.NODE_ENV !== 'production') {
+    await createDefaultPasswords();
+  }
 
   const server = await registerRoutes(app);
 
