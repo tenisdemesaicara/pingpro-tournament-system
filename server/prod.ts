@@ -326,38 +326,77 @@ async function initializeDatabase() {
 }
 
 (async () => {
-  // Initialize database first (critical for production)
-  await initializeDatabase();
-  
-  // Create default passwords (only in development to avoid credential leaks)
-  if (process.env.NODE_ENV !== 'production') {
-    await createDefaultPasswords();
+  try {
+    log('🚀 Starting production server...', 'startup');
+    
+    // Initialize database first (critical for production)
+    log('📊 Initializing database...', 'startup');
+    await initializeDatabase();
+    log('✅ Database initialized successfully', 'startup');
+    
+    // Create default passwords (only in development to avoid credential leaks)
+    if (process.env.NODE_ENV !== 'production') {
+      log('🔑 Creating default passwords (development only)...', 'startup');
+      await createDefaultPasswords();
+      log('✅ Default passwords created', 'startup');
+    } else {
+      log('🔒 Skipping default passwords in production', 'startup');
+    }
+
+    log('🛣️  Registering routes...', 'startup');
+    const server = await registerRoutes(app);
+    log('✅ Routes registered successfully', 'startup');
+
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      // Log error for monitoring
+      log(`Error ${status}: ${message}`, 'error');
+      
+      // Send error response
+      res.status(status).json({ message });
+      
+      // Don't throw after responding - this can crash the process
+    });
+
+    // APENAS servir arquivos estáticos - SEM VITE
+    log('📁 Setting up static files...', 'startup');
+    serveStatic(app);
+    log('✅ Static files configured', 'startup');
+
+    const port = parseInt(process.env.PORT || '5000', 10);
+    log(`🌐 Starting server on port ${port}...`, 'startup');
+    
+    server.listen({
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      log(`🎉 SERVER READY! serving on port ${port}`, 'startup');
+      log(`🔗 Health check: http://0.0.0.0:${port}/api/health`, 'startup');
+    });
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`💥 FATAL STARTUP ERROR: ${errorMessage}`, 'error');
+    log(`Stack trace: ${error instanceof Error ? error.stack : 'No stack trace'}`, 'error');
+    
+    // Try to start server anyway on basic port for health checks
+    const port = parseInt(process.env.PORT || '5000', 10);
+    log(`🆘 Attempting emergency server start on port ${port}...`, 'error');
+    
+    app.get('/health', (req, res) => {
+      res.status(500).json({ 
+        status: 'error', 
+        message: 'Server started with errors',
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    app.listen(port, '0.0.0.0', () => {
+      log(`🆘 Emergency server running on port ${port} (with errors)`, 'error');
+    });
   }
-
-  const server = await registerRoutes(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    // Log error for monitoring
-    log(`Error ${status}: ${message}`, 'error');
-    
-    // Send error response
-    res.status(status).json({ message });
-    
-    // Don't throw after responding - this can crash the process
-  });
-
-  // APENAS servir arquivos estáticos - SEM VITE
-  serveStatic(app);
-
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
 })();
