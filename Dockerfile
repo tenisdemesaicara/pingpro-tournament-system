@@ -14,6 +14,9 @@ COPY . .
 # Build da aplicação (com dev dependencies disponíveis)
 RUN npm run build
 
+# Build do servidor de produção (SEM VITE)
+RUN npx esbuild server/prod.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --outbase=server
+
 # Limpar dev dependencies após o build
 RUN npm prune --production
 
@@ -23,5 +26,5 @@ RUN npm run db:push --force || true
 # Expor porta
 EXPOSE 5000
 
-# Comando de inicialização
-CMD ["npm", "start"]
+# Comando de inicialização (usando servidor de produção)
+CMD ["node", "dist/prod.js"]
