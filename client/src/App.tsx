@@ -142,18 +142,18 @@ function Router() {
           )}
         </Route>
         <Route path="/tournaments/:id">
-          {(params) => (
+          {() => (
             <ProtectedRoute>
               <Navbar />
-              <TournamentDetail id={params.id} />
+              <TournamentDetail />
             </ProtectedRoute>
           )}
         </Route>
         <Route path="/tournaments/:id/scoring">
-          {(params) => (
+          {() => (
             <ProtectedRoute>
               <Navbar />
-              <ScoringInfo id={params.id} />
+              <ScoringInfo />
             </ProtectedRoute>
           )}
         </Route>
