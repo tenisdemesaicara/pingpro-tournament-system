@@ -122,12 +122,14 @@ async function initializeDatabase() {
     await client.query('SELECT 1');
     log('Database connection successful ✓', 'database');
     
-    // Apply schema directly using SQL (reliable for production)
-    const createSchemaSql = `
-      -- Enable UUID extension (correct one for gen_random_uuid)
-      CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-      
-      -- Athletes table
+    // Apply schema step by step (better error isolation)
+    
+    // Step 1: Enable extension
+    await client.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto";');
+    log('✓ PostgreSQL pgcrypto extension enabled', 'database');
+    
+    // Step 2: Core tables
+    const coreTablesSQL = `
       CREATE TABLE IF NOT EXISTS athletes (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL,
@@ -156,7 +158,6 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       );
       
-      -- Categories table
       CREATE TABLE IF NOT EXISTS categories (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL,
@@ -167,7 +168,6 @@ async function initializeDatabase() {
         skill_level TEXT NOT NULL DEFAULT 'all'
       );
       
-      -- Tournaments table
       CREATE TABLE IF NOT EXISTS tournaments (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL,
@@ -189,8 +189,12 @@ async function initializeDatabase() {
         scoring_system JSON,
         created_at TIMESTAMP DEFAULT NOW()
       );
-      
-      -- Tournament participants table
+    `;
+    await client.query(coreTablesSQL);
+    log('✓ Core tables created (athletes, categories, tournaments)', 'database');
+    
+    // Step 3: Junction and match tables  
+    const matchTablesSQL = `
       CREATE TABLE IF NOT EXISTS tournament_participants (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         tournament_id VARCHAR NOT NULL,
@@ -201,7 +205,16 @@ async function initializeDatabase() {
         registered_at TIMESTAMP DEFAULT NOW()
       );
       
-      -- Matches table
+      CREATE TABLE IF NOT EXISTS tournament_categories (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        tournament_id VARCHAR NOT NULL,
+        category_id VARCHAR NOT NULL,
+        format TEXT NOT NULL DEFAULT 'single_elimination',
+        max_participants INTEGER,
+        current_participants INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      
       CREATE TABLE IF NOT EXISTS matches (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         tournament_id VARCHAR NOT NULL,
@@ -227,19 +240,12 @@ async function initializeDatabase() {
         next_match_id VARCHAR,
         next_match_slot INTEGER
       );
-      
-      -- Tournament categories table (missing!)
-      CREATE TABLE IF NOT EXISTS tournament_categories (
-        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-        tournament_id VARCHAR NOT NULL,
-        category_id VARCHAR NOT NULL,
-        format TEXT NOT NULL DEFAULT 'single_elimination',
-        max_participants INTEGER,
-        current_participants INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-      
-      -- External links table (missing!)
+    `;
+    await client.query(matchTablesSQL);
+    log('✓ Match and tournament tables created', 'database');
+    
+    // Step 4: Additional tables
+    const additionalTablesSQL = `
       CREATE TABLE IF NOT EXISTS external_links (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         short_code VARCHAR(32) NOT NULL UNIQUE,
@@ -257,7 +263,6 @@ async function initializeDatabase() {
         updated_at TIMESTAMP DEFAULT NOW()
       );
       
-      -- Consents table (missing!)  
       CREATE TABLE IF NOT EXISTS consents (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         tournament_id VARCHAR NOT NULL,
@@ -279,8 +284,12 @@ async function initializeDatabase() {
         user_agent TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       );
-      
-      -- Create essential indexes
+    `;
+    await client.query(additionalTablesSQL);
+    log('✓ Additional tables created (external_links, consents)', 'database');
+    
+    // Step 5: Indexes
+    const indexesSQL = `
       CREATE INDEX IF NOT EXISTS idx_athletes_email ON athletes(email);
       CREATE INDEX IF NOT EXISTS idx_tournament_participants_tournament ON tournament_participants(tournament_id);
       CREATE INDEX IF NOT EXISTS idx_matches_tournament ON matches(tournament_id);
@@ -288,8 +297,8 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_external_links_code ON external_links(short_code);
       CREATE INDEX IF NOT EXISTS idx_consents_tournament ON consents(tournament_id);
     `;
-    
-    await client.query(createSchemaSql);
+    await client.query(indexesSQL);
+    log('✓ Database indexes created', 'database');
     client.release();
     
     log('Database schema applied successfully ✓', 'database');
