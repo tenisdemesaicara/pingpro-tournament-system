@@ -11,14 +11,17 @@ RUN npm ci
 # Copiar código fonte
 COPY . .
 
-# Build da aplicação (agora tem acesso às dev dependencies)
+# Build da aplicação (com dev dependencies disponíveis)
 RUN npm run build
 
-# Limpar dev dependencies para economizar espaço
+# Limpar dev dependencies após o build
 RUN npm prune --production
 
+# Aplicar schema do banco
+RUN npm run db:push --force || true
+
 # Expor porta
-EXPOSE 10000
+EXPOSE 5000
 
 # Comando de inicialização
 CMD ["npm", "start"]
