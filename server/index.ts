@@ -47,6 +47,11 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Configuração de sessão
 const isProduction = process.env.NODE_ENV === 'production';
+console.log('🔍 DEBUG SESSION CONFIG:', {
+  nodeEnv: process.env.NODE_ENV,
+  isProduction,
+  sameSite: isProduction ? 'none' : 'lax'
+});
 
 // Configure session store based on environment
 const sessionConfig: any = {
