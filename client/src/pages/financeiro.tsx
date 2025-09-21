@@ -48,6 +48,7 @@ export default function FinanceiroSimples() {
   // States para Receitas
   const [isRevenueDialogOpen, setIsRevenueDialogOpen] = useState(false);
   const [isEditRevenueDialogOpen, setIsEditRevenueDialogOpen] = useState(false);
+  const [isMarkRevenueAsReceivedDialogOpen, setIsMarkRevenueAsReceivedDialogOpen] = useState(false);
   const [selectedRevenue, setSelectedRevenue] = useState<Revenue | null>(null);
   const [revenueFormData, setRevenueFormData] = useState({
     amount: "",
@@ -65,6 +66,7 @@ export default function FinanceiroSimples() {
   // States para Despesas
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [isEditExpenseDialogOpen, setIsEditExpenseDialogOpen] = useState(false);
+  const [isMarkExpenseAsPaidDialogOpen, setIsMarkExpenseAsPaidDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState({
     amount: "",
@@ -79,6 +81,14 @@ export default function FinanceiroSimples() {
   const [expenseFilterStartDate, setExpenseFilterStartDate] = useState(currentMonthDates.start);
   const [expenseFilterEndDate, setExpenseFilterEndDate] = useState(currentMonthDates.end);
   const [paymentData, setPaymentData] = useState({
+    paymentDate: new Date().toISOString().split('T')[0],
+    paymentMethod: "pix",
+  });
+  const [revenuePaymentData, setRevenuePaymentData] = useState({
+    paymentDate: new Date().toISOString().split('T')[0],
+    paymentMethod: "pix",
+  });
+  const [expensePaymentData, setExpensePaymentData] = useState({
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: "pix",
   });
@@ -283,6 +293,120 @@ export default function FinanceiroSimples() {
     },
   });
 
+  // Mutation para extornar pagamento
+  const reversePaymentMutation = useMutation({
+    mutationFn: async ({ paymentId, reason }: { paymentId: string; reason: string }) => {
+      const response = await apiRequest('PATCH', `/api/payments/${paymentId}/reverse`, { reason });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      toast({
+        title: "Sucesso!",
+        description: "Pagamento extornado com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao extornar pagamento.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutations para receitas
+  const markRevenueAsPaidMutation = useMutation({
+    mutationFn: async ({ revenueId, paymentDate, paymentMethod }: { revenueId: string, paymentDate: string, paymentMethod: string }) => {
+      const response = await apiRequest('PATCH', `/api/revenues/${revenueId}/pay`, { 
+        paymentDate, 
+        paymentMethod 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/revenues'] });
+      toast({
+        title: "Sucesso!",
+        description: "Receita marcada como recebida.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao marcar receita como recebida.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reverseRevenueMutation = useMutation({
+    mutationFn: async ({ revenueId, reason }: { revenueId: string; reason: string }) => {
+      const response = await apiRequest('PATCH', `/api/revenues/${revenueId}/reverse`, { reason });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/revenues'] });
+      toast({
+        title: "Sucesso!",
+        description: "Receita extornada com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao extornar receita.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutations para despesas
+  const markExpenseAsPaidMutation = useMutation({
+    mutationFn: async ({ expenseId, paymentDate, paymentMethod }: { expenseId: string, paymentDate: string, paymentMethod: string }) => {
+      const response = await apiRequest('PATCH', `/api/expenses/${expenseId}/pay`, { 
+        paymentDate, 
+        paymentMethod 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
+      toast({
+        title: "Sucesso!",
+        description: "Despesa marcada como paga.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao marcar despesa como paga.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reverseExpenseMutation = useMutation({
+    mutationFn: async ({ expenseId, reason }: { expenseId: string; reason: string }) => {
+      const response = await apiRequest('PATCH', `/api/expenses/${expenseId}/reverse`, { reason });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
+      toast({
+        title: "Sucesso!",
+        description: "Despesa extornada com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao extornar despesa.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Função para criar pagamentos
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -333,6 +457,16 @@ export default function FinanceiroSimples() {
     
     if (!selectedPayment) return;
 
+    // Validações corretas para paymentData
+    if (!paymentData.paymentDate || !paymentData.paymentMethod) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios: data do pagamento e método de pagamento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await markAsPaidMutation.mutateAsync({
         paymentId: selectedPayment.id,
@@ -340,7 +474,114 @@ export default function FinanceiroSimples() {
         paymentMethod: paymentData.paymentMethod,
       });
     } catch (error) {
-      console.error("Erro ao marcar como pago:", error);
+      console.error("Erro ao marcar pagamento como pago:", error);
+    }
+  };
+
+  // Funções para extornar e marcar como pago
+  const handleReversePayment = async (payment: Payment) => {
+    const reason = prompt("Motivo do estorno:");
+    if (!reason) return;
+
+    try {
+      await reversePaymentMutation.mutateAsync({
+        paymentId: payment.id,
+        reason,
+      });
+    } catch (error) {
+      console.error("Erro ao extornar pagamento:", error);
+    }
+  };
+
+  const openMarkRevenueAsReceivedDialog = (revenue: Revenue) => {
+    setSelectedRevenue(revenue);
+    setIsMarkRevenueAsReceivedDialogOpen(true);
+  };
+
+  const handleMarkRevenueAsPaid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedRevenue) return;
+
+    // Validações corretas para revenuePaymentData
+    if (!revenuePaymentData.paymentDate || !revenuePaymentData.paymentMethod) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios: data do recebimento e método de pagamento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await markRevenueAsPaidMutation.mutateAsync({
+        revenueId: selectedRevenue.id,
+        paymentDate: revenuePaymentData.paymentDate,
+        paymentMethod: revenuePaymentData.paymentMethod,
+      });
+      setIsMarkRevenueAsReceivedDialogOpen(false);
+    } catch (error) {
+      console.error("Erro ao marcar receita como recebida:", error);
+    }
+  };
+
+  const handleReverseRevenue = async (revenue: Revenue) => {
+    const reason = prompt("Motivo do estorno:");
+    if (!reason) return;
+
+    try {
+      await reverseRevenueMutation.mutateAsync({
+        revenueId: revenue.id,
+        reason,
+      });
+    } catch (error) {
+      console.error("Erro ao extornar receita:", error);
+    }
+  };
+
+  const openMarkExpenseAsPaidDialog = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setIsMarkExpenseAsPaidDialogOpen(true);
+  };
+
+  const handleMarkExpenseAsPaid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedExpense) return;
+
+    // Validações corretas para expensePaymentData
+    if (!expensePaymentData.paymentDate || !expensePaymentData.paymentMethod) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios: data do pagamento e método de pagamento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await markExpenseAsPaidMutation.mutateAsync({
+        expenseId: selectedExpense.id,
+        paymentDate: expensePaymentData.paymentDate,
+        paymentMethod: expensePaymentData.paymentMethod,
+      });
+      setIsMarkExpenseAsPaidDialogOpen(false);
+    } catch (error) {
+      console.error("Erro ao marcar despesa como paga:", error);
+    }
+  };
+
+  const handleReverseExpense = async (expense: Expense) => {
+    const reason = prompt("Motivo do estorno:");
+    if (!reason) return;
+
+    try {
+      await reverseExpenseMutation.mutateAsync({
+        expenseId: expense.id,
+        reason,
+      });
+    } catch (error) {
+      console.error("Erro ao extornar despesa:", error);
     }
   };
 
@@ -581,13 +822,17 @@ export default function FinanceiroSimples() {
         revenue.category === 'torneios' ? 'Torneios' :
         revenue.category === 'equipamentos' ? 'Equipamentos' : 'Outros',
         revenue.paymentMethod === 'pix' ? 'PIX' :
-        revenue.paymentMethod === 'credit_card' ? 'Cartão' :
-        revenue.paymentMethod === 'bank_transfer' ? 'Transferência' : 'Dinheiro'
+        revenue.paymentMethod === 'dinheiro' ? 'Dinheiro' :
+        revenue.paymentMethod === 'cartao' ? 'Cartão' :
+        revenue.paymentMethod === 'transferencia' ? 'Transferência' : (revenue.paymentMethod || '-'),
+        revenue.status === 'received' ? 
+          (revenue.paymentDate ? new Date(revenue.paymentDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'Recebida') :
+          'Pendente'
       ]);
 
       autoTable(doc, {
         startY: currentY,
-        head: [['Data', 'Valor', 'Descrição', 'Categoria', 'Método']],
+        head: [['Data', 'Valor', 'Descrição', 'Categoria', 'Método', 'Status']],
         body: receitasTableData,
         theme: 'striped',
         headStyles: {
@@ -620,17 +865,23 @@ export default function FinanceiroSimples() {
         new Date(expense.date + 'T00:00:00').toLocaleDateString('pt-BR'),
         `R$ ${parseFloat(expense.amount.toString()).toFixed(2)}`,
         expense.description,
-        expense.category === 'aluguel' ? 'Aluguel' :
-        expense.category === 'equipamentos' ? 'Equipamentos' :
-        expense.category === 'marketing' ? 'Marketing' : 'Outros',
+        expense.category === 'material' ? 'Material' :
+        expense.category === 'equipamento' ? 'Equipamento' :
+        expense.category === 'local' ? 'Local' :
+        expense.category === 'alimentacao' ? 'Alimentação' :
+        expense.category === 'transporte' ? 'Transporte' : 'Outros',
         expense.paymentMethod === 'pix' ? 'PIX' :
-        expense.paymentMethod === 'credit_card' ? 'Cartão' :
-        expense.paymentMethod === 'bank_transfer' ? 'Transferência' : 'Dinheiro'
+        expense.paymentMethod === 'dinheiro' ? 'Dinheiro' :
+        expense.paymentMethod === 'cartao' ? 'Cartão' :
+        expense.paymentMethod === 'transferencia' ? 'Transferência' : (expense.paymentMethod || '-'),
+        expense.status === 'paid' ? 
+          (expense.paymentDate ? new Date(expense.paymentDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'Paga') :
+          'Pendente'
       ]);
 
       autoTable(doc, {
         startY: currentY,
-        head: [['Data', 'Valor', 'Descrição', 'Categoria', 'Método']],
+        head: [['Data', 'Valor', 'Descrição', 'Categoria', 'Método', 'Status']],
         body: despesasTableData,
         theme: 'striped',
         headStyles: {
@@ -1298,19 +1549,32 @@ export default function FinanceiroSimples() {
                               <TableCell>{payment.reference || 'N/A'}</TableCell>
                               <TableCell>
                                 <div className="flex gap-2">
-                                  {payment.status === 'pending' && (
+                                  {payment.status !== 'paid' && (
                                     <Button
                                       size="sm"
                                       onClick={() => openPayDialog(payment)}
                                       disabled={markAsPaidMutation.isPending}
+                                      data-testid="button-marcar-pago"
                                     >
                                       Marcar como Pago
+                                    </Button>
+                                  )}
+                                  {payment.status === 'paid' && !payment.isReversed && (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => handleReversePayment(payment)}
+                                      disabled={reversePaymentMutation.isPending}
+                                      data-testid="button-extornar-cobranca"
+                                    >
+                                      Extornar
                                     </Button>
                                   )}
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => openEditDialog(payment)}
+                                    data-testid="button-editar-cobranca"
                                   >
                                     Editar
                                   </Button>
@@ -1318,6 +1582,7 @@ export default function FinanceiroSimples() {
                                     size="sm"
                                     variant="destructive"
                                     onClick={() => handleDeletePayment(payment.id)}
+                                    data-testid="button-excluir-cobranca"
                                   >
                                     Excluir
                                   </Button>
@@ -1542,6 +1807,7 @@ export default function FinanceiroSimples() {
                           <TableHead>Descrição</TableHead>
                           <TableHead>Categoria</TableHead>
                           <TableHead>Método</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1561,14 +1827,47 @@ export default function FinanceiroSimples() {
                             <TableCell>
                               {revenue.paymentMethod === 'pix' ? 'PIX' :
                                revenue.paymentMethod === 'dinheiro' ? 'Dinheiro' :
-                               revenue.paymentMethod === 'cartao' ? 'Cartão' : 'Transferência'}
+                               revenue.paymentMethod === 'cartao' ? 'Cartão' :
+                               revenue.paymentMethod === 'transferencia' ? 'Transferência' : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={
+                                revenue.status === 'received' ? 'default' :
+                                revenue.status === 'pending' ? 'secondary' : 'destructive'
+                              }>
+                                {revenue.status === 'received' ? 'Recebida' : 
+                                 revenue.status === 'pending' ? 'Pendente' : 'Cancelada'}
+                              </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
+                                {revenue.status !== 'received' && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => openMarkRevenueAsReceivedDialog(revenue)}
+                                    disabled={markRevenueAsPaidMutation.isPending}
+                                    data-testid="button-marcar-receita-paga"
+                                  >
+                                    Marcar como Recebida
+                                  </Button>
+                                )}
+                                {revenue.status === 'received' && !revenue.isReversed && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => handleReverseRevenue(revenue)}
+                                    disabled={reverseRevenueMutation.isPending}
+                                    data-testid="button-extornar-receita"
+                                  >
+                                    Extornar
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleEditRevenue(revenue)}
+                                  data-testid="button-editar-receita"
                                 >
                                   Editar
                                 </Button>
@@ -1576,6 +1875,7 @@ export default function FinanceiroSimples() {
                                   size="sm"
                                   variant="destructive"
                                   onClick={() => handleDeleteRevenue(revenue.id)}
+                                  data-testid="button-excluir-receita"
                                 >
                                   Excluir
                                 </Button>
@@ -1803,6 +2103,7 @@ export default function FinanceiroSimples() {
                           <TableHead>Descrição</TableHead>
                           <TableHead>Categoria</TableHead>
                           <TableHead>Método</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1824,14 +2125,47 @@ export default function FinanceiroSimples() {
                             <TableCell>
                               {expense.paymentMethod === 'pix' ? 'PIX' :
                                expense.paymentMethod === 'dinheiro' ? 'Dinheiro' :
-                               expense.paymentMethod === 'cartao' ? 'Cartão' : 'Transferência'}
+                               expense.paymentMethod === 'cartao' ? 'Cartão' :
+                               expense.paymentMethod === 'transferencia' ? 'Transferência' : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={
+                                expense.status === 'paid' ? 'default' :
+                                expense.status === 'pending' ? 'secondary' : 'destructive'
+                              }>
+                                {expense.status === 'paid' ? 'Paga' : 
+                                 expense.status === 'pending' ? 'Pendente' : 'Cancelada'}
+                              </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
+                                {expense.status !== 'paid' && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => openMarkExpenseAsPaidDialog(expense)}
+                                    disabled={markExpenseAsPaidMutation.isPending}
+                                    data-testid="button-marcar-despesa-paga"
+                                  >
+                                    Marcar como Paga
+                                  </Button>
+                                )}
+                                {expense.status === 'paid' && !expense.isReversed && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => handleReverseExpense(expense)}
+                                    disabled={reverseExpenseMutation.isPending}
+                                    data-testid="button-extornar-despesa"
+                                  >
+                                    Extornar
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleEditExpense(expense)}
+                                  data-testid="button-editar-despesa"
                                 >
                                   Editar
                                 </Button>
@@ -1839,6 +2173,7 @@ export default function FinanceiroSimples() {
                                   size="sm"
                                   variant="destructive"
                                   onClick={() => handleDeleteExpense(expense.id)}
+                                  data-testid="button-excluir-despesa"
                                 >
                                   Excluir
                                 </Button>
@@ -2233,6 +2568,112 @@ export default function FinanceiroSimples() {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog para Marcar Receita como Recebida */}
+        <Dialog open={isMarkRevenueAsReceivedDialogOpen} onOpenChange={setIsMarkRevenueAsReceivedDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Marcar Receita como Recebida</DialogTitle>
+            </DialogHeader>
+            
+            {selectedRevenue && (
+              <form onSubmit={handleMarkRevenueAsPaid} className="space-y-4">
+                <div className="space-y-2">
+                  <p><strong>Descrição:</strong> {selectedRevenue.description}</p>
+                  <p><strong>Valor:</strong> R$ {parseFloat(selectedRevenue.amount).toFixed(2)}</p>
+                  <p><strong>Data:</strong> {new Date(selectedRevenue.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Data do Recebimento *</label>
+                  <Input
+                    type="date"
+                    value={revenuePaymentData.paymentDate}
+                    onChange={(e) => setRevenuePaymentData({ ...revenuePaymentData, paymentDate: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Método de Recebimento *</label>
+                  <Select value={revenuePaymentData.paymentMethod} onValueChange={(value) => setRevenuePaymentData({ ...revenuePaymentData, paymentMethod: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="cartao">Cartão</SelectItem>
+                      <SelectItem value="transferencia">Transferência</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsMarkRevenueAsReceivedDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={markRevenueAsPaidMutation.isPending}>
+                    {markRevenueAsPaidMutation.isPending ? "Marcando..." : "Marcar como Recebida"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog para Marcar Despesa como Paga */}
+        <Dialog open={isMarkExpenseAsPaidDialogOpen} onOpenChange={setIsMarkExpenseAsPaidDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Marcar Despesa como Paga</DialogTitle>
+            </DialogHeader>
+            
+            {selectedExpense && (
+              <form onSubmit={handleMarkExpenseAsPaid} className="space-y-4">
+                <div className="space-y-2">
+                  <p><strong>Descrição:</strong> {selectedExpense.description}</p>
+                  <p><strong>Valor:</strong> R$ {parseFloat(selectedExpense.amount).toFixed(2)}</p>
+                  <p><strong>Data:</strong> {new Date(selectedExpense.date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Data do Pagamento *</label>
+                  <Input
+                    type="date"
+                    value={expensePaymentData.paymentDate}
+                    onChange={(e) => setExpensePaymentData({ ...expensePaymentData, paymentDate: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Método de Pagamento *</label>
+                  <Select value={expensePaymentData.paymentMethod} onValueChange={(value) => setExpensePaymentData({ ...expensePaymentData, paymentMethod: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="cartao">Cartão</SelectItem>
+                      <SelectItem value="transferencia">Transferência</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsMarkExpenseAsPaidDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={markExpenseAsPaidMutation.isPending}>
+                    {markExpenseAsPaidMutation.isPending ? "Marcando..." : "Marcar como Paga"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </DialogContent>
         </Dialog>
       </div>

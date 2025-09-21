@@ -230,6 +230,10 @@ export const payments = pgTable("payments", {
   description: text("description"),
   paymentMethod: text("payment_method"), // dinheiro, pix, cartao, transferencia
   reference: text("reference"), // mês/ano ou descrição da cobrança
+  isReversed: boolean("is_reversed").default(false), // indica se o pagamento foi extornado
+  reversedAt: timestamp("reversed_at"), // data/hora do estorno
+  reversedBy: text("reversed_by"), // usuário que fez o estorno
+  reversalReason: text("reversal_reason"), // motivo do estorno
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -254,6 +258,11 @@ export const revenues = pgTable("revenues", {
   paymentMethod: text("payment_method"), // dinheiro, pix, cartao, transferencia
   athleteId: varchar("athlete_id").references(() => athletes.id), // opcional, para receitas vinculadas a atletas
   paymentId: varchar("payment_id").references(() => payments.id), // referência ao pagamento que gerou esta receita
+  status: text("status").notNull().default("pending"), // received, pending, cancelled
+  isReversed: boolean("is_reversed").default(false), // indica se a receita foi extornada
+  reversedAt: timestamp("reversed_at"), // data/hora do estorno
+  reversedBy: text("reversed_by"), // usuário que fez o estorno
+  reversalReason: text("reversal_reason"), // motivo do estorno
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -268,6 +277,11 @@ export const expenses = pgTable("expenses", {
   category: text("category").notNull(), // material, equipamento, local, alimentacao, transporte, outros
   paymentMethod: text("payment_method"), // dinheiro, pix, cartao, transferencia
   supplier: text("supplier"), // fornecedor/prestador de serviço
+  status: text("status").notNull().default("pending"), // paid, pending, cancelled
+  isReversed: boolean("is_reversed").default(false), // indica se a despesa foi extornada
+  reversedAt: timestamp("reversed_at"), // data/hora do estorno
+  reversedBy: text("reversed_by"), // usuário que fez o estorno
+  reversalReason: text("reversal_reason"), // motivo do estorno
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -768,6 +782,109 @@ export type RolePermission = typeof rolePermissions.$inferSelect;
 export type UserSession = typeof userSessions.$inferSelect;
 export type UserActivityLog = typeof userActivityLog.$inferSelect;
 
+// CONTROLE PATRIMONIAL
+export const assets = pgTable("assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetCode: varchar("asset_code").notNull().unique(), // PAT-YYYY-0001
+  
+  // Identificação básica
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // móvel, imóvel, eletrônico, material esportivo, etc.
+  brand: text("brand"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  
+  // Informações de aquisição
+  acquisitionDate: date("acquisition_date").notNull(),
+  supplier: text("supplier"),
+  invoiceNumber: text("invoice_number"),
+  acquisitionValue: decimal("acquisition_value", { precision: 12, scale: 2 }).notNull(),
+  acquisitionMethod: text("acquisition_method").notNull(), // compra, doação, patrocínio, etc.
+  
+  // Localização e responsável
+  location: text("location").notNull(), // sede, sala de treino, ginásio
+  responsible: text("responsible").notNull(), // diretor, técnico, associado
+  situation: text("situation").notNull().default("in_use"), // in_use, loaned, stored, maintenance
+  
+  // Depreciação e vida útil
+  lifeYears: integer("life_years"), // vida útil em anos
+  residualValue: decimal("residual_value", { precision: 12, scale: 2 }),
+  depreciationMethod: text("depreciation_method").default("straight_line"), // linha reta, etc.
+  depreciationStartDate: date("depreciation_start_date"),
+  
+  // Conservação e controle
+  condition: text("condition").notNull().default("good"), // new, good, fair, poor
+  lastMaintenanceDate: date("last_maintenance_date"),
+  lastMaintenanceDescription: text("last_maintenance_description"),
+  nextMaintenanceDate: date("next_maintenance_date"),
+  warrantyUntil: date("warranty_until"),
+  
+  // Outros
+  notes: text("notes"),
+  photoUrls: text("photo_urls").array(),
+  documentUrls: text("document_urls").array(),
+  
+  // Controle
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Schema de inserção para controle patrimonial
+export const insertAssetSchema = createInsertSchema(assets).omit({
+  id: true,
+  assetCode: true, // Gerado automaticamente
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  // Validações específicas
+  category: z.enum([
+    "movel", 
+    "imovel", 
+    "eletronico", 
+    "material_esportivo", 
+    "equipamento_mesa", 
+    "material_escritorio", 
+    "veiculo", 
+    "outros"
+  ]),
+  acquisitionMethod: z.enum([
+    "compra", 
+    "doacao", 
+    "patrocinio", 
+    "transferencia", 
+    "outros"
+  ]),
+  situation: z.enum([
+    "in_use", 
+    "loaned", 
+    "stored", 
+    "maintenance", 
+    "disposed"
+  ]),
+  condition: z.enum([
+    "new", 
+    "good", 
+    "fair", 
+    "poor"
+  ]),
+  depreciationMethod: z.enum([
+    "straight_line", 
+    "declining_balance", 
+    "none"
+  ]).optional(),
+  acquisitionValue: z.union([z.string(), z.number()]).transform((val) => typeof val === 'string' ? parseFloat(val) : val),
+  residualValue: z.string().transform((val) => val ? parseFloat(val) : null).optional(),
+  lifeYears: z.number().min(1).max(100).optional(),
+  photoUrls: z.array(z.string()).optional(),
+  documentUrls: z.array(z.string()).optional(),
+});
+
+// Tipos derivados para assets
+export type Asset = typeof assets.$inferSelect;
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+
 // Tipos compostos para APIs
 export type UserWithRoles = User & {
   roles: (Role & { permissions: Permission[] })[];
@@ -781,4 +898,25 @@ export type RoleWithPermissions = Role & {
 export type UserProfile = Omit<User, 'passwordHash'> & {
   roles: Role[];
 };
+
+// Configurações do Sistema
+export const systemSettings = pgTable("system_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // favicon, site_title, logo, etc.
+  value: text("value"), // valor da configuração
+  fileUrl: text("file_url"), // URL do arquivo para uploads (favicon, logo, etc.)
+  description: text("description"), // descrição da configuração
+  category: text("category").notNull().default("general"), // general, appearance, system
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 

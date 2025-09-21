@@ -60,7 +60,7 @@ export default function Login() {
           <Shield className="w-16 h-16 text-primary mx-auto mb-4" />
           <CardTitle className="text-2xl" data-testid="text-login-title">Entrar no Sistema</CardTitle>
           <CardDescription className="text-gray-600 dark:text-gray-400" data-testid="text-login-subtitle">
-            Associação Mesatenista de Içara
+            Sistema de Gestão de Tênis de Mesa
           </CardDescription>
         </CardHeader>
         <CardContent>

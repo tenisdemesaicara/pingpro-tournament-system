@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, Users, Trophy, BarChart3, LogIn, UserPlus, Eye } from "lucide-react";
+import { CreditCard, Users, Trophy, BarChart3, LogIn, UserPlus, Eye, Zap, Target } from "lucide-react";
 
 export default function Home() {
   const actions = [
@@ -72,14 +72,18 @@ export default function Home() {
       <section className="relative bg-gradient-to-br from-blue-600 to-blue-800 dark:from-blue-800 dark:to-blue-900 text-white py-20 lg:py-32">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex justify-center items-center mb-6">
+            <Target className="h-12 w-12 md:h-16 md:w-16 text-blue-200 mr-4" />
+            <Zap className="h-8 w-8 md:h-12 md:w-12 text-white" />
+          </div>
           <h1 className="text-4xl md:text-6xl font-bold mb-6" data-testid="text-hero-title">
-            Gestão da Associação
+            Sistema de Gestão
             <br />
-            <span className="text-blue-200">Mesatenista de Içara</span>
+            <span className="text-blue-200">Clube de Tênis de Mesa</span>
           </h1>
           <p className="text-xl md:text-2xl mb-12 text-blue-100 max-w-3xl mx-auto" data-testid="text-hero-subtitle">
-            Controle financeiro, mensalidades, atletas, associados, torneios e ranking em uma única plataforma
-            fácil de usar.
+            Complete sua gestão esportiva: controle financeiro, atletas, torneios e ranking em uma plataforma 
+            profissional e intuitiva.
           </p>
           
           {/* Botões de Ação Principal */}
@@ -159,7 +163,7 @@ export default function Home() {
             Sobre o Sistema
           </h2>
           <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed">
-            A Associação Mesatenista de Içara agora conta com um sistema digital que une gestão administrativa, 
+            Plataforma completa para clubes e associações de tênis de mesa que une gestão administrativa, 
             financeira e esportiva em um só ambiente. Simples, ágil e confiável.
           </p>
         </div>
@@ -172,7 +176,7 @@ export default function Home() {
             Mais tempo para o esporte, menos preocupação com a gestão.
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Simplifique a administração da sua associação e foque no que realmente importa.
+            Simplifique a administração do seu clube e foque no que realmente importa: desenvolver o tênis de mesa.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/login">

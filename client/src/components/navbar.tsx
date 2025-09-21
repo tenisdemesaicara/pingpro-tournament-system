@@ -20,6 +20,7 @@ export default function Navbar() {
     { href: "/tournaments", label: "Torneios", testId: "nav-tournaments" },
     { href: "/ranking", label: "Ranking", testId: "nav-ranking" },
     { href: "/financeiro", label: "Financeiro", testId: "nav-financeiro" },
+    { href: "/patrimonio", label: "Patrimônio", testId: "nav-patrimonio" },
   ];
 
   const registrationItems = [

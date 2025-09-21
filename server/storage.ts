@@ -1,4 +1,4 @@
-import { type Athlete, type InsertAthlete, type Tournament, type InsertTournament, type TournamentParticipant, type InsertTournamentParticipant, type TournamentParticipantWithAthlete, type Match, type InsertMatch, type Community, type InsertCommunity, type Category, type InsertCategory, type TournamentWithParticipants, type Payment, type InsertPayment, type Revenue, type InsertRevenue, type Expense, type InsertExpense, type RankingSeason, type InsertRankingSeason, type Consent, type InsertConsent, type ExternalLink, type InsertExternalLink, athletes, tournaments, tournamentParticipants, matches, communities, categories, tournamentCategories, payments, revenues, expenses, rankingSeasons, consents, externalLinks } from "@shared/schema";
+import { type Athlete, type InsertAthlete, type Tournament, type InsertTournament, type TournamentParticipant, type InsertTournamentParticipant, type TournamentParticipantWithAthlete, type Match, type InsertMatch, type Community, type InsertCommunity, type Category, type InsertCategory, type TournamentWithParticipants, type Payment, type InsertPayment, type Revenue, type InsertRevenue, type Expense, type InsertExpense, type RankingSeason, type InsertRankingSeason, type Consent, type InsertConsent, type ExternalLink, type InsertExternalLink, type Asset, type InsertAsset, type SystemSetting, type InsertSystemSetting, athletes, tournaments, tournamentParticipants, matches, communities, categories, tournamentCategories, payments, revenues, expenses, rankingSeasons, consents, externalLinks, assets, systemSettings } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, desc, asc, and, sql } from "drizzle-orm";
@@ -88,6 +88,24 @@ export interface IStorage {
   updateExternalLink(id: string, link: Partial<InsertExternalLink>): Promise<ExternalLink | undefined>;
   deleteExternalLink(id: string): Promise<boolean>;
   incrementLinkAccess(shortCode: string): Promise<void>;
+
+  // Assets (Controle Patrimonial)
+  getAsset(id: string): Promise<Asset | undefined>;
+  getAllAssets(): Promise<Asset[]>;
+  getActiveAssets(): Promise<Asset[]>;
+  createAsset(asset: InsertAsset): Promise<Asset>;
+  updateAsset(id: string, asset: Partial<InsertAsset>): Promise<Asset | undefined>;
+  deleteAsset(id: string): Promise<boolean>;
+  inactivateAsset(id: string): Promise<Asset | undefined>;
+  activateAsset(id: string): Promise<Asset | undefined>;
+  getAssetsByCategory(category: string): Promise<Asset[]>;
+  getAssetsBySituation(situation: string): Promise<Asset[]>;
+
+  // System Settings
+  getSystemSetting(key: string): Promise<any>;
+  getAllSystemSettings(): Promise<any[]>;
+  createOrUpdateSystemSetting(key: string, value?: string, fileUrl?: string, description?: string, category?: string): Promise<any>;
+  deleteSystemSetting(key: string): Promise<boolean>;
 }
 
 // Implementação simplificada
@@ -1050,6 +1068,147 @@ export class DatabaseStorage implements IStorage {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
+  }
+
+  // Assets (Controle Patrimonial)
+  private async generateAssetCode(): Promise<string> {
+    const currentYear = new Date().getFullYear();
+    const prefix = `PAT-${currentYear}-`;
+    
+    // Busca o último código do ano atual
+    const latestAssets = await db.select()
+      .from(assets)
+      .where(sql`asset_code LIKE ${prefix + '%'}`)
+      .orderBy(desc(assets.assetCode))
+      .limit(1);
+    
+    let nextNumber = 1;
+    if (latestAssets.length > 0) {
+      const lastCode = latestAssets[0].assetCode;
+      const numberPart = lastCode.split('-').pop();
+      if (numberPart) {
+        nextNumber = parseInt(numberPart) + 1;
+      }
+    }
+    
+    return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+  }
+
+  async getAsset(id: string): Promise<Asset | undefined> {
+    const results = await db.select().from(assets).where(eq(assets.id, id));
+    return results[0];
+  }
+
+  async getAllAssets(): Promise<Asset[]> {
+    return await db.select().from(assets).orderBy(desc(assets.createdAt));
+  }
+
+  async getActiveAssets(): Promise<Asset[]> {
+    return await db.select().from(assets)
+      .where(eq(assets.isActive, true))
+      .orderBy(desc(assets.createdAt));
+  }
+
+  async createAsset(asset: InsertAsset): Promise<Asset> {
+    try {
+      const assetCode = await this.generateAssetCode();
+      const newAsset = { 
+        ...asset, 
+        id: randomUUID(),
+        assetCode,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      await db.insert(assets).values(newAsset);
+      return newAsset as Asset;
+    } catch (error) {
+      console.error("Error in createAsset:", error);
+      throw error;
+    }
+  }
+
+  async updateAsset(id: string, asset: Partial<InsertAsset>): Promise<Asset | undefined> {
+    await db.update(assets)
+      .set({ ...asset, updatedAt: new Date() })
+      .where(eq(assets.id, id));
+    return this.getAsset(id);
+  }
+
+  async deleteAsset(id: string): Promise<boolean> {
+    await db.delete(assets).where(eq(assets.id, id));
+    return true;
+  }
+
+  async inactivateAsset(id: string): Promise<Asset | undefined> {
+    await db.update(assets)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(assets.id, id));
+    return this.getAsset(id);
+  }
+
+  async activateAsset(id: string): Promise<Asset | undefined> {
+    await db.update(assets)
+      .set({ isActive: true, updatedAt: new Date() })
+      .where(eq(assets.id, id));
+    return this.getAsset(id);
+  }
+
+  async getAssetsByCategory(category: string): Promise<Asset[]> {
+    return await db.select().from(assets)
+      .where(and(eq(assets.category, category), eq(assets.isActive, true)))
+      .orderBy(desc(assets.createdAt));
+  }
+
+  async getAssetsBySituation(situation: string): Promise<Asset[]> {
+    return await db.select().from(assets)
+      .where(and(eq(assets.situation, situation), eq(assets.isActive, true)))
+      .orderBy(desc(assets.createdAt));
+  }
+
+  // System Settings
+  async getSystemSetting(key: string): Promise<any> {
+    const results = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
+    return results[0];
+  }
+
+  async getAllSystemSettings(): Promise<any[]> {
+    return await db.select().from(systemSettings).orderBy(asc(systemSettings.key));
+  }
+
+  async createOrUpdateSystemSetting(key: string, value?: string, fileUrl?: string, description?: string, category?: string): Promise<any> {
+    const existing = await this.getSystemSetting(key);
+    
+    const settingData = {
+      key,
+      value: value || null,
+      fileUrl: fileUrl || null,
+      description: description || null,
+      category: category || 'general',
+      updatedAt: new Date()
+    };
+
+    if (existing) {
+      // Atualizar existente
+      await db.update(systemSettings)
+        .set(settingData)
+        .where(eq(systemSettings.key, key));
+      return await this.getSystemSetting(key);
+    } else {
+      // Criar novo
+      const newSetting = {
+        ...settingData,
+        id: randomUUID(),
+        createdAt: new Date()
+      };
+      await db.insert(systemSettings).values(newSetting);
+      return newSetting;
+    }
+  }
+
+  async deleteSystemSetting(key: string): Promise<boolean> {
+    await db.delete(systemSettings).where(eq(systemSettings.key, key));
+    return true;
   }
 }
 

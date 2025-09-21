@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAthleteSchema, insertTournamentSchema, insertTournamentParticipantSchema, insertMatchSchema, insertCategorySchema, insertPaymentSchema, insertRevenueSchema, insertExpenseSchema, insertConsentSchema, insertExternalLinkSchema, tournamentRegistrationSchema } from "@shared/schema";
+import { insertAthleteSchema, insertTournamentSchema, insertTournamentParticipantSchema, insertMatchSchema, insertCategorySchema, insertPaymentSchema, insertRevenueSchema, insertExpenseSchema, insertConsentSchema, insertExternalLinkSchema, insertAssetSchema, tournamentRegistrationSchema } from "@shared/schema";
 import { calculateAgeInTournamentYear, isEligibleForCategory, extractYearFromDate } from "@shared/utils";
 import { eq, and, ne, or } from "drizzle-orm";
 import { z } from "zod";
@@ -24,6 +24,9 @@ import {
   userPermissionsSchema
 } from "@shared/schema";
 import bcrypt from 'bcrypt';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 import { generateGroupStageMatches, generateRoundRobinMatches, generateKnockoutMatches } from "./bracketUtils";
 import { BracketManager } from "./bracketLogic";
 
@@ -3056,7 +3059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!success) {
         return res.status(404).json({ error: "Payment not found" });
       }
-      res.status(204).send();
+      res.json({ message: "Payment deleted successfully" });
     } catch (error) {
       console.error("Error deleting payment:", error);
       res.status(500).json({ error: "Failed to delete payment" });
@@ -3122,7 +3125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!success) {
         return res.status(404).json({ error: "Revenue not found" });
       }
-      res.status(204).send();
+      res.json({ message: "Revenue deleted successfully" });
     } catch (error) {
       console.error("Error deleting revenue:", error);
       res.status(500).json({ error: "Failed to delete revenue" });
@@ -3188,10 +3191,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!success) {
         return res.status(404).json({ error: "Expense not found" });
       }
-      res.status(204).send();
+      res.json({ message: "Expense deleted successfully" });
     } catch (error) {
       console.error("Error deleting expense:", error);
       res.status(500).json({ error: "Failed to delete expense" });
+    }
+  });
+
+  // Endpoint para extornar pagamento
+  app.patch("/api/payments/:id/reverse", async (req, res) => {
+    try {
+      const { reason } = req.body;
+      const payment = await storage.updatePayment(req.params.id, {
+        isReversed: true,
+        reversedAt: new Date(),
+        reversedBy: 'admin', // TODO: pegar usuário da sessão
+        reversalReason: reason || 'Sem motivo especificado',
+        status: 'pending'
+      });
+      
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      
+      res.json(payment);
+    } catch (error) {
+      console.error("Error reversing payment:", error);
+      res.status(500).json({ error: "Failed to reverse payment" });
+    }
+  });
+
+  // Endpoint para marcar receita como paga
+  app.patch("/api/revenues/:id/pay", async (req, res) => {
+    try {
+      const { paymentDate, paymentMethod } = req.body;
+      const revenue = await storage.updateRevenue(req.params.id, {
+        status: 'received',
+        paymentDate,
+        paymentMethod
+      });
+      
+      if (!revenue) {
+        return res.status(404).json({ error: "Revenue not found" });
+      }
+      
+      res.json(revenue);
+    } catch (error) {
+      console.error("Error marking revenue as paid:", error);
+      res.status(500).json({ error: "Failed to mark revenue as paid" });
+    }
+  });
+
+  // Endpoint para extornar receita
+  app.patch("/api/revenues/:id/reverse", async (req, res) => {
+    try {
+      const { reason } = req.body;
+      const revenue = await storage.updateRevenue(req.params.id, {
+        isReversed: true,
+        reversedAt: new Date(),
+        reversedBy: 'admin', // TODO: pegar usuário da sessão
+        reversalReason: reason || 'Sem motivo especificado',
+        status: 'pending'
+      });
+      
+      if (!revenue) {
+        return res.status(404).json({ error: "Revenue not found" });
+      }
+      
+      res.json(revenue);
+    } catch (error) {
+      console.error("Error reversing revenue:", error);
+      res.status(500).json({ error: "Failed to reverse revenue" });
+    }
+  });
+
+  // Endpoint para marcar despesa como paga
+  app.patch("/api/expenses/:id/pay", async (req, res) => {
+    try {
+      const { paymentDate, paymentMethod } = req.body;
+      const expense = await storage.updateExpense(req.params.id, {
+        status: 'paid',
+        paymentDate,
+        paymentMethod
+      });
+      
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      
+      res.json(expense);
+    } catch (error) {
+      console.error("Error marking expense as paid:", error);
+      res.status(500).json({ error: "Failed to mark expense as paid" });
+    }
+  });
+
+  // Endpoint para extornar despesa
+  app.patch("/api/expenses/:id/reverse", async (req, res) => {
+    try {
+      const { reason } = req.body;
+      const expense = await storage.updateExpense(req.params.id, {
+        isReversed: true,
+        reversedAt: new Date(),
+        reversedBy: 'admin', // TODO: pegar usuário da sessão
+        reversalReason: reason || 'Sem motivo especificado',
+        status: 'pending'
+      });
+      
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      
+      res.json(expense);
+    } catch (error) {
+      console.error("Error reversing expense:", error);
+      res.status(500).json({ error: "Failed to reverse expense" });
     }
   });
 
@@ -3306,6 +3420,289 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting external link:", error);
       res.status(500).json({ error: "Failed to delete external link" });
+    }
+  });
+
+  // Assets routes (Controle Patrimonial)
+  app.get("/api/assets", requireAuth, requirePermission('assets.read'), async (req, res) => {
+    try {
+      const assets = await storage.getAllAssets();
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching assets:", error);
+      res.status(500).json({ error: "Failed to fetch assets" });
+    }
+  });
+
+  app.get("/api/assets/active", requireAuth, requirePermission('assets.read'), async (req, res) => {
+    try {
+      const assets = await storage.getActiveAssets();
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching active assets:", error);
+      res.status(500).json({ error: "Failed to fetch active assets" });
+    }
+  });
+
+  app.get("/api/assets/category/:category", requireAuth, requirePermission('assets.read'), async (req, res) => {
+    try {
+      const { category } = req.params;
+      const assets = await storage.getAssetsByCategory(category);
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching assets by category:", error);
+      res.status(500).json({ error: "Failed to fetch assets by category" });
+    }
+  });
+
+  app.get("/api/assets/situation/:situation", requireAuth, requirePermission('assets.read'), async (req, res) => {
+    try {
+      const { situation } = req.params;
+      const assets = await storage.getAssetsBySituation(situation);
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching assets by situation:", error);
+      res.status(500).json({ error: "Failed to fetch assets by situation" });
+    }
+  });
+
+  app.get("/api/assets/:id", requireAuth, requirePermission('assets.read'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const asset = await storage.getAsset(id);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      console.error("Error fetching asset:", error);
+      res.status(500).json({ error: "Failed to fetch asset" });
+    }
+  });
+
+  app.post("/api/assets", requireAuth, requirePermission('assets.create'), async (req, res) => {
+    try {
+      const validatedData = insertAssetSchema.parse(req.body);
+      const asset = await storage.createAsset(validatedData);
+      res.status(201).json(asset);
+    } catch (error) {
+      console.error("Error creating asset:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create asset" });
+    }
+  });
+
+  app.put("/api/assets/:id", requireAuth, requirePermission('assets.update'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertAssetSchema.partial().parse(req.body);
+      const asset = await storage.updateAsset(id, validatedData);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      console.error("Error updating asset:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update asset" });
+    }
+  });
+
+  app.delete("/api/assets/:id", requireAuth, requirePermission('assets.delete'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteAsset(id);
+      if (!success) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting asset:", error);
+      res.status(500).json({ error: "Failed to delete asset" });
+    }
+  });
+
+  app.put("/api/assets/:id/inactivate", requireAuth, requirePermission('assets.update'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const asset = await storage.inactivateAsset(id);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      console.error("Error inactivating asset:", error);
+      res.status(500).json({ error: "Failed to inactivate asset" });
+    }
+  });
+
+  app.put("/api/assets/:id/activate", requireAuth, requirePermission('assets.update'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const asset = await storage.activateAsset(id);
+      if (!asset) {
+        return res.status(404).json({ error: "Asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      console.error("Error activating asset:", error);
+      res.status(500).json({ error: "Failed to activate asset" });
+    }
+  });
+
+  // Dynamic favicon endpoint
+  app.get("/api/favicon", async (req, res) => {
+    try {
+      const faviconSetting = await storage.getSystemSetting('favicon');
+      
+      if (faviconSetting && faviconSetting.fileUrl) {
+        // Redirect to the uploaded favicon
+        res.redirect(faviconSetting.fileUrl);
+      } else {
+        // Return default favicon if none configured
+        const defaultFaviconPath = path.join(process.cwd(), 'client', 'public', 'favicon.png');
+        if (fs.existsSync(defaultFaviconPath)) {
+          res.sendFile(defaultFaviconPath);
+        } else {
+          // No favicon found at all
+          res.status(404).json({ error: "Favicon not found" });
+        }
+      }
+    } catch (error) {
+      console.error("Error serving favicon:", error);
+      res.status(500).json({ error: "Failed to serve favicon" });
+    }
+  });
+
+  // System Settings routes
+  app.get("/api/system/settings", requireAuth, requirePermission('system.manage'), async (req, res) => {
+    try {
+      const settings = await storage.getAllSystemSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching system settings:", error);
+      res.status(500).json({ error: "Failed to fetch system settings" });
+    }
+  });
+
+  app.get("/api/system/settings/:key", requireAuth, requirePermission('system.manage'), async (req, res) => {
+    try {
+      const { key } = req.params;
+      const setting = await storage.getSystemSetting(key);
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      res.json(setting);
+    } catch (error) {
+      console.error("Error fetching system setting:", error);
+      res.status(500).json({ error: "Failed to fetch system setting" });
+    }
+  });
+
+  // Configure multer for file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 2 * 1024 * 1024, // 2MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      // Allow only favicon-compatible files
+      const allowedTypes = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png', 'image/ico'];
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only ICO and PNG files are allowed.'));
+      }
+    }
+  });
+
+  app.post("/api/system/settings", requireAuth, requirePermission('system.manage'), upload.single('file'), async (req, res) => {
+    try {
+      const { key, value, description, category } = req.body;
+      let fileUrl: string | undefined = undefined;
+
+      // Handle file upload if present
+      if (req.file) {
+        const fileName = `${key}_${Date.now()}_${req.file.originalname}`;
+        const filePath = path.join(process.cwd(), 'client', 'public', 'uploads', fileName);
+        
+        // Create uploads directory if it doesn't exist
+        const uploadDir = path.dirname(filePath);
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        // Save file to disk
+        fs.writeFileSync(filePath, req.file.buffer);
+        fileUrl = `/uploads/${fileName}`;
+      }
+
+      const setting = await storage.createOrUpdateSystemSetting(
+        key,
+        value || undefined,
+        fileUrl,
+        description || undefined,
+        category || 'general'
+      );
+
+      res.json(setting);
+    } catch (error) {
+      console.error("Error saving system setting:", error);
+      if (error.message.includes('Invalid file type')) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to save system setting" });
+    }
+  });
+
+  app.delete("/api/system/settings/:key", requireAuth, requirePermission('system.manage'), async (req, res) => {
+    try {
+      const { key } = req.params;
+      const success = await storage.deleteSystemSetting(key);
+      if (!success) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting system setting:", error);
+      res.status(500).json({ error: "Failed to delete system setting" });
+    }
+  });
+
+  app.delete("/api/system/settings/:key/file", requireAuth, requirePermission('system.manage'), async (req, res) => {
+    try {
+      const { key } = req.params;
+      const setting = await storage.getSystemSetting(key);
+      
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+
+      if (setting.fileUrl) {
+        // Remove file from disk
+        const filePath = path.join(process.cwd(), 'client', 'public', setting.fileUrl);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+
+        // Update setting to remove file URL
+        await storage.createOrUpdateSystemSetting(
+          key,
+          setting.value || undefined,
+          undefined, // Clear file URL
+          setting.description || undefined,
+          setting.category || 'general'
+        );
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing system setting file:", error);
+      res.status(500).json({ error: "Failed to remove system setting file" });
     }
   });
 

@@ -20,6 +20,8 @@ import SelfRegistrationAssociate from "@/pages/self-registration-associate";
 import AdminApprovals from "@/pages/admin-approvals";
 import Associates from "@/pages/associates";
 import Financeiro from "@/pages/financeiro";
+import Patrimonio from "@/pages/patrimonio";
+import Relatorios from "@/pages/relatorios";
 import NotFound from "@/pages/not-found";
 import TournamentConsent from "@/pages/tournament-consent";
 import PublicTournamentRegister from "@/pages/public-tournament-register";
@@ -31,6 +33,7 @@ import ConsentTournament from "@/pages/consent-tournament";
 import Consent from "@/pages/consent";
 import ConsentsAdmin from "@/pages/consents-admin";
 import AdminUsers from "@/pages/admin-users";
+import AdminSystem from "@/pages/admin-system";
 import Profile from "@/pages/profile";
 import { AuthProvider } from "@/context/auth-context";
 import ProtectedRoute from "@/components/protected-route";
@@ -133,6 +136,14 @@ function Router() {
             </ProtectedRoute>
           )}
         </Route>
+        <Route path="/patrimonio">
+          {() => (
+            <ProtectedRoute>
+              <Navbar />
+              <Patrimonio />
+            </ProtectedRoute>
+          )}
+        </Route>
         <Route path="/create-tournament">
           {() => (
             <ProtectedRoute>
@@ -170,6 +181,14 @@ function Router() {
             <ProtectedRoute>
               <Navbar />
               <AdminUsers />
+            </ProtectedRoute>
+          )}
+        </Route>
+        <Route path="/admin/system">
+          {() => (
+            <ProtectedRoute>
+              <Navbar />
+              <AdminSystem />
             </ProtectedRoute>
           )}
         </Route>

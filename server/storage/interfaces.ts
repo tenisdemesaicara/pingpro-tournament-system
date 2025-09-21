@@ -1,4 +1,4 @@
-import { type Athlete, type InsertAthlete, type Tournament, type InsertTournament, type TournamentParticipant, type InsertTournamentParticipant, type Match, type InsertMatch, type Community, type InsertCommunity, type Category, type InsertCategory, type TournamentWithParticipants, type AthleteWithStats, type EligibleAthlete, type TournamentCategory, type InsertTournamentCategory, type Payment, type InsertPayment, type Revenue, type InsertRevenue, type Expense, type InsertExpense } from "@shared/schema";
+import { type Athlete, type InsertAthlete, type Tournament, type InsertTournament, type TournamentParticipant, type InsertTournamentParticipant, type Match, type InsertMatch, type Community, type InsertCommunity, type Category, type InsertCategory, type TournamentWithParticipants, type AthleteWithStats, type EligibleAthlete, type TournamentCategory, type InsertTournamentCategory, type Payment, type InsertPayment, type Revenue, type InsertRevenue, type Expense, type InsertExpense, type SystemSetting, type InsertSystemSetting } from "@shared/schema";
 
 export interface IStorage {
   // Athletes
@@ -95,4 +95,10 @@ export interface IStorage {
   saveUploadedImage(filename: string, originalName: string, size: number, mimeType: string): Promise<string>;
   getUploadedImage(filename: string): Promise<{ filename: string; originalName: string; uploadedAt: Date } | undefined>;
   deleteUploadedImage(filename: string): Promise<boolean>;
+
+  // System Settings
+  getSystemSetting(key: string): Promise<SystemSetting | undefined>;
+  getAllSystemSettings(): Promise<SystemSetting[]>;
+  createOrUpdateSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting>;
+  deleteSystemSetting(key: string): Promise<boolean>;
 }
