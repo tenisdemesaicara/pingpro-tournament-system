@@ -5,6 +5,7 @@ import { serveStatic, log } from "./static";
 import { createDefaultPasswords } from "./auth";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
+import onHeaders from "on-headers";
 import { pool } from "./db";
 
 // Show dynamic login info on startup
@@ -75,11 +76,7 @@ if (isProduction) {
   console.log('🔒 Using MemoryStore for development');
 }
 
-app.use(session(sessionConfig));
-
-// CORREÇÃO CRÍTICA: Middleware para forçar SameSite=None em produção usando on-headers
-const onHeaders = require('on-headers');
-
+// CORREÇÃO CRÍTICA: Middleware ANTES do session para executar DEPOIS (ordem LIFO)
 if (isProduction) {
   app.use((req, res, next) => {
     onHeaders(res, () => {
@@ -101,6 +98,8 @@ if (isProduction) {
     next();
   });
 }
+
+app.use(session(sessionConfig));
 
 app.use((req, res, next) => {
   const start = Date.now();
