@@ -77,34 +77,27 @@ if (isProduction) {
 
 app.use(session(sessionConfig));
 
-// CORREÇÃO CRÍTICA: Middleware para forçar SameSite=None em produção
+// CORREÇÃO CRÍTICA: Middleware para forçar SameSite=None em produção usando on-headers
+const onHeaders = require('on-headers');
+
 if (isProduction) {
   app.use((req, res, next) => {
-    const originalWriteHead = res.writeHead;
-    res.writeHead = function(statusCode, reasonPhrase, headers) {
-      // Fix headers for both writeHead signatures
-      let hdrs = headers;
-      if (typeof reasonPhrase === 'object') {
-        hdrs = reasonPhrase;
+    onHeaders(res, () => {
+      const cookies = res.getHeader('Set-Cookie');
+      if (cookies) {
+        const updatedCookies = Array.isArray(cookies) 
+          ? cookies.map(cookie => 
+              typeof cookie === 'string' && cookie.includes('connect.sid') && cookie.includes('SameSite=Strict')
+                ? cookie.replace('SameSite=Strict', 'SameSite=None')
+                : cookie
+            )
+          : typeof cookies === 'string' && cookies.includes('connect.sid') && cookies.includes('SameSite=Strict')
+            ? cookies.replace('SameSite=Strict', 'SameSite=None')
+            : cookies;
+        
+        res.setHeader('Set-Cookie', updatedCookies);
       }
-      
-      // Force SameSite=None for session cookies in production
-      if (hdrs && hdrs['set-cookie']) {
-        if (Array.isArray(hdrs['set-cookie'])) {
-          hdrs['set-cookie'] = hdrs['set-cookie'].map(cookie => 
-            cookie.includes('connect.sid') && cookie.includes('SameSite=Strict') 
-              ? cookie.replace('SameSite=Strict', 'SameSite=None') 
-              : cookie
-          );
-        } else if (typeof hdrs['set-cookie'] === 'string') {
-          if (hdrs['set-cookie'].includes('connect.sid') && hdrs['set-cookie'].includes('SameSite=Strict')) {
-            hdrs['set-cookie'] = hdrs['set-cookie'].replace('SameSite=Strict', 'SameSite=None');
-          }
-        }
-      }
-      
-      return originalWriteHead.call(this, statusCode, reasonPhrase, hdrs);
-    };
+    });
     next();
   });
 }
