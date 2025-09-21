@@ -57,8 +57,8 @@ const sessionConfig: any = {
     secure: isProduction, // true em produção para HTTPS, false em dev
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 horas
-    sameSite: 'lax', // 'lax' para same-site (aplicação serve tudo do mesmo domínio)
-    // Domain não setado para permitir cross-domain
+    sameSite: isProduction ? 'none' : 'lax', // 'none' em prod para cross-domain, 'lax' em dev
+    domain: isProduction ? undefined : undefined, // Sem domain específico para permitir ambos
   }
 };
 
