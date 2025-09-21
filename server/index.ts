@@ -24,33 +24,23 @@ function showLoginCredentials() {
 
 const app = express();
 
-// Configuração CORS simples e segura - 100% SEM REPLIT
+// CRÍTICO: Trust proxy para funcionar com Render (sessões funcionarem)
+app.set('trust proxy', 1);
+
+// Configuração CORS específica e segura - 100% SEM REPLIT
 const corsOptions = {
-  origin: true, // Aceitar qualquer origem (simplificado para funcionar com redirecionamentos)
-  credentials: true, // Permitir cookies
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['*'], // Permitir todos os headers
-  exposedHeaders: ['Set-Cookie'],
+  origin: [
+    'https://tenisdemesaicara.com.br',
+    'https://www.tenisdemesaicara.com.br',
+    'https://pingpro.onrender.com'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
-
-// Headers de segurança adicionais para funcionar com qualquer domínio
-app.use((req, res, next) => {
-  // Headers essenciais para cross-origin
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS,PATCH');
-  res.header('Access-Control-Allow-Headers', '*');
-  
-  // Se for preflight (OPTIONS), responder OK
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-  
-  next();
-});
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
@@ -64,12 +54,11 @@ const sessionConfig: any = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    // Para funcionar com redirecionamento de domínio (pingpro.onrender.com -> tenisdemesaicara.com.br)
     secure: isProduction, // true em produção para HTTPS, false em dev
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 horas
-    sameSite: isProduction ? 'none' : 'lax', // 'none' em prod para cross-origin, 'lax' em dev
-    // Domain não deve ser setado para permitir cross-domain
+    sameSite: 'lax', // 'lax' para same-site (aplicação serve tudo do mesmo domínio)
+    // Domain não setado para permitir cross-domain
   }
 };
 
