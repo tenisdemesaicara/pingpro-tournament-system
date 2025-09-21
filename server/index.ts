@@ -24,14 +24,33 @@ function showLoginCredentials() {
 
 const app = express();
 
-// Configuração CORS para suportar domínio personalizado
+// Configuração CORS para suportar domínio personalizado e redirecionamentos
 const corsOptions = {
-  origin: [
-    'http://localhost:5000',
-    'https://pingpro.onrender.com',
-    'https://tenisdemesaicara.com.br',
-    'http://tenisdemesaicara.com.br'
-  ],
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Lista de origens permitidas
+    const allowedOrigins = [
+      'http://localhost:5000',
+      'https://pingpro.onrender.com',
+      'https://tenisdemesaicara.com.br',
+      'http://tenisdemesaicara.com.br'
+    ];
+    
+    // Log para debugging
+    console.log(`🌐 CORS REQUEST - Origin: ${origin || 'undefined'}`);
+    
+    // Permitir requisições sem origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    // Verificar se está na lista de permitidos
+    if (allowedOrigins.includes(origin)) {
+      console.log(`✅ CORS ALLOWED: ${origin}`);
+      return callback(null, true);
+    }
+    
+    // Log para origens não permitidas
+    console.log(`❌ CORS BLOCKED: ${origin}`);
+    return callback(new Error('Não permitido pelo CORS'), false);
+  },
   credentials: true, // Permitir cookies cross-origin
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -40,13 +59,34 @@ const corsOptions = {
     'Content-Type',
     'Accept',
     'Authorization',
-    'X-CSRF-Token'
+    'X-CSRF-Token',
+    'X-Forwarded-For',
+    'X-Forwarded-Host',
+    'X-Forwarded-Proto'
   ],
   exposedHeaders: ['Set-Cookie'],
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+
+// Middleware para debug de headers e origem
+app.use((req, res, next) => {
+  // Log apenas para requests de API ou login importantes
+  if (req.path.includes('/api/auth') || req.path.includes('/api/users')) {
+    console.log(`🔍 REQUEST DEBUG:`);
+    console.log(`   Method: ${req.method}`);
+    console.log(`   Path: ${req.path}`);
+    console.log(`   Origin: ${req.headers.origin || 'undefined'}`);
+    console.log(`   Host: ${req.headers.host}`);
+    console.log(`   X-Forwarded-Host: ${req.headers['x-forwarded-host'] || 'undefined'}`);
+    console.log(`   User-Agent: ${req.headers['user-agent']?.substring(0, 50) || 'undefined'}...`);
+    console.log(`   Has Session: ${!!req.session}`);
+    console.log(`   Cookie: ${req.headers.cookie ? 'present' : 'missing'}`);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
