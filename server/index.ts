@@ -77,6 +77,37 @@ if (isProduction) {
 
 app.use(session(sessionConfig));
 
+// CORREÇÃO CRÍTICA: Middleware para forçar SameSite=None em produção
+if (isProduction) {
+  app.use((req, res, next) => {
+    const originalWriteHead = res.writeHead;
+    res.writeHead = function(statusCode, reasonPhrase, headers) {
+      // Fix headers for both writeHead signatures
+      let hdrs = headers;
+      if (typeof reasonPhrase === 'object') {
+        hdrs = reasonPhrase;
+      }
+      
+      // Force SameSite=None for session cookies in production
+      if (hdrs && hdrs['set-cookie']) {
+        if (Array.isArray(hdrs['set-cookie'])) {
+          hdrs['set-cookie'] = hdrs['set-cookie'].map(cookie => 
+            cookie.includes('connect.sid') && cookie.includes('SameSite=Strict') 
+              ? cookie.replace('SameSite=Strict', 'SameSite=None') 
+              : cookie
+          );
+        } else if (typeof hdrs['set-cookie'] === 'string') {
+          if (hdrs['set-cookie'].includes('connect.sid') && hdrs['set-cookie'].includes('SameSite=Strict')) {
+            hdrs['set-cookie'] = hdrs['set-cookie'].replace('SameSite=Strict', 'SameSite=None');
+          }
+        }
+      }
+      
+      return originalWriteHead.call(this, statusCode, reasonPhrase, hdrs);
+    };
+    next();
+  });
+}
 
 app.use((req, res, next) => {
   const start = Date.now();
