@@ -142,26 +142,46 @@ export async function getUserWithRoles(userId: string): Promise<UserWithRoles | 
  */
 export async function authenticateUser(usernameOrEmail: string, password: string): Promise<SessionUser | null> {
   try {
+    console.log(`🔍 DEBUG LOGIN: Tentativa de login para usuário: ${usernameOrEmail}`);
+    
     // Buscar usuário por username ou email
     const userResult = await db.select().from(users).where(
       eq(users.username, usernameOrEmail)
     );
     
+    console.log(`📊 DEBUG LOGIN: Usuários encontrados por username: ${userResult.length}`);
+    
     if (!userResult.length) {
       // Tentar buscar por email
+      console.log(`📧 DEBUG LOGIN: Tentando buscar por email...`);
       const emailResult = await db.select().from(users).where(
         eq(users.email, usernameOrEmail)
       );
-      if (!emailResult.length) return null;
+      console.log(`📊 DEBUG LOGIN: Usuários encontrados por email: ${emailResult.length}`);
+      if (!emailResult.length) {
+        console.log(`❌ DEBUG LOGIN: Usuário não encontrado`);
+        return null;
+      }
       userResult.push(emailResult[0]);
     }
 
     const user = userResult[0];
-    if (!user.isActive) return null;
+    console.log(`👤 DEBUG LOGIN: Usuário encontrado: ${user.username} (ativo: ${user.isActive})`);
+    
+    if (!user.isActive) {
+      console.log(`❌ DEBUG LOGIN: Usuário inativo`);
+      return null;
+    }
 
     // Verificar senha
+    console.log(`🔐 DEBUG LOGIN: Verificando senha... Hash no DB: ${user.passwordHash.substring(0, 10)}...`);
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!isValidPassword) return null;
+    console.log(`🔐 DEBUG LOGIN: Senha válida: ${isValidPassword}`);
+    
+    if (!isValidPassword) {
+      console.log(`❌ DEBUG LOGIN: Senha inválida`);
+      return null;
+    }
 
     // Atualizar último login
     await db.update(users)
