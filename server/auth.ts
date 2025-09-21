@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { users, roles, permissions, userRoles, rolePermissions, userPermissionOverrides } from '@shared/schema';
@@ -21,6 +22,7 @@ interface SessionUser {
     permissions: Permission[];
   }>;
   effectivePermissions: string[]; // Lista de nomes de permissões efetivas (roles + grants - denies)
+  token?: string; // JWT token para cross-domain em produção
 }
 
 declare module 'express-session' {
@@ -182,6 +184,17 @@ export async function authenticateUser(usernameOrEmail: string, password: string
       roles: userWithRoles.roles,
       effectivePermissions: userWithRoles.effectivePermissions
     };
+
+    // CORREÇÃO CRÍTICA: Usar JWT para cross-domain em vez de session
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      const token = jwt.sign(
+        { userId: sessionUser.id, timestamp: Date.now() },
+        process.env.JWT_SECRET || 'dev-jwt-secret',
+        { expiresIn: '24h' }
+      );
+      return { ...sessionUser, token };
+    }
 
     return sessionUser;
   } catch (error) {
