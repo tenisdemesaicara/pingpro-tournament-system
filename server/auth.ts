@@ -289,8 +289,6 @@ export function requireAnyPermission(permissionNames: string[]) {
     if (!user) {
       return res.status(401).json({ message: 'Acesso negado. Login necessário.' });
     }
-
-    const user = req.session.user;
     
     // SEGURANÇA: Verificar usando permissões efetivas que incluem overrides individuais
     const hasAnyPermission = permissionNames.some(permissionName => 
