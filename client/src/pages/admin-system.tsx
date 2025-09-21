@@ -71,7 +71,7 @@ export default function AdminSystem() {
   // Mutação para remover arquivo
   const removeFileMutation = useMutation({
     mutationFn: async (key: string) => {
-      return await apiRequest(`/api/system/settings/${key}/file`, 'DELETE');
+      return await apiRequest('DELETE', `/api/system/settings/${key}/file`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/system/settings'] });

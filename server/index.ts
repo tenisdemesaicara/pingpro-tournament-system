@@ -1,5 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
+import path from "path";
+import fs from "fs";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
 import { createDefaultPasswords } from "./auth";
@@ -134,6 +136,12 @@ app.use((req, res, next) => {
 (async () => {
   // Mostrar credenciais administrativas
   await createDefaultPasswords();
+
+  // Serve uploaded files (favicon, etc.) in both development and production
+  const uploadsPath = path.join(process.cwd(), 'client', 'public', 'uploads');
+  if (fs.existsSync(uploadsPath)) {
+    app.use('/uploads', express.static(uploadsPath));
+  }
 
   const server = await registerRoutes(app);
 
