@@ -3560,12 +3560,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const faviconSetting = await storage.getSystemSetting('favicon');
       
       if (faviconSetting && faviconSetting.fileUrl) {
-        // Redirect to the uploaded favicon
-        res.redirect(faviconSetting.fileUrl);
+        // Serve the uploaded favicon directly
+        const faviconPath = path.join(process.cwd(), 'client', 'public', faviconSetting.fileUrl);
+        if (fs.existsSync(faviconPath)) {
+          // Determine content type based on file extension
+          const ext = path.extname(faviconPath).toLowerCase();
+          let contentType = 'image/x-icon';
+          if (ext === '.png') contentType = 'image/png';
+          else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+          else if (ext === '.gif') contentType = 'image/gif';
+          else if (ext === '.svg') contentType = 'image/svg+xml';
+          
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+          res.sendFile(faviconPath);
+        } else {
+          console.warn(`Favicon file not found: ${faviconPath}`);
+          res.status(404).json({ error: "Configured favicon file not found" });
+        }
       } else {
         // Return default favicon if none configured
         const defaultFaviconPath = path.join(process.cwd(), 'client', 'public', 'favicon.png');
         if (fs.existsSync(defaultFaviconPath)) {
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
           res.sendFile(defaultFaviconPath);
         } else {
           // No favicon found at all
