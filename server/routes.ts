@@ -42,6 +42,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // DEBUG: Endpoint para verificar se ambos domínios usam mesmo DB
+  app.get("/api/debug/env", (req, res) => {
+    const dbUrl = process.env.DATABASE_URL || 'no-db-url';
+    const dbHash = dbUrl.substring(0, 20) + '...' + dbUrl.substring(dbUrl.length - 10);
+    
+    res.json({
+      host: req.headers.host,
+      forwarded_host: req.headers['x-forwarded-host'],
+      forwarded_proto: req.headers['x-forwarded-proto'],
+      origin: req.headers.origin,
+      database_hash: dbHash,
+      node_env: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Inicializar gerenciador de bracket
   const bracketManager = new BracketManager(storage);
 
