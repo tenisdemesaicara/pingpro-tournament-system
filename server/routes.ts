@@ -1690,6 +1690,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(transaction.status).json(transaction.data);
   });
 
+  // Get active tournaments (public endpoint)
+  app.get("/api/tournaments/active", async (req, res) => {
+    try {
+      const tournaments = await storage.getAllTournaments();
+      const activeTournaments = tournaments
+        .filter(t => t.status === 'active' || t.status === 'registration_open')
+        .map(tournament => ({
+          id: tournament.id,
+          name: tournament.name,
+          date: tournament.date,
+          location: tournament.location || 'Local a definir',
+          format: tournament.format,
+          status: tournament.status,
+          description: tournament.description,
+          registrationDeadline: tournament.registrationDeadline,
+          maxParticipants: tournament.maxParticipants,
+          currentParticipants: 0 // TODO: Calculate real participant count
+        }));
+      
+      res.json(activeTournaments);
+    } catch (error) {
+      console.error('Error fetching active tournaments:', error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
   // Tournaments routes (PROTEGIDOS)
   app.get("/api/tournaments", requireAuth, async (req, res) => {
     try {

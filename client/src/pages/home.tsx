@@ -1,10 +1,40 @@
 import { Link } from "wouter";
-import HeroSection from "@/components/hero-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, Users, Trophy, BarChart3 } from "lucide-react";
+import { CreditCard, Users, Trophy, BarChart3, LogIn, UserPlus, Eye } from "lucide-react";
 
 export default function Home() {
+  const actions = [
+    {
+      icon: LogIn,
+      title: "Entrar no Sistema",
+      description: "Acesso para administradores e colaboradores",
+      href: "/login",
+      variant: "default" as const,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50 dark:bg-blue-950",
+    },
+    {
+      icon: UserPlus,
+      title: "Inscrever-se",
+      description: "Criar conta para gestão de clube ou associação",
+      href: "#",
+      variant: "outline" as const,
+      color: "text-green-600",
+      bgColor: "bg-green-50 dark:bg-green-950",
+      comingSoon: true,
+    },
+    {
+      icon: Eye,
+      title: "Visualizar Torneios",
+      description: "Ver torneios ativos e resultados",
+      href: "/torneios-publicos",
+      variant: "outline" as const,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50 dark:bg-purple-950",
+    },
+  ];
+
   const resources = [
     {
       icon: CreditCard,
@@ -39,7 +69,52 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <HeroSection />
+      <section className="relative bg-gradient-to-br from-blue-600 to-blue-800 dark:from-blue-800 dark:to-blue-900 text-white py-20 lg:py-32">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6" data-testid="text-hero-title">
+            Gestão da Associação
+            <br />
+            <span className="text-blue-200">Mesatenista de Içara</span>
+          </h1>
+          <p className="text-xl md:text-2xl mb-12 text-blue-100 max-w-3xl mx-auto" data-testid="text-hero-subtitle">
+            Controle financeiro, mensalidades, atletas, associados, torneios e ranking em uma única plataforma
+            fácil de usar.
+          </p>
+          
+          {/* Botões de Ação Principal */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            {actions.map((action, index) => {
+              const IconComponent = action.icon;
+              return (
+                <div key={index} className="relative">
+                  <Link href={action.href}>
+                    <Button 
+                      size="lg" 
+                      variant={action.variant}
+                      className={`text-lg font-medium px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300 ${
+                        action.variant === 'default' 
+                          ? 'bg-white text-blue-600 hover:bg-gray-100' 
+                          : 'bg-white/10 border-2 border-white text-white hover:bg-white hover:text-blue-600 backdrop-blur-sm'
+                      }`}
+                      disabled={action.comingSoon}
+                      data-testid={`button-${action.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <IconComponent className="h-5 w-5 mr-2" />
+                      {action.title}
+                    </Button>
+                  </Link>
+                  {action.comingSoon && (
+                    <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                      Em breve
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       {/* Seção de Recursos */}
       <section id="recursos" className="py-20 bg-white dark:bg-gray-950">
@@ -99,15 +174,29 @@ export default function Home() {
           <p className="text-xl text-blue-100 mb-8">
             Simplifique a administração da sua associação e foque no que realmente importa.
           </p>
-          <Link href="/login">
-            <Button 
-              size="lg" 
-              className="text-lg font-medium px-8 py-4 bg-white text-blue-600 hover:bg-gray-100 shadow-lg hover:shadow-xl transition-all duration-300"
-              data-testid="button-cta-access"
-            >
-              Acessar Agora
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/login">
+              <Button 
+                size="lg" 
+                className="text-lg font-medium px-8 py-4 bg-white text-blue-600 hover:bg-gray-100 shadow-lg hover:shadow-xl transition-all duration-300"
+                data-testid="button-cta-login"
+              >
+                <LogIn className="h-5 w-5 mr-2" />
+                Entrar no Sistema
+              </Button>
+            </Link>
+            <Link href="/torneios-publicos">
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="text-lg font-medium px-8 py-4 bg-white/10 border-2 border-white text-white hover:bg-white hover:text-blue-600 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm"
+                data-testid="button-cta-tournaments"
+              >
+                <Eye className="h-5 w-5 mr-2" />
+                Ver Torneios
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

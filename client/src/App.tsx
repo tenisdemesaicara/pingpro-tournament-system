@@ -5,6 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Navbar from "@/components/navbar";
 import Home from "@/pages/home";
+import Dashboard from "@/pages/dashboard";
+import Login from "@/pages/login";
+import PublicTournamentsView from "@/pages/public-tournaments-view";
 import Tournaments from "@/pages/tournaments";
 import Athletes from "@/pages/athletes";
 import Ranking from "@/pages/ranking";
@@ -70,15 +73,26 @@ function Router() {
           {(params) => <PublicTournamentRegister tournamentId={params.tournamentId} />}
         </Route>
         
-        {/* Rotas administrativas COM navbar (PROTEGIDAS) */}
-        <Route path="/">
+        {/* Página inicial pública (Landing Page) */}
+        <Route path="/" component={Home} />
+        
+        {/* Área administrativa (Dashboard) */}
+        <Route path="/dashboard">
           {() => (
             <ProtectedRoute>
               <Navbar />
-              <Home />
+              <Dashboard />
             </ProtectedRoute>
           )}
         </Route>
+        
+        {/* Rotas administrativas COM navbar (PROTEGIDAS) */}
+        {/* Rota de login */}
+        <Route path="/login" component={Login} />
+        
+        {/* Rota pública para visualizar torneios ativos */}
+        <Route path="/torneios-publicos" component={PublicTournamentsView} />
+        
         <Route path="/tournaments">
           {() => (
             <ProtectedRoute>
