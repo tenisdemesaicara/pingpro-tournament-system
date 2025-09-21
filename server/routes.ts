@@ -1698,7 +1698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const tournaments = await storage.getAllTournaments();
       const activeTournaments = tournaments
-        .filter(t => t.status === 'active' || t.status === 'registration_open')
+        .filter(t => t.status === 'active' || t.status === 'registration_open' || t.status === 'in_progress')
         .map(tournament => ({
           id: tournament.id,
           name: tournament.name,
