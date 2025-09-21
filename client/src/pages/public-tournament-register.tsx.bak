@@ -1,0 +1,696 @@
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { calculateAgeInTournamentYear, extractYearFromDate } from "@shared/utils";
+import { formatCPF, unformatCPF, formatPhone, unformatPhone } from "@/lib/format-utils";
+
+interface Tournament {
+  id: string;
+  name: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  location: string;
+  organizer: string;
+}
+
+interface PublicTournamentRegisterProps {
+  tournamentId: string;
+}
+
+export default function PublicTournamentRegister({ tournamentId }: PublicTournamentRegisterProps) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const [formData, setFormData] = useState({
+    // Dados pessoais
+    name: "",
+    email: "",
+    phone: "",
+    birthDate: "",
+    cpf: "",
+    rg: "",
+    
+    // Endereço
+    street: "",
+    neighborhood: "",
+    zipCode: "",
+    city: "",
+    state: "",
+    complement: "",
+    
+    // Dados esportivos
+    club: "",
+    gender: "", // masculino, feminino
+    observations: "",
+    
+    // Categorias selecionadas
+    selectedCategoryId: "", // Categoria obrigatória por idade
+    selectedAbsolutoId: "", // Categoria Absoluto opcional
+    
+    // Consentimento para menores
+    parentName: "",
+    parentEmail: "",
+    parentPhone: "",
+    parentCpf: "",
+  });
+
+  const [eligibleCategories, setEligibleCategories] = useState<any[]>([]);
+  const [absoluteCategories, setAbsoluteCategories] = useState<any[]>([]);
+  const [athleteAge, setAthleteAge] = useState<number | null>(null);
+  const [isMinor, setIsMinor] = useState(false);
+  const [existingAthlete, setExistingAthlete] = useState<any>(null);
+  const [checkingAthlete, setCheckingAthlete] = useState(false);
+
+  // Buscar dados do torneio
+  const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
+    queryKey: [`/api/tournaments/${tournamentId}`],
+  });
+
+  // Calcular categorias elegíveis quando a data de nascimento mudar
+  useEffect(() => {
+    if (formData.birthDate && formData.gender && tournament?.startDate) {
+      const tournamentYear = extractYearFromDate(tournament.startDate);
+      const age = calculateAgeInTournamentYear(formData.birthDate, tournamentYear);
+      setAthleteAge(age);
+      setIsMinor(age < 18);
+
+      // Buscar categorias do torneio e separar por tipo
+      fetch(`/api/tournaments/${tournamentId}/categories`)
+        .then(res => res.json())
+        .then(categories => {
+          // Separar categorias Absoluto das outras
+          const absoluteCategs = categories.filter((cat: any) => 
+            cat.name.includes('Absoluto') && 
+            cat.gender === formData.gender &&
+            age >= 14 // Absoluto só para 14+ anos
+          );
+
+          // Categorias por idade (excluindo Absoluto)
+          const ageCategories = categories.filter((cat: any) => {
+            // Excluir Absoluto
+            if (cat.name.includes('Absoluto')) return false;
+            
+            // Verificar idade
+            if (cat.minAge !== null && age < cat.minAge) return false;
+            if (cat.maxAge !== null && age > cat.maxAge) return false;
+            
+            // Filtrar por gênero
+            if (cat.gender && cat.gender !== formData.gender) return false;
+            
+            return true;
+          });
+          
+          setEligibleCategories(ageCategories);
+          setAbsoluteCategories(absoluteCategs);
+        })
+        .catch(console.error);
+    } else {
+      setEligibleCategories([]);
+      setAbsoluteCategories([]);
+      setAthleteAge(null);
+    }
+  }, [formData.birthDate, formData.gender, tournament, tournamentId]);
+
+  // Verificar se atleta já existe quando CPF ou email mudar
+  useEffect(() => {
+    const checkExistingAthlete = async () => {
+      if (formData.cpf && formData.cpf.length >= 14) {
+        setCheckingAthlete(true);
+        try {
+          const response = await fetch(`/api/athletes?search=${encodeURIComponent(formData.cpf)}`);
+          const athletes = await response.json();
+          const existing = athletes.find((a: any) => 
+            a.cpf === unformatCPF(formData.cpf) || a.email === formData.email
+          );
+          setExistingAthlete(existing || null);
+        } catch (error) {
+          console.error('Erro ao verificar atleta:', error);
+        }
+        setCheckingAthlete(false);
+      }
+    };
+    
+    if (formData.cpf || formData.email) {
+      checkExistingAthlete();
+    }
+  }, [formData.cpf, formData.email]);
+
+  // Mutation para criar atleta e inscrever no torneio
+  const registerMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      // Primeiro, criar o atleta
+      const athleteData = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        birthDate: data.birthDate,
+        cpf: data.cpf,
+        rg: data.rg,
+        street: data.street,
+        neighborhood: data.neighborhood,
+        zipCode: data.zipCode,
+        city: data.city,
+        state: data.state,
+        complement: data.complement,
+        club: data.club,
+        gender: data.gender,
+        observations: data.observations,
+        type: "atleta",
+        status: "pending", // Será aprovado automaticamente via inscrição pública
+      };
+
+      const athleteResponse = await apiRequest('POST', '/api/athletes', athleteData);
+      const athlete = await athleteResponse.json();
+
+      // Inscrever na categoria obrigatória por idade
+      const participantData1 = {
+        athleteId: athlete.id,
+        categoryId: data.selectedCategoryId,
+      };
+      await apiRequest('POST', `/api/tournaments/${tournamentId}/participants`, participantData1);
+
+      // Inscrever na categoria Absoluto se selecionada
+      if (data.selectedAbsolutoId) {
+        const participantData2 = {
+          athleteId: athlete.id,
+          categoryId: data.selectedAbsolutoId,
+        };
+        await apiRequest('POST', `/api/tournaments/${tournamentId}/participants`, participantData2);
+      }
+      
+      return athlete;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sucesso! 🎉",
+        description: "Sua inscrição foi realizada com sucesso! Aguarde a confirmação da organização.",
+      });
+      // Redirecionar para página de confirmação
+      setLocation(`/public/tournament/${tournamentId}/success`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro na Inscrição",
+        description: error.message || "Erro ao realizar inscrição. Tente novamente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Verificar se categoria foi selecionada
+    if (!formData.selectedCategoryId) {
+      toast({
+        title: "Categoria Obrigatória",
+        description: "Selecione sua categoria por idade para se inscrever",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Verificar se atleta já existe
+    if (existingAthlete) {
+      toast({
+        title: "Atleta Já Cadastrado",
+        description: `O atleta ${existingAthlete.name} já está cadastrado. Entre em contato com a organização.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Verificar consentimento para menores
+    if (isMinor) {
+      if (!formData.parentName || !formData.parentEmail || !formData.parentCpf) {
+        toast({
+          title: "Consentimento Obrigatório",
+          description: "Para menores de 18 anos, é obrigatório o consentimento do responsável",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
+    registerMutation.mutate(formData);
+  };
+
+  if (tournamentLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Carregando torneio...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <Card className="mb-6">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">{tournament?.name}</CardTitle>
+            <p className="text-muted-foreground">
+              {tournament?.description}
+            </p>
+            <div className="flex justify-center gap-4 text-sm text-muted-foreground">
+              <span>📅 {tournament?.startDate ? new Date(tournament.startDate).toLocaleDateString('pt-BR') : 'Data a definir'}</span>
+              <span>📍 {tournament?.location}</span>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Inscrição no Torneio</CardTitle>
+            <p className="text-muted-foreground">
+              Preencha seus dados para se inscrever na competição
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* Status de Verificação de Atleta */}
+              {checkingAthlete && (
+                <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-blue-700 dark:text-blue-300">
+                    Verificando se você já está cadastrado...
+                  </span>
+                </div>
+              )}
+              
+              {existingAthlete && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <h3 className="font-medium text-red-800 dark:text-red-200">
+                      Atleta Já Cadastrado
+                    </h3>
+                  </div>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-2">
+                    O atleta <strong>{existingAthlete.name}</strong> já está cadastrado no sistema.
+                    Entre em contato com a organização para fazer sua inscrição.
+                  </p>
+                </div>
+              )}
+              
+              {isMinor && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                    <h3 className="font-medium text-amber-800 dark:text-amber-200">
+                      Menor de Idade Detectado
+                    </h3>
+                  </div>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">
+                    Como você tem {athleteAge} anos, será necessário preencher dados do responsável legal.
+                  </p>
+                </div>
+              )}
+              
+              {/* Dados Pessoais */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Dados Pessoais</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="name">Nome Completo *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="phone">Telefone</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => {
+                        const formatted = formatPhone(e.target.value);
+                        setFormData({...formData, phone: formatted});
+                      }}
+                      placeholder="(11) 99999-9999"
+                      maxLength={15}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="birthDate">Data de Nascimento *</Label>
+                    <Input
+                      id="birthDate"
+                      type="date"
+                      value={formData.birthDate}
+                      onChange={(e) => setFormData({...formData, birthDate: e.target.value})}
+                      required
+                    />
+                    {athleteAge && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Idade no torneio: {athleteAge} anos
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="gender">Gênero *</Label>
+                    <Select value={formData.gender || undefined} onValueChange={(value) => setFormData({...formData, gender: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="feminino">Feminino</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="cpf">CPF</Label>
+                    <Input
+                      id="cpf"
+                      value={formData.cpf}
+                      onChange={(e) => {
+                        const formatted = formatCPF(e.target.value);
+                        setFormData({...formData, cpf: formatted});
+                      }}
+                      placeholder="000.000.000-00"
+                      maxLength={14}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="rg">RG</Label>
+                    <Input
+                      id="rg"
+                      value={formData.rg}
+                      onChange={(e) => setFormData({...formData, rg: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Endereço */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Endereço</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="street">Rua</Label>
+                    <Input
+                      id="street"
+                      value={formData.street}
+                      onChange={(e) => setFormData({...formData, street: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="zipCode">CEP *</Label>
+                    <Input
+                      id="zipCode"
+                      value={formData.zipCode}
+                      onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="neighborhood">Bairro *</Label>
+                    <Input
+                      id="neighborhood"
+                      value={formData.neighborhood}
+                      onChange={(e) => setFormData({...formData, neighborhood: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="city">Cidade *</Label>
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => setFormData({...formData, city: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="state">Estado *</Label>
+                    <Input
+                      id="state"
+                      value={formData.state}
+                      onChange={(e) => setFormData({...formData, state: e.target.value})}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="complement">Complemento</Label>
+                  <Input
+                    id="complement"
+                    value={formData.complement}
+                    onChange={(e) => setFormData({...formData, complement: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              {/* Dados Esportivos */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Dados Esportivos</h3>
+                
+                <div>
+                  <Label htmlFor="club">Clube/Associação</Label>
+                  <Input
+                    id="club"
+                    value={formData.club}
+                    onChange={(e) => setFormData({...formData, club: e.target.value})}
+                  />
+                </div>
+
+                {/* Categoria obrigatória por idade */}
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="category">Categoria por Idade * (Obrigatória)</Label>
+                    {!formData.birthDate || !formData.gender ? (
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                            Para ver as categorias disponíveis
+                          </span>
+                        </div>
+                        <p className="text-sm text-blue-700 dark:text-blue-300 mt-2">
+                          Preencha primeiro sua <strong>data de nascimento</strong> e <strong>gênero</strong> acima ⬆️
+                        </p>
+                      </div>
+                    ) : eligibleCategories.length > 0 ? (
+                      <>
+                        <Select value={formData.selectedCategoryId} onValueChange={(value) => setFormData({...formData, selectedCategoryId: value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione sua categoria por idade" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {eligibleCategories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{category.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {category.gender === 'masculino' ? 'Masc' : 
+                                     category.gender === 'feminino' ? 'Fem' : 'Misto'}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Esta é sua categoria obrigatória baseada na idade ({athleteAge} anos)
+                        </p>
+                      </>
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground border border-dashed rounded-lg">
+                        <p>Nenhuma categoria por idade disponível.</p>
+                        <p className="text-xs">Verifique sua data de nascimento e gênero.</p>
+                      </div>
+                    )}
+                </div>
+
+                {/* Categoria Absoluto opcional */}
+                {formData.birthDate && formData.gender && absoluteCategories.length > 0 && athleteAge && athleteAge >= 14 && (
+                  <div>
+                    <Label htmlFor="absoluto">Categoria Absoluto (Opcional)</Label>
+                    <Select value={formData.selectedAbsolutoId} onValueChange={(value) => setFormData({...formData, selectedAbsolutoId: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma categoria Absoluto (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Não participar do Absoluto</SelectItem>
+                        {absoluteCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{category.name}</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {category.name.includes(' A ') ? 'Elite' :
+                                 category.name.includes(' B ') ? 'Avançado' :
+                                 category.name.includes(' C ') ? 'Intermediário' : 'Iniciante'}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Escolha uma categoria Absoluto adicional se desejar competir também por nível técnico
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="observations">Observações</Label>
+                  <Textarea
+                    id="observations"
+                    value={formData.observations}
+                    onChange={(e) => setFormData({...formData, observations: e.target.value})}
+                    placeholder="Informações adicionais, restrições médicas, etc."
+                  />
+                </div>
+              </div>
+
+              {/* Consentimento do Responsável (para menores de 18 anos) */}
+              {isMinor && (
+                <div className="space-y-4 border border-amber-200 rounded-lg p-4 bg-amber-50 dark:bg-amber-900/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                    <h3 className="text-lg font-medium text-amber-800 dark:text-amber-200">
+                      Consentimento do Responsável
+                    </h3>
+                  </div>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Como você tem {athleteAge} anos (menor de idade), é necessário o consentimento de um responsável legal.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="parentName">Nome do Responsável *</Label>
+                      <Input
+                        id="parentName"
+                        value={formData.parentName}
+                        onChange={(e) => setFormData({...formData, parentName: e.target.value})}
+                        placeholder="Nome completo do pai/mãe/responsável"
+                        required={isMinor}
+                        data-testid="input-parent-name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="parentEmail">Email do Responsável *</Label>
+                      <Input
+                        id="parentEmail"
+                        type="email"
+                        value={formData.parentEmail}
+                        onChange={(e) => setFormData({...formData, parentEmail: e.target.value})}
+                        placeholder="email@exemplo.com"
+                        required={isMinor}
+                        data-testid="input-parent-email"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="parentCpf">CPF do Responsável *</Label>
+                      <Input
+                        id="parentCpf"
+                        value={formData.parentCpf}
+                        onChange={(e) => {
+                          const formatted = formatCPF(e.target.value);
+                          setFormData({...formData, parentCpf: formatted});
+                        }}
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        required={isMinor}
+                        data-testid="input-parent-cpf"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="parentPhone">Telefone do Responsável</Label>
+                      <Input
+                        id="parentPhone"
+                        value={formData.parentPhone}
+                        onChange={(e) => {
+                          const formatted = formatPhone(e.target.value);
+                          setFormData({...formData, parentPhone: formatted});
+                        }}
+                        placeholder="(11) 99999-9999"
+                        maxLength={15}
+                        data-testid="input-parent-phone"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg border border-amber-300 dark:border-amber-700">
+                    <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                      <p><strong>⚠️ DECLARAÇÃO DE VERACIDADE:</strong></p>
+                      <p>Como responsável legal, declaro que todas as informações fornecidas são verdadeiras.</p>
+                      <p>Estou ciente de que fornecer informações falsas constitui <strong>falsidade ideológica</strong> (Art. 299 do Código Penal).</p>
+                      <p>Autorizo a participação do menor no torneio e assumo total responsabilidade.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-center gap-4 pt-4">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => setLocation(`/public/tournament/${tournamentId}/consent`)}
+                >
+                  Voltar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={registerMutation.isPending || !formData.selectedCategoryId}
+                  className="px-8"
+                  data-testid="button-confirm-registration"
+                >
+                  {registerMutation.isPending ? 'Processando...' : 'Confirmar Inscrição'}
+                </Button>
+                {!formData.selectedCategoryId && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    ⬆️ Selecione uma categoria para liberar o botão
+                  </p>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

@@ -3,17 +3,23 @@ import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
 import { createDefaultPasswords } from "./auth";
 import session from "express-session";
+import ConnectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 
-// Configuração de tipos para sessão
-declare module 'express-session' {
-  interface SessionData {
-    user: {
-      id: string;
-      username: string;
-      role: string;
-    };
-  }
+// Show dynamic login info on startup
+function showLoginCredentials() {
+  console.log('');
+  console.log('🔑 ========== INFORMAÇÕES DE LOGIN ==========');
+  console.log('📧 Usuário admin configurado no sistema');
+  console.log('🔒 Senha: [configurada via Perfil > Segurança]');
+  console.log('🌐 URL: http://localhost:5000');
+  console.log('ℹ️  Para alterar credenciais: Perfil > Segurança');
+  console.log('🛡️  Por segurança, senha não é exibida no console');
+  console.log('===========================================');
+  console.log('');
 }
+
+// Tipos de sessão são definidos em auth.ts
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -21,7 +27,9 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Configuração de sessão
 const isProduction = process.env.NODE_ENV === 'production';
-app.use(session({
+
+// Configure session store based on environment
+const sessionConfig: any = {
   secret: process.env.SESSION_SECRET || 'dev-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
@@ -31,7 +39,22 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000, // 24 horas
     sameSite: 'lax' // Importante para CORS
   }
-}));
+};
+
+// Use PostgreSQL session store in production
+if (isProduction) {
+  const PgStore = ConnectPgSimple(session);
+  sessionConfig.store = new PgStore({
+    pool: pool, // Use database pool
+    tableName: 'session', // Session table name
+    createTableIfMissing: true // Auto-create session table
+  });
+  console.log('🔒 Using PostgreSQL session store for production');
+} else {
+  console.log('🔒 Using MemoryStore for development');
+}
+
+app.use(session(sessionConfig));
 
 
 app.use((req, res, next) => {
@@ -93,5 +116,6 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    showLoginCredentials();
   });
 })();

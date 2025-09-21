@@ -1,98 +1,38 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import HeroSection from "@/components/hero-section";
-import TournamentCard from "@/components/tournament-card";
-import RankingTable from "@/components/ranking-table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { type Tournament, type AthleteWithStats } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CreditCard, Users, Trophy, BarChart3 } from "lucide-react";
 
 export default function Home() {
-  const { data: liveTournaments, isLoading: loadingTournaments } = useQuery<Tournament[]>({
-    queryKey: ['/api/tournaments'],
-    select: (data) => data?.filter(t => t.status === 'in_progress' || t.status === 'registration_open').slice(0, 6) || [],
-  });
-
-  const { data: topAthletes, isLoading: loadingRanking } = useQuery<AthleteWithStats[]>({
-    queryKey: ['/api/athletes/ranking'],
-    select: (data) => data?.slice(0, 3) || [],
-  });
-
-  const tournamentFormats = [
+  const resources = [
     {
-      name: "Eliminação Simples",
-      description: "Eliminação imediata após perder uma partida. Ideal para torneios rápidos.",
-      icon: "schedule",
-      badge: "Duração: Rápida",
-      badgeColor: "primary",
+      icon: CreditCard,
+      title: "Gestão financeira",
+      description: "Controle contas a pagar e receber.",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50 dark:bg-blue-950",
     },
     {
-      name: "Eliminação Dupla",
-      description: "Segunda chance para todos. Eliminação após perder duas partidas.",
-      icon: "favorite",
-      badge: "Mais Popular",
-      badgeColor: "secondary",
+      icon: Users,
+      title: "Atletas e associados",
+      description: "Cadastro organizado e atualizado.",
+      color: "text-green-600",
+      bgColor: "bg-green-50 dark:bg-green-950",
     },
     {
-      name: "Round Robin",
-      description: "Todos contra todos. Cada jogador enfrenta todos os demais.",
-      icon: "group",
-      badge: "Máxima Participação",
-      badgeColor: "primary",
+      icon: Trophy,
+      title: "Torneios e ranking",
+      description: "Acompanhe resultados e desempenho em tempo real.",
+      color: "text-purple-600",
+      bgColor: "bg-purple-50 dark:bg-purple-950",
     },
     {
-      name: "Sistema Suíço",
-      description: "Emparelhamentos baseados na força, sem eliminação direta.",
-      icon: "trending_up",
-      badge: "Equilibrado",
-      badgeColor: "primary",
-    },
-    {
-      name: "Liga",
-      description: "Competição contínua com ranking baseado em pontuação acumulada.",
-      icon: "emoji_events",
-      badge: "Longo Prazo",
-      badgeColor: "secondary",
-    },
-    {
-      name: "Personalizado",
-      description: "Crie regras únicas e formatos especiais para suas necessidades.",
-      icon: "settings",
-      badge: "Totalmente Flexível",
-      badgeColor: "primary",
-    },
-  ];
-
-  const stats = [
-    { value: "150K+", label: "Torneios Criados" },
-    { value: "50K+", label: "Atletas Ativos" },
-    { value: "1.2M+", label: "Partidas Disputadas" },
-  ];
-
-  const features = [
-    {
-      icon: "person_add",
-      title: "Cadastro de Atletas",
-      description: "Gerencie perfis completos dos jogadores com estatísticas e histórico",
-      color: "primary",
-    },
-    {
-      icon: "sports",
-      title: "Chaveamento Automático",
-      description: "Geração inteligente de chaves com base no ranking e categorias",
-      color: "secondary",
-    },
-    {
-      icon: "trending_up",
-      title: "Ranking Dinâmico",
-      description: "Sistema de pontuação baseado na performance em torneios",
-      color: "primary",
-    },
-    {
-      icon: "notifications",
-      title: "Notificações",
-      description: "Alertas em tempo real para jogadores e organizadores",
-      color: "secondary",
+      icon: BarChart3,
+      title: "Relatórios práticos",
+      description: "Informações claras para apoiar decisões.",
+      color: "text-orange-600",
+      bgColor: "bg-orange-50 dark:bg-orange-950",
     },
   ];
 
@@ -101,190 +41,75 @@ export default function Home() {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Tournament Stats */}
-      <section className="py-16 bg-muted">
+      {/* Seção de Recursos */}
+      <section id="recursos" className="py-20 bg-white dark:bg-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            {stats.map((stat, index) => (
-              <div key={index} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
-                <div className="text-3xl md:text-4xl font-bold text-primary mb-2" data-testid={`stat-value-${index}`}>
-                  {stat.value}
-                </div>
-                <div className="text-muted-foreground" data-testid={`stat-label-${index}`}>
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Tournament Formats */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 md:mb-16">
-            <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4">Formatos de Torneio</h3>
-            <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-              Escolha entre diversos formatos para criar o torneio perfeito para sua comunidade de tênis de mesa
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            {tournamentFormats.map((format, index) => (
-              <Card 
-                key={index} 
-                className="material-elevation-1 hover:material-elevation-2 transition-all duration-300 animate-slide-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-                data-testid={`format-card-${index}`}
-              >
-                <CardContent className="p-4 md:p-6">
-                  <div className="mb-4 md:mb-6 h-32 md:h-48 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-lg flex items-center justify-center">
-                    <span className="material-icons text-4xl md:text-6xl text-primary">
-                      {format.icon}
-                    </span>
-                  </div>
-                  <h4 className="text-lg md:text-xl font-semibold text-foreground mb-2 md:mb-3" data-testid={`format-name-${index}`}>
-                    {format.name}
-                  </h4>
-                  <p className="text-sm md:text-base text-muted-foreground mb-3 md:mb-4" data-testid={`format-description-${index}`}>
-                    {format.description}
-                  </p>
-                  <div className={`flex items-center text-${format.badgeColor}`}>
-                    <span className="material-icons mr-2">{format.icon}</span>
-                    <span className="text-sm" data-testid={`format-badge-${index}`}>
-                      {format.badge}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Live Tournaments */}
-      <section className="py-20 bg-muted">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold text-foreground mb-4">Torneios em Andamento</h3>
-            <p className="text-lg text-muted-foreground">Acompanhe os torneios mais emocionantes acontecendo agora</p>
-          </div>
-
-          {loadingTournaments ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardContent className="p-6">
-                    <div className="h-4 bg-muted rounded mb-4"></div>
-                    <div className="h-6 bg-muted rounded mb-2"></div>
-                    <div className="h-4 bg-muted rounded mb-4"></div>
-                    <div className="flex justify-between">
-                      <div className="h-4 bg-muted rounded w-20"></div>
-                      <div className="h-8 bg-muted rounded w-16"></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {liveTournaments?.map((tournament) => (
-                <TournamentCard 
-                  key={tournament.id} 
-                  tournament={tournament}
-                  onViewClick={(id) => window.location.href = `/tournaments/${id}`}
-                />
-              ))}
-            </div>
-          )}
-
-          <div className="text-center mt-8">
-            <Link href="/tournaments">
-              <Button 
-                className="material-elevation-1"
-                data-testid="button-view-all-tournaments"
-              >
-                Ver Todos os Torneios
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-
-      {/* Features Section */}
-      <section className="py-20 bg-muted">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold text-foreground mb-4">Recursos Completos</h3>
-            <p className="text-lg text-muted-foreground">Tudo que você precisa para gerenciar torneios profissionais</p>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Tudo o que você precisa em um só lugar
+            </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <div key={index} className="text-center" data-testid={`feature-${index}`}>
-                <div className={`w-16 h-16 bg-${feature.color} rounded-full flex items-center justify-center mx-auto mb-4`}>
-                  <span className={`material-icons text-${feature.color}-foreground text-2xl`}>
-                    {feature.icon}
-                  </span>
-                </div>
-                <h4 className="text-lg font-semibold text-foreground mb-2" data-testid={`feature-title-${index}`}>
-                  {feature.title}
-                </h4>
-                <p className="text-sm text-muted-foreground" data-testid={`feature-description-${index}`}>
-                  {feature.description}
-                </p>
-              </div>
-            ))}
+            {resources.map((resource, index) => {
+              const IconComponent = resource.icon;
+              return (
+                <Card 
+                  key={index} 
+                  className="text-center border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                  data-testid={`resource-card-${index}`}
+                >
+                  <CardContent className="pt-6">
+                    <div className={`w-16 h-16 ${resource.bgColor} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                      <IconComponent className={`h-8 w-8 ${resource.color}`} />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2" data-testid={`resource-title-${index}`}>
+                      {resource.title}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300 text-sm" data-testid={`resource-description-${index}`}>
+                      {resource.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h3 className="text-3xl font-bold text-foreground mb-4">Pronto para Começar?</h3>
-          <p className="text-lg text-muted-foreground mb-8">
-            Junte-se a milhares de organizadores que confiam na nossa plataforma para 
-            gerenciar seus torneios de tênis de mesa.
+      {/* Seção Sobre */}
+      <section className="py-20 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8">
+            Sobre o Sistema
+          </h2>
+          <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed">
+            A Associação Mesatenista de Içara agora conta com um sistema digital que une gestão administrativa, 
+            financeira e esportiva em um só ambiente. Simples, ágil e confiável.
           </p>
-
-          <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <Link href="/create-tournament">
-              <Button 
-                size="lg" 
-                className="text-lg font-medium material-elevation-2"
-                data-testid="button-cta-create"
-              >
-                Criar Torneio Gratuito
-              </Button>
-            </Link>
-            <Link href="/tournaments">
-              <Button 
-                variant="outline" 
-                size="lg"
-                data-testid="button-cta-explore"
-              >
-                Explorar Demo
-              </Button>
-            </Link>
-          </div>
-
-          <div className="mt-8 text-sm text-muted-foreground">
-            Plano gratuito • Sem cartão de crédito • Configuração em 2 minutos
-          </div>
         </div>
       </section>
 
-      {/* Floating Action Button */}
-      <Link href="/create-tournament">
-        <button 
-          className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full material-elevation-3 hover:material-elevation-2 transition-all duration-300 z-50"
-          data-testid="fab-create-tournament"
-        >
-          <span className="material-icons">add</span>
-        </button>
-      </Link>
+      {/* Chamada Final (Call to Action) */}
+      <section className="py-20 bg-blue-600 dark:bg-blue-700">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+            Mais tempo para o esporte, menos preocupação com a gestão.
+          </h2>
+          <p className="text-xl text-blue-100 mb-8">
+            Simplifique a administração da sua associação e foque no que realmente importa.
+          </p>
+          <Link href="/login">
+            <Button 
+              size="lg" 
+              className="text-lg font-medium px-8 py-4 bg-white text-blue-600 hover:bg-gray-100 shadow-lg hover:shadow-xl transition-all duration-300"
+              data-testid="button-cta-access"
+            >
+              Acessar Agora
+            </Button>
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

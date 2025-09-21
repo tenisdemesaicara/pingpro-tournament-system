@@ -19,6 +19,19 @@ function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// Show dynamic login info on startup (production)
+function showLoginCredentials() {
+  console.log('');
+  console.log('🔑 ========== INFORMAÇÕES DE LOGIN ==========');
+  console.log('📧 Usuário admin configurado no sistema');
+  console.log('🔒 Senha: [configurada via Perfil > Segurança]');
+  console.log('🌐 URL: https://pingpro.onrender.com');
+  console.log('ℹ️  Para alterar credenciais: Perfil > Segurança');
+  console.log('🛡️  Por segurança, senha não é exibida no console');
+  console.log('===========================================');
+  console.log('');
+}
+
 // Simple static file serving
 function serveStatic(app: express.Express) {
   const distPath = path.resolve("dist/public");
@@ -35,16 +48,7 @@ function serveStatic(app: express.Express) {
   });
 }
 
-// Configuração de tipos para sessão
-declare module 'express-session' {
-  interface SessionData {
-    user: {
-      id: string;
-      username: string;
-      role: string;
-    };
-  }
-}
+// Tipos de sessão são definidos em auth.ts
 
 const app = express();
 
@@ -375,6 +379,7 @@ async function initializeDatabase() {
     }, () => {
       log(`🎉 SERVER READY! serving on port ${port}`, 'startup');
       log(`🔗 Health check: http://0.0.0.0:${port}/api/health`, 'startup');
+      showLoginCredentials();
     });
     
   } catch (error) {

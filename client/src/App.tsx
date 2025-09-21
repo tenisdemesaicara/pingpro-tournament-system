@@ -27,6 +27,8 @@ import TournamentRegistration from "@/pages/tournament-registration";
 import ConsentTournament from "@/pages/consent-tournament";
 import Consent from "@/pages/consent";
 import ConsentsAdmin from "@/pages/consents-admin";
+import AdminUsers from "@/pages/admin-users";
+import Profile from "@/pages/profile";
 import { AuthProvider } from "@/context/auth-context";
 import ProtectedRoute from "@/components/protected-route";
 
@@ -125,6 +127,14 @@ function Router() {
             </ProtectedRoute>
           )}
         </Route>
+        <Route path="/profile">
+          {() => (
+            <ProtectedRoute>
+              <Navbar />
+              <Profile />
+            </ProtectedRoute>
+          )}
+        </Route>
         <Route path="/admin/approvals">
           {() => (
             <ProtectedRoute>
@@ -138,6 +148,14 @@ function Router() {
             <ProtectedRoute>
               <Navbar />
               <ConsentsAdmin />
+            </ProtectedRoute>
+          )}
+        </Route>
+        <Route path="/admin/users">
+          {() => (
+            <ProtectedRoute>
+              <Navbar />
+              <AdminUsers />
             </ProtectedRoute>
           )}
         </Route>

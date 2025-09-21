@@ -1,9 +1,31 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
+interface Permission {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  module: string;
+  action: string;
+  createdAt: string;
+}
+
+interface Role {
+  id: string;
+  name: string;
+  displayName: string;
+  permissions: Permission[];
+}
+
 interface AuthUser {
   id: string;
   username: string;
-  role: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
+  profileImageUrl?: string;
+  roles: Role[];
 }
 
 interface AuthContextType {
@@ -12,6 +34,9 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  hasPermission: (permissionName: string) => boolean;
+  hasRole: (roleName: string) => boolean;
+  hasAnyPermission: (permissionNames: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -84,6 +109,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Funções de verificação de permissão
+  const hasPermission = (permissionName: string): boolean => {
+    if (!user || !user.roles) return false;
+    
+    return user.roles.some(role => 
+      role.permissions?.some(permission => permission.name === permissionName)
+    );
+  };
+
+  const hasRole = (roleName: string): boolean => {
+    if (!user || !user.roles) return false;
+    
+    return user.roles.some(role => role.name === roleName);
+  };
+
+  const hasAnyPermission = (permissionNames: string[]): boolean => {
+    if (!user || !user.roles) return false;
+    
+    return permissionNames.some(permissionName => hasPermission(permissionName));
+  };
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -93,7 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     login,
     logout,
-    checkAuth
+    checkAuth,
+    hasPermission,
+    hasRole,
+    hasAnyPermission
   };
 
   return (

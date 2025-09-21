@@ -1,0 +1,129 @@
+# PingPong Pro - Tournament Management System
+
+## Overview
+
+PingPong Pro is a comprehensive table tennis tournament management platform built with modern web technologies. It provides tools for organizing tournaments, managing athlete registrations, tracking rankings, and facilitating community engagement around table tennis competitions. The system supports multiple tournament formats including single elimination, double elimination, round robin, and Swiss-style tournaments.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript for type safety and modern development
+- **Routing**: Wouter for lightweight client-side routing
+- **UI Library**: Radix UI components with shadcn/ui design system
+- **Styling**: Tailwind CSS with custom CSS variables for theming
+- **State Management**: TanStack Query (React Query) for server state management
+- **Form Handling**: React Hook Form with Zod validation for type-safe forms
+- **Build Tool**: Vite for fast development and optimized production builds
+
+### Backend Architecture
+- **Runtime**: Node.js with Express.js web framework
+- **Language**: TypeScript for full-stack type safety
+- **API Design**: RESTful API endpoints with consistent error handling
+- **Data Layer**: In-memory storage implementation with interface for future database integration
+- **Session Management**: Express sessions with PostgreSQL session store (connect-pg-simple)
+- **Development**: Hot module replacement with Vite middleware integration
+
+### Database Design
+- **ORM**: Drizzle ORM with PostgreSQL dialect
+- **Database**: PostgreSQL with Neon serverless connection
+- **Schema**: Well-defined table structures for athletes, tournaments, participants, matches, and communities
+- **Migrations**: Drizzle Kit for database schema management
+- **Validation**: Drizzle-Zod integration for runtime type validation
+
+### Key Data Models
+- **Athletes**: User profiles with rankings, categories, and statistics
+- **Tournaments**: Competition management with various formats and status tracking
+- **Matches**: Game results and bracket progression
+- **Communities**: Local club and regional organization support
+- **Tournament Participants**: Junction table managing athlete enrollments
+
+### Authentication & Authorization
+- Session-based authentication using Express sessions
+- Role-based access patterns prepared for organizer/participant distinctions
+- Secure cookie configuration for production deployment
+
+### Frontend Components
+- **Reusable UI Components**: Comprehensive component library using Radix primitives
+- **Form Components**: Standardized form handling with validation feedback
+- **Data Display**: Tournament cards, ranking tables, and athlete profiles
+- **Navigation**: Responsive navbar with mobile-friendly design
+- **Theming**: Light/dark mode support with CSS custom properties
+
+### API Structure
+- **RESTful Endpoints**: CRUD operations for all major entities
+- **Consistent Response Format**: Standardized JSON responses with error handling
+- **Query Parameters**: Filtering and pagination support
+- **Validation**: Request validation using Zod schemas
+- **Error Handling**: Centralized error middleware with appropriate HTTP status codes
+
+## External Dependencies
+
+### Database & Storage
+- **@neondatabase/serverless**: Serverless PostgreSQL connection for Neon database
+- **drizzle-orm**: Type-safe ORM for database operations
+- **drizzle-kit**: Database migration and schema management tools
+- **connect-pg-simple**: PostgreSQL session store for Express sessions
+
+### UI & Styling
+- **@radix-ui/***: Comprehensive set of accessible UI primitives
+- **tailwindcss**: Utility-first CSS framework
+- **class-variance-authority**: Type-safe variant handling for components
+- **clsx**: Conditional className utility
+- **lucide-react**: Icon library for consistent iconography
+
+### Development & Build
+- **vite**: Fast build tool and development server
+- **@vitejs/plugin-react**: React support for Vite
+- **@replit/vite-plugin-runtime-error-modal**: Enhanced error reporting for Replit
+- **@replit/vite-plugin-cartographer**: Development tooling integration
+
+### Data Management
+- **@tanstack/react-query**: Powerful data fetching and caching library
+- **react-hook-form**: Performant forms with minimal re-renders
+- **@hookform/resolvers**: Validation resolvers for React Hook Form
+- **zod**: Runtime type validation and schema definition
+
+### Date & Utilities
+- **date-fns**: Modern date utility library
+- **nanoid**: URL-safe unique ID generator
+- **cmdk**: Command palette component for enhanced UX
+
+## Automated Deployment System
+
+### Auto-Deploy Configuration
+The project includes an automated deployment system that monitors file changes and automatically deploys to production without manual intervention.
+
+**Features:**
+- **File Monitoring**: Watches all source files (client/src, server, shared) for changes
+- **Automatic Git Operations**: Auto-commits and pushes changes to GitHub
+- **Production Deployment**: Render automatically deploys when GitHub receives updates
+- **Smart Timing**: Waits 3 seconds after last change to batch multiple file saves
+
+### Usage Instructions
+
+**Option 1: Manual Start**
+```bash
+npm run auto-deploy
+```
+
+**Option 2: Development + Auto-Deploy**
+```bash
+./start-with-autodeploy.sh
+```
+
+**Workflow:**
+1. Edit any file in the Replit project
+2. Save the file (Ctrl+S)
+3. Auto-deploy detects change and schedules deployment
+4. After 3 seconds, commits and pushes to GitHub
+5. Render automatically builds and deploys to production
+6. Production site updates within 3-5 minutes
+
+**Monitoring:**
+- Console shows deployment status and timestamps
+- Production URL: https://pingpro.onrender.com
+- Build logs available in Render dashboard

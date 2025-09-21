@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Navbar() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission, hasRole, hasAnyPermission } = useAuth();
   const { toast } = useToast();
 
   const isActive = (path: string) => location === path;
@@ -74,40 +74,68 @@ export default function Navbar() {
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Dropdown de Administração */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="hidden sm:inline-flex"
-                  data-testid="button-admin"
-                >
-                  <span className="material-icons mr-2">admin_panel_settings</span>
-                  Admin
-                  <ChevronDown className="ml-1 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem asChild>
-                  <Link 
-                    href="/admin/approvals"
-                    className="w-full"
-                    data-testid="nav-admin-approvals"
+            {/* Dropdown de Administração - Controle baseado em permissões reais */}
+            {hasAnyPermission(['users.read', 'system.manage', 'athletes.manage']) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="hidden sm:inline-flex"
+                    data-testid="button-admin"
                   >
-                    Aprovações
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link 
-                    href="/admin/consents"
-                    className="w-full"
-                    data-testid="nav-admin-consents"
-                  >
-                    Consentimentos LGPD
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <span className="material-icons mr-2">admin_panel_settings</span>
+                    {hasPermission('system.manage') ? 'Admin' : 'Operador'}
+                    <ChevronDown className="ml-1 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {hasPermission('users.read') && (
+                    <DropdownMenuItem asChild>
+                      <Link 
+                        href="/admin/users"
+                        className="w-full"
+                        data-testid="nav-admin-users"
+                      >
+                        👥 Usuários
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {hasPermission('athletes.manage') && (
+                    <DropdownMenuItem asChild>
+                      <Link 
+                        href="/admin/approvals"
+                        className="w-full"
+                        data-testid="nav-admin-approvals"
+                      >
+                        ✅ Aprovações
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {hasPermission('system.manage') && (
+                    <DropdownMenuItem asChild>
+                      <Link 
+                        href="/admin/consents"
+                        className="w-full"
+                        data-testid="nav-admin-consents"
+                      >
+                        🔒 Consentimentos LGPD
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {hasPermission('system.manage') && (
+                    <DropdownMenuItem asChild>
+                      <Link 
+                        href="/admin/system"
+                        className="w-full"
+                        data-testid="nav-admin-system"
+                      >
+                        ⚙️ Sistema
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {/* Dropdown do usuário */}
             <DropdownMenu>
@@ -119,6 +147,16 @@ export default function Navbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link 
+                    href="/profile"
+                    className="w-full"
+                    data-testid="nav-profile"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Meu Perfil
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={async () => {
                     await logout();

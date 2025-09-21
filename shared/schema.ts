@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, json, decimal, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, json, decimal, date, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -578,4 +578,207 @@ export const insertExternalLinkSchema = createInsertSchema(externalLinks).omit({
 
 export type InsertExternalLink = z.infer<typeof insertExternalLinkSchema>;
 export type ExternalLink = typeof externalLinks.$inferSelect;
+
+// ===== SISTEMA DE USUÁRIOS E PERMISSÕES =====
+
+// Usuários do sistema (administradores, operadores, etc.)
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  isActive: boolean("is_active").default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  profileImageUrl: text("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Roles/Funções (Admin, Operador, etc.)
+export const roles = pgTable("roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  isSystemRole: boolean("is_system_role").default(false), // Roles que não podem ser editadas
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Permissões específicas
+export const permissions = pgTable("permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  module: text("module").notNull(), // tournaments, athletes, users, finances, etc.
+  action: text("action").notNull(), // create, read, update, delete, manage
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Relação muitos-para-muitos entre usuários e roles
+export const userRoles = pgTable("user_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  roleId: varchar("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  assignedBy: varchar("assigned_by").references(() => users.id),
+});
+
+// Relação muitos-para-muitos entre roles e permissões
+export const rolePermissions = pgTable("role_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roleId: varchar("role_id").notNull().references(() => roles.id, { onDelete: "cascade" }),
+  permissionId: varchar("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Overrides de permissões por usuário (grant/deny individual permissions)
+export const userPermissionOverrides = pgTable("user_permission_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permissionId: varchar("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
+  effect: text("effect").notNull(), // 'grant' ou 'deny'
+  assignedBy: varchar("assigned_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueUserPermission: unique().on(table.userId, table.permissionId), // Previne duplicatas
+}));
+
+// Sessões de usuário
+export const userSessions = pgTable("user_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: text("session_id").notNull().unique(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+// Log de atividades dos usuários
+export const userActivityLog = pgTable("user_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  action: text("action").notNull(),
+  module: text("module").notNull(),
+  entityId: text("entity_id"), // ID da entidade afetada
+  entityType: text("entity_type"), // Tipo da entidade (tournament, athlete, etc.)
+  details: json("details"), // Detalhes adicionais da ação
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Esquemas de validação para usuários
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  passwordHash: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+}).extend({
+  password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Senha deve conter pelo menos uma letra minúscula, uma maiúscula e um número"),
+  confirmPassword: z.string(),
+  roleIds: z.array(z.string()).min(1, "Pelo menos uma função deve ser selecionada"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Senhas não coincidem",
+  path: ["confirmPassword"],
+});
+
+export const updateUserSchema = createInsertSchema(users).omit({
+  id: true,
+  passwordHash: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+}).extend({
+  roleIds: z.array(z.string()).min(1, "Pelo menos uma função deve ser selecionada"),
+});
+
+export const updateProfileSchema = createInsertSchema(users).omit({
+  id: true,
+  passwordHash: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+  isActive: true,
+  profileImageUrl: true,
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Senha atual é obrigatória"),
+  newPassword: z.string().min(8, "Nova senha deve ter pelo menos 8 caracteres")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Nova senha deve conter pelo menos uma letra minúscula, uma maiúscula e um número"),
+  confirmNewPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmNewPassword, {
+  message: "Novas senhas não coincidem",
+  path: ["confirmNewPassword"],
+});
+
+// Schemas para permissões individuais de usuários
+export const insertUserPermissionOverrideSchema = createInsertSchema(userPermissionOverrides).omit({
+  id: true,
+  createdAt: true,
+  assignedBy: true,
+}).extend({
+  effect: z.enum(['grant', 'deny'], { 
+    required_error: "Efeito deve ser 'grant' ou 'deny'" 
+  }),
+});
+
+export const userPermissionsSchema = z.object({
+  grants: z.array(z.string()).default([]), // Array de permission IDs para conceder
+  denies: z.array(z.string()).default([]), // Array de permission IDs para negar
+});
+
+// Tipos TypeScript
+export type InsertUserPermissionOverride = z.infer<typeof insertUserPermissionOverrideSchema>;
+export type UserPermissions = z.infer<typeof userPermissionsSchema>;
+
+export const loginSchema = z.object({
+  username: z.string().min(1, "Nome de usuário é obrigatório"),
+  password: z.string().min(1, "Senha é obrigatória"),
+});
+
+export const insertRoleSchema = createInsertSchema(roles).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  permissionIds: z.array(z.string()).optional(),
+});
+
+export const insertPermissionSchema = createInsertSchema(permissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Tipos derivados
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUser = z.infer<typeof updateUserSchema>;
+export type ChangePassword = z.infer<typeof changePasswordSchema>;
+export type Login = z.infer<typeof loginSchema>;
+export type User = typeof users.$inferSelect;
+export type Role = typeof roles.$inferSelect;
+export type Permission = typeof permissions.$inferSelect;
+export type UserRole = typeof userRoles.$inferSelect;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+export type UserSession = typeof userSessions.$inferSelect;
+export type UserActivityLog = typeof userActivityLog.$inferSelect;
+
+// Tipos compostos para APIs
+export type UserWithRoles = User & {
+  roles: (Role & { permissions: Permission[] })[];
+  effectivePermissions: string[]; // Lista de nomes de permissões efetivas
+};
+
+export type RoleWithPermissions = Role & {
+  permissions: Permission[];
+};
+
+export type UserProfile = Omit<User, 'passwordHash'> & {
+  roles: Role[];
+};
 

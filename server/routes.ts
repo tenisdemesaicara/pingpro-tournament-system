@@ -3,17 +3,34 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertAthleteSchema, insertTournamentSchema, insertTournamentParticipantSchema, insertMatchSchema, insertCategorySchema, insertPaymentSchema, insertRevenueSchema, insertExpenseSchema, insertConsentSchema, insertExternalLinkSchema, tournamentRegistrationSchema } from "@shared/schema";
 import { calculateAgeInTournamentYear, isEligibleForCategory, extractYearFromDate } from "@shared/utils";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { Pool } from "pg";
-import { authenticateUser, requireAuth } from "./auth";
+import { authenticateUser, requireAuth, requirePermission, requireRole, getUserWithRoles } from "./auth";
+import { 
+  insertUserSchema, 
+  updateUserSchema,
+  changePasswordSchema, 
+  loginSchema,
+  users, 
+  roles, 
+  permissions, 
+  userRoles, 
+  rolePermissions,
+  userPermissionOverrides,
+  insertUserPermissionOverrideSchema,
+  userPermissionsSchema
+} from "@shared/schema";
+import bcrypt from 'bcrypt';
 import { generateGroupStageMatches, generateRoundRobinMatches, generateKnockoutMatches } from "./bracketUtils";
 import { BracketManager } from "./bracketLogic";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+  
+  // DEBUG removido - problema resolvido!
   
   // Health check endpoint for Render
   app.get("/api/health", (req, res) => {
@@ -67,6 +84,656 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== ROTAS DE GERENCIAMENTO DE USUÁRIOS =====
+  
+  // Listar todos os usuários (apenas admins)
+  app.get("/api/users", requireAuth, requirePermission('users.read'), async (req, res) => {
+    try {
+      const usersResult = await db.select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        isActive: users.isActive,
+        lastLoginAt: users.lastLoginAt,
+        profileImageUrl: users.profileImageUrl,
+        createdAt: users.createdAt,
+      }).from(users);
+
+      // Buscar roles para cada usuário
+      const usersWithRoles = await Promise.all(
+        usersResult.map(async (user) => {
+          const userRolesResult = await db.select({
+            roleId: roles.id,
+            roleName: roles.name,
+            roleDisplayName: roles.displayName,
+          }).from(userRoles)
+          .innerJoin(roles, eq(userRoles.roleId, roles.id))
+          .where(eq(userRoles.userId, user.id));
+
+          return {
+            ...user,
+            roles: userRolesResult.map(r => ({
+              id: r.roleId,
+              name: r.roleName,
+              displayName: r.roleDisplayName,
+            }))
+          };
+        })
+      );
+
+      res.json(usersWithRoles);
+    } catch (error) {
+      console.error("Erro ao buscar usuários:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // Criar novo usuário (apenas admins)
+  app.post("/api/users", requireAuth, requirePermission('users.create'), async (req, res) => {
+    try {
+      console.log("🔍 CRIAÇÃO DE USUÁRIO - Body recebido:", JSON.stringify(req.body, null, 2));
+      const validatedData = insertUserSchema.parse(req.body);
+      console.log("✅ VALIDAÇÃO OK para criação de usuário");
+      
+      // Verificar se username ou email já existem
+      const existingUser = await db.select().from(users).where(
+        sql`${users.username} = ${validatedData.username} OR ${users.email} = ${validatedData.email}`
+      );
+      
+      if (existingUser.length > 0) {
+        return res.status(400).json({ 
+          message: "Usuário ou email já existem" 
+        });
+      }
+
+      // Hash da senha
+      const passwordHash = await bcrypt.hash(validatedData.password, 10);
+
+      // Criar usuário
+      const newUser = await db.insert(users).values({
+        username: validatedData.username,
+        email: validatedData.email,
+        passwordHash,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        isActive: validatedData.isActive ?? true,
+        profileImageUrl: validatedData.profileImageUrl,
+      }).returning();
+
+      // Atribuir roles
+      if (validatedData.roleIds && validatedData.roleIds.length > 0) {
+        const roleAssignments = validatedData.roleIds.map(roleId => ({
+          userId: newUser[0].id,
+          roleId,
+          assignedBy: req.session.user!.id,
+        }));
+        
+        await db.insert(userRoles).values(roleAssignments);
+      }
+
+      // Retornar usuário criado (sem hash da senha)
+      const { passwordHash: _, ...userResponse } = newUser[0];
+      res.status(201).json(userResponse);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: error.errors 
+        });
+      }
+      console.error("Erro ao criar usuário:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // 🎯 ATUALIZAR PERFIL - ANTES DE :id PARA EVITAR CONFLITO!
+  app.put("/api/users/profile", requireAuth, async (req, res) => {
+    console.log("✅ CHEGOU NA ROTA DE PERFIL CORRETA!");
+    
+    try {
+      const { username, email, firstName, lastName } = req.body;
+      
+      if (!username || !email || !firstName || !lastName) {
+        return res.status(400).json({ 
+          message: "Campos obrigatórios faltando"
+        });
+      }
+
+      // Verificar conflitos (exceto próprio usuário)
+      const existingUsers = await db.select()
+        .from(users)
+        .where(
+          and(
+            ne(users.id, req.session.user!.id),
+            or(
+              eq(users.username, username),
+              eq(users.email, email)
+            )
+          )
+        );
+
+      if (existingUsers.length > 0) {
+        const existingUser = existingUsers[0];
+        if (existingUser.username === username) {
+          return res.status(400).json({ message: "Nome de usuário já existe" });
+        }
+        if (existingUser.email === email) {
+          return res.status(400).json({ message: "Email já existe" });
+        }
+      }
+
+      // Atualizar perfil
+      await db.update(users)
+        .set({
+          username,
+          email,
+          firstName,
+          lastName,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, req.session.user!.id));
+
+      res.json({ message: "Perfil atualizado com sucesso" });
+    } catch (error) {
+      console.error("Erro ao atualizar perfil:", error);
+      return res.status(500).json({ 
+        message: "Erro interno do servidor"
+      });
+    }
+  });
+
+  // Atualizar usuário (apenas admins)
+  app.put("/api/users/:id", requireAuth, requirePermission('users.update'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = updateUserSchema.parse(req.body);
+
+      // Verificar se usuário existe
+      const existingUser = await db.select().from(users).where(eq(users.id, id));
+      if (!existingUser.length) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+
+      // Verificar conflitos de username/email
+      const conflictUser = await db.select().from(users).where(
+        and(
+          sql`${users.id} != ${id}`,
+          sql`${users.username} = ${validatedData.username} OR ${users.email} = ${validatedData.email}`
+        )
+      );
+      
+      if (conflictUser.length > 0) {
+        return res.status(400).json({ 
+          message: "Usuário ou email já existem" 
+        });
+      }
+
+      // Atualizar usuário
+      const updatedUser = await db.update(users)
+        .set({
+          username: validatedData.username,
+          email: validatedData.email,
+          firstName: validatedData.firstName,
+          lastName: validatedData.lastName,
+          isActive: validatedData.isActive,
+          profileImageUrl: validatedData.profileImageUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, id))
+        .returning();
+
+      // Atualizar roles
+      if (validatedData.roleIds) {
+        // Remover roles existentes
+        await db.delete(userRoles).where(eq(userRoles.userId, id));
+        
+        // Adicionar novas roles
+        if (validatedData.roleIds.length > 0) {
+          const roleAssignments = validatedData.roleIds.map(roleId => ({
+            userId: id,
+            roleId,
+            assignedBy: req.session.user!.id,
+          }));
+          
+          await db.insert(userRoles).values(roleAssignments);
+        }
+      }
+
+      const { passwordHash: _, ...userResponse } = updatedUser[0];
+      res.json(userResponse);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: error.errors 
+        });
+      }
+      console.error("Erro ao atualizar usuário:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // Excluir usuário (apenas admins)
+  app.delete("/api/users/:id", requireAuth, requirePermission('users.delete'), async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Verificar se usuário existe
+      const existingUser = await db.select().from(users).where(eq(users.id, id));
+      if (!existingUser.length) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+
+      // Não permitir auto-exclusão
+      if (id === req.session.user!.id) {
+        return res.status(400).json({ 
+          message: "Não é possível excluir seu próprio usuário" 
+        });
+      }
+
+      // Excluir usuário (cascade irá remover roles automaticamente)
+      await db.delete(users).where(eq(users.id, id));
+
+      res.json({ message: "Usuário excluído com sucesso" });
+    } catch (error) {
+      console.error("Erro ao excluir usuário:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // Alterar senha
+  app.post("/api/users/:id/change-password", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = changePasswordSchema.parse(req.body);
+
+      // Verificar se o usuário pode alterar esta senha
+      if (id !== req.session.user!.id && !req.session.user!.roles.some((role: any) => 
+        role.permissions.some((permission: any) => permission.name === 'users.manage')
+      )) {
+        return res.status(403).json({ 
+          message: "Não autorizado a alterar esta senha" 
+        });
+      }
+
+      // Buscar usuário
+      const user = await db.select().from(users).where(eq(users.id, id));
+      if (!user.length) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+
+      // Verificar senha atual (apenas para próprio usuário)
+      if (id === req.session.user!.id) {
+        const isCurrentPasswordValid = await bcrypt.compare(
+          validatedData.currentPassword, 
+          user[0].passwordHash
+        );
+        if (!isCurrentPasswordValid) {
+          return res.status(400).json({ 
+            message: "Senha atual incorreta" 
+          });
+        }
+      }
+
+      // Hash da nova senha
+      const newPasswordHash = await bcrypt.hash(validatedData.newPassword, 10);
+
+      // Atualizar senha
+      await db.update(users)
+        .set({ 
+          passwordHash: newPasswordHash,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, id));
+
+      res.json({ message: "Senha alterada com sucesso" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: error.errors 
+        });
+      }
+      console.error("Erro ao alterar senha:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // Obter perfil do usuário atual
+  app.get("/api/users/profile", requireAuth, async (req, res) => {
+    try {
+      const user = await db.select().from(users).where(eq(users.id, req.session.user!.id));
+
+      if (!user.length) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+
+      // Return only safe fields
+      const profile = {
+        id: user[0].id,
+        username: user[0].username,
+        email: user[0].email,
+        firstName: user[0].firstName,
+        lastName: user[0].lastName,
+        createdAt: user[0].createdAt,
+      };
+
+      res.json(profile);
+    } catch (error) {
+      console.error("Erro ao buscar perfil:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // ROTA MOVIDA PARA CIMA PARA EVITAR CONFLITO COM :id
+
+  // Alterar senha do usuário atual
+  app.post("/api/users/change-password", requireAuth, async (req, res) => {
+    try {
+      const validatedData = changePasswordSchema.parse(req.body);
+
+      // Buscar usuário
+      const user = await db.select().from(users).where(eq(users.id, req.session.user!.id));
+      if (!user.length) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+
+      // Verificar senha atual
+      const isCurrentPasswordValid = await bcrypt.compare(
+        validatedData.currentPassword, 
+        user[0].passwordHash
+      );
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ 
+          message: "Senha atual incorreta" 
+        });
+      }
+
+      // Hash da nova senha
+      const newPasswordHash = await bcrypt.hash(validatedData.newPassword, 10);
+
+      // Atualizar senha
+      await db.update(users)
+        .set({ 
+          passwordHash: newPasswordHash,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, req.session.user!.id));
+
+      res.json({ message: "Senha alterada com sucesso" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: error.errors 
+        });
+      }
+      console.error("Erro ao alterar senha:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // Listar roles disponíveis
+  app.get("/api/roles", requireAuth, requirePermission('users.read'), async (req, res) => {
+    try {
+      const rolesResult = await db.select().from(roles);
+      res.json(rolesResult);
+    } catch (error) {
+      console.error("Erro ao buscar roles:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // Listar permissões disponíveis
+  app.get("/api/permissions", requireAuth, requirePermission('users.read'), async (req, res) => {
+    try {
+      const permissionsResult = await db.select().from(permissions);
+      res.json(permissionsResult);
+    } catch (error) {
+      console.error("Erro ao buscar permissões:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+
+  // ===== ROTAS DE GERENCIAMENTO DE PERMISSÕES INDIVIDUAIS =====
+  
+  // Listar permissões efetivas de um usuário específico
+  app.get("/api/users/:id/permissions", requireAuth, requirePermission('users.manage'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      console.log(`🔍 Buscando permissões efetivas para usuário ${id}`);
+      
+      // Buscar usuário com permissões efetivas
+      const userWithPermissions = await getUserWithRoles(id);
+      if (!userWithPermissions) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      // Buscar overrides específicos do usuário
+      const overrides = await db.select({
+        id: userPermissionOverrides.id,
+        permissionId: userPermissionOverrides.permissionId,
+        permissionName: permissions.name,
+        permissionDisplayName: permissions.displayName,
+        effect: userPermissionOverrides.effect,
+        createdAt: userPermissionOverrides.createdAt,
+        assignedBy: userPermissionOverrides.assignedBy
+      }).from(userPermissionOverrides)
+      .innerJoin(permissions, eq(userPermissionOverrides.permissionId, permissions.id))
+      .where(eq(userPermissionOverrides.userId, id));
+      
+      // Buscar permissões dos roles para referência
+      const rolePermissions = userWithPermissions.roles.flatMap(role => 
+        role.permissions.map(permission => permission.name)
+      );
+      
+      const response = {
+        userId: id,
+        effectivePermissions: userWithPermissions.effectivePermissions,
+        rolePermissions, // Permissões vindas dos roles
+        individualOverrides: overrides, // Permissões individuais (grants/denies)
+        roles: userWithPermissions.roles.map(role => ({
+          id: role.id,
+          name: role.name,
+          displayName: role.displayName
+        }))
+      };
+      
+      console.log(`✅ Permissões encontradas para usuário ${id}: ${userWithPermissions.effectivePermissions.length} efetivas`);
+      res.json(response);
+    } catch (error) {
+      console.error("Erro ao buscar permissões do usuário:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
+  
+  // Conceder ou negar permissões individuais para um usuário
+  app.post("/api/users/:id/permissions", requireAuth, requirePermission('users.manage'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = userPermissionsSchema.parse(req.body);
+      
+      console.log(`🔧 Atualizando permissões individuais para usuário ${id}:`, JSON.stringify(validatedData, null, 2));
+      
+      // VALIDAÇÃO DE SEGURANÇA: Prevenir auto-lockout
+      if (id === req.session.user!.id) {
+        // Buscar permissões que estão sendo negadas
+        const deniedPermissions = await Promise.all(
+          validatedData.denies.map(async (permissionId) => {
+            const permission = await db.select().from(permissions).where(eq(permissions.id, permissionId));
+            return permission.length > 0 ? permission[0] : null;
+          })
+        );
+        
+        // Verificar se está tentando negar permissões críticas para si mesmo
+        const criticalPermissions = ['users.manage', 'admin.access'];
+        const deniedCriticalPermissions = deniedPermissions.filter(permission => 
+          permission && criticalPermissions.includes(permission.name)
+        );
+        
+        if (deniedCriticalPermissions.length > 0) {
+          return res.status(403).json({ 
+            message: "Você não pode negar permissões críticas para si mesmo para evitar auto-lockout",
+            deniedPermissions: deniedCriticalPermissions.map(p => p!.name)
+          });
+        }
+      }
+      
+      // Verificar se usuário existe
+      const user = await db.select().from(users).where(eq(users.id, id));
+      if (!user.length) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      // VALIDAÇÃO: Verificar se usuário alvo é admin ou tem permissões superiores
+      const targetUserWithRoles = await getUserWithRoles(id);
+      if (targetUserWithRoles) {
+        const targetHasAdminRole = targetUserWithRoles.roles.some(role => role.name === 'admin');
+        const currentUserHasAdminRole = req.session.user!.roles.some((role: any) => role.name === 'admin');
+        
+        // Apenas admins podem modificar permissões de outros admins
+        if (targetHasAdminRole && !currentUserHasAdminRole) {
+          return res.status(403).json({ 
+            message: "Apenas administradores podem modificar permissões de outros administradores" 
+          });
+        }
+      }
+      
+      // Processar grants (conceder permissões)
+      const grantPromises = validatedData.grants.map(async (permissionId) => {
+        // Verificar se permissão existe
+        const permission = await db.select().from(permissions).where(eq(permissions.id, permissionId));
+        if (!permission.length) {
+          throw new Error(`Permissão ${permissionId} não encontrada`);
+        }
+        
+        // Remover override anterior (se existir) e criar novo
+        await db.delete(userPermissionOverrides).where(
+          and(
+            eq(userPermissionOverrides.userId, id),
+            eq(userPermissionOverrides.permissionId, permissionId)
+          )
+        );
+        
+        await db.insert(userPermissionOverrides).values({
+          userId: id,
+          permissionId,
+          effect: 'grant',
+          assignedBy: req.session.user!.id
+        });
+        
+        console.log(`➕ Permissão ${permissionId} concedida para usuário ${id}`);
+      });
+      
+      // Processar denies (negar permissões)
+      const denyPromises = validatedData.denies.map(async (permissionId) => {
+        // Verificar se permissão existe
+        const permission = await db.select().from(permissions).where(eq(permissions.id, permissionId));
+        if (!permission.length) {
+          throw new Error(`Permissão ${permissionId} não encontrada`);
+        }
+        
+        // Remover override anterior (se existir) e criar novo
+        await db.delete(userPermissionOverrides).where(
+          and(
+            eq(userPermissionOverrides.userId, id),
+            eq(userPermissionOverrides.permissionId, permissionId)
+          )
+        );
+        
+        await db.insert(userPermissionOverrides).values({
+          userId: id,
+          permissionId,
+          effect: 'deny',
+          assignedBy: req.session.user!.id
+        });
+        
+        console.log(`➖ Permissão ${permissionId} negada para usuário ${id}`);
+      });
+      
+      // Executar todas as operações
+      await Promise.all([...grantPromises, ...denyPromises]);
+      
+      // VALIDAÇÃO FINAL: Verificar se a operação não resultou em escalação de privilégios inadequada
+      const updatedUser = await getUserWithRoles(id);
+      if (updatedUser) {
+        const hasAdminPermissions = updatedUser.effectivePermissions.includes('admin.access');
+        const hasUserManagePermissions = updatedUser.effectivePermissions.includes('users.manage');
+        
+        // Log de auditoria para operações críticas
+        if (hasAdminPermissions || hasUserManagePermissions) {
+          console.log(`🔒 AUDITORIA: Usuário ${req.session.user!.username} (${req.session.user!.id}) modificou permissões críticas do usuário ${updatedUser.username} (${id})`);
+          console.log(`📋 Permissões efetivas resultantes: ${updatedUser.effectivePermissions.join(', ')}`);
+        }
+      }
+      
+      console.log(`✅ Permissões atualizadas para usuário ${id}`);
+      res.json({ 
+        message: "Permissões individuais atualizadas com sucesso",
+        effectivePermissions: updatedUser?.effectivePermissions || []
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: error.errors 
+        });
+      }
+      console.error("Erro ao atualizar permissões individuais:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erro interno do servidor";
+      res.status(500).json({ message: errorMessage });
+    }
+  });
+  
+  // Remover override de permissão específico
+  app.delete("/api/users/:id/permissions/:permissionId", requireAuth, requirePermission('users.manage'), async (req, res) => {
+    try {
+      const { id, permissionId } = req.params;
+      
+      console.log(`🗑️ Removendo override de permissão ${permissionId} para usuário ${id}`);
+      
+      // Verificar se usuário existe
+      const user = await db.select().from(users).where(eq(users.id, id));
+      if (!user.length) {
+        return res.status(404).json({ message: "Usuário não encontrado" });
+      }
+      
+      // Verificar se override existe
+      const override = await db.select().from(userPermissionOverrides).where(
+        and(
+          eq(userPermissionOverrides.userId, id),
+          eq(userPermissionOverrides.permissionId, permissionId)
+        )
+      );
+      
+      if (!override.length) {
+        return res.status(404).json({ message: "Override de permissão não encontrado" });
+      }
+      
+      // Remover override
+      await db.delete(userPermissionOverrides).where(
+        and(
+          eq(userPermissionOverrides.userId, id),
+          eq(userPermissionOverrides.permissionId, permissionId)
+        )
+      );
+      
+      // Buscar permissões atualizadas
+      const updatedUser = await getUserWithRoles(id);
+      
+      console.log(`✅ Override removido para usuário ${id}, permissão ${permissionId}`);
+      res.json({ 
+        message: "Override de permissão removido com sucesso",
+        effectivePermissions: updatedUser?.effectivePermissions || []
+      });
+    } catch (error) {
+      console.error("Erro ao remover override de permissão:", error);
+      res.status(500).json({ message: "Erro interno do servidor" });
+    }
+  });
 
   // Athletes routes - rotas específicas primeiro (PROTEGIDAS)
   app.get("/api/athletes", requireAuth, async (req, res) => {
@@ -536,7 +1203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/athletes", requireAuth, async (req, res) => {
+  app.post("/api/athletes", requireAuth, requirePermission("athletes.create"), async (req, res) => {
     try {
       const validatedData = insertAthleteSchema.parse(req.body);
       
@@ -616,7 +1283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/athletes/:id", async (req, res) => {
+  app.patch("/api/athletes/:id", requireAuth, requirePermission("athletes.update"), async (req, res) => {
     try {
       console.log("=== ATHLETE UPDATE DEBUG ===");
       console.log("Raw body gender:", req.body.gender);
@@ -632,7 +1299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/athletes/:id", async (req, res) => {
+  app.delete("/api/athletes/:id", requireAuth, requirePermission("athletes.delete"), async (req, res) => {
     try {
       const success = await storage.deleteAthlete(req.params.id);
       if (!success) {
@@ -1252,11 +1919,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("=== GENERATE CATEGORY BRACKET DEBUG ===");
       console.log("Tournament ID:", req.params.id);
       console.log("Category ID:", req.params.categoryId);
-      console.log("User:", req.session.user?.username, "Role:", req.session.user?.role);
+      console.log("User:", req.session.user?.username, "Role:", req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user');
       console.log("Request body:", req.body);
       
       // Verificar permissões (só admin pode gerar chaveamento)
-      if (req.session.user?.role !== 'admin') {
+      if (req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user' !== 'admin') {
         return res.status(403).json({ error: "Apenas administradores podem gerar chaveamento" });
       }
       
@@ -1373,7 +2040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Tournament ID:", req.params.id, "Category ID:", req.params.categoryId);
       
       // Verificar permissões
-      if (req.session.user?.role !== 'admin') {
+      if (req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user' !== 'admin') {
         return res.status(403).json({ error: "Apenas administradores podem avançar para mata-mata" });
       }
       
@@ -1445,10 +2112,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("=== GENERATE BRACKET DEBUG ===");
       console.log("Tournament ID:", req.params.id);
-      console.log("User:", req.session.user?.username, "Role:", req.session.user?.role);
+      console.log("User:", req.session.user?.username, "Role:", req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user');
       
       // Verificar permissões (só admin pode gerar chaveamento)
-      if (req.session.user?.role !== 'admin') {
+      if (req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user' !== 'admin') {
         return res.status(403).json({ error: "Apenas administradores podem gerar chaveamento" });
       }
       
