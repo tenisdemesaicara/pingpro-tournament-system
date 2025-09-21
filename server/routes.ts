@@ -58,6 +58,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // DEBUG: POST endpoint para testar body parsing
+  app.post("/api/debug/body", (req, res) => {
+    res.json({
+      host: req.headers.host,
+      content_type: req.headers['content-type'],
+      body_received: req.body,
+      body_keys: Object.keys(req.body || {}),
+      raw_body: JSON.stringify(req.body),
+      has_username: !!req.body?.username,
+      has_password: !!req.body?.password,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Inicializar gerenciador de bracket
   const bracketManager = new BracketManager(storage);
 
