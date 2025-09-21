@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
 import { createDefaultPasswords } from "./auth";
@@ -22,6 +23,30 @@ function showLoginCredentials() {
 // Tipos de sessão são definidos em auth.ts
 
 const app = express();
+
+// Configuração CORS para suportar domínio personalizado
+const corsOptions = {
+  origin: [
+    'http://localhost:5000',
+    'https://pingpro.onrender.com',
+    'https://tenisdemesaicara.com.br',
+    'http://tenisdemesaicara.com.br'
+  ],
+  credentials: true, // Permitir cookies cross-origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'X-CSRF-Token'
+  ],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
@@ -34,10 +59,12 @@ const sessionConfig: any = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Manter false para funcionar tanto em dev quanto prod no Replit
+    // Para funcionar com redirecionamento de domínio (pingpro.onrender.com -> tenisdemesaicara.com.br)
+    secure: isProduction, // true em produção para HTTPS, false em dev
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 horas
-    sameSite: 'lax' // Importante para CORS
+    sameSite: isProduction ? 'none' : 'lax', // 'none' em prod para cross-origin, 'lax' em dev
+    // Domain não deve ser setado para permitir cross-domain
   }
 };
 

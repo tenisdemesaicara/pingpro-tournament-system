@@ -102,6 +102,7 @@ const editUserSchema = z.object({
 });
 
 const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Senha atual é obrigatória"),
   newPassword: z.string().min(8, "Senha deve ter pelo menos 8 caracteres")
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Senha deve conter pelo menos uma letra minúscula, uma maiúscula e um número"),
   confirmNewPassword: z.string(),
@@ -262,6 +263,7 @@ export default function AdminUsers() {
   const passwordForm = useForm({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: {
+      currentPassword: "",
       newPassword: "",
       confirmNewPassword: "",
     },
@@ -814,6 +816,20 @@ export default function AdminUsers() {
           </DialogHeader>
           <Form {...passwordForm}>
             <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+              <FormField
+                control={passwordForm.control}
+                name="currentPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha Atual</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} data-testid="input-currentPassword" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <FormField
                 control={passwordForm.control}
                 name="newPassword"
