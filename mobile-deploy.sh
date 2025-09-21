@@ -5,30 +5,12 @@ echo "📱 DEPLOY MOBILE - PINGPRO"
 echo "=========================="
 echo ""
 
-# Detecta se há mudanças
-echo "🔍 Verificando mudanças..."
-if [ -z "$(git status --porcelain)" ]; then
-    echo "❌ Nenhuma mudança detectada."
-    echo "💡 Edite qualquer arquivo no Replit e tente novamente."
-    echo "   (O Replit salva automaticamente - sem Ctrl+S)"
-    exit 0
-fi
-
-echo "✅ Mudanças detectadas! Iniciando deploy..."
+# Deploy via API GitHub (sem git local)
+echo "🚀 Iniciando deploy via API GitHub..."
+echo "💡 Contorna restrições do Git no Replit"
 echo ""
 
-# Adiciona e commita mudanças
-echo "📦 Criando commit..."
-git add .
-TIMESTAMP=$(date '+%Y-%m-%d_%H-%M-%S')
-git commit -m "Deploy mobile - $TIMESTAMP"
-
-echo "✅ Commit criado"
-echo ""
-
-# Push para GitHub (e Render)
-echo "🚀 Enviando para produção..."
-git push origin main
+node api-deploy.js
 
 if [ $? -eq 0 ]; then
     echo ""
