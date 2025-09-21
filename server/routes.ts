@@ -48,17 +48,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rotas de autenticação (SEMPRE PÚBLICAS)
   app.post("/api/auth/login", async (req, res) => {
     try {
+      // DEBUG: Log detalhado para debug cross-domain
+      console.log('🔍 LOGIN DEBUG:');
+      console.log('   Host:', req.headers.host);
+      console.log('   Origin:', req.headers.origin);
+      console.log('   X-Forwarded-Host:', req.headers['x-forwarded-host']);
+      console.log('   X-Forwarded-Proto:', req.headers['x-forwarded-proto']);
+      console.log('   User-Agent:', req.headers['user-agent']?.substring(0, 50));
+      console.log('   Body received:', { username: req.body.username, hasPassword: !!req.body.password });
+      
       const { username, password } = req.body;
       
       if (!username || !password) {
+        console.log('❌ Login failed: missing credentials');
         return res.status(400).json({ message: "Usuário e senha são obrigatórios" });
       }
 
+      console.log('🔍 Attempting authentication for:', username);
       const user = await authenticateUser(username, password);
       if (!user) {
+        console.log('❌ Authentication failed for:', username);
         return res.status(401).json({ message: "Credenciais inválidas" });
       }
 
+      console.log('✅ Authentication successful for:', username);
       req.session.user = user;
       res.json(user);
     } catch (error) {
