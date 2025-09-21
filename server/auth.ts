@@ -204,18 +204,47 @@ export async function authenticateUser(usernameOrEmail: string, password: string
 }
 
 /**
- * Middleware para verificar se o usuário está autenticado
+ * Middleware para verificar se o usuário está autenticado (session ou JWT)
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.session || !req.session.user) {
-    return res.status(401).json({ message: 'Acesso negado. Login necessário.' });
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    // Primeiro, verificar JWT token se disponível
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-jwt-secret') as any;
+        const userId = decoded.userId;
+        
+        // Buscar usuário completo com roles e permissões
+        const userWithRoles = await getUserWithRoles(userId);
+        if (userWithRoles && userWithRoles.isActive) {
+          // Adicionar usuário ao request para uso nas rotas
+          (req as any).user = userWithRoles;
+          return next();
+        }
+      } catch (jwtError) {
+        // Token inválido, continuar para verificar session
+      }
+    }
+    
+    // Fallback para session-based auth (development)
+    if (req.session && req.session.user) {
+      if (!req.session.user.isActive) {
+        return res.status(401).json({ message: 'Usuário inativo.' });
+      }
+      
+      // Adicionar usuário ao request
+      (req as any).user = req.session.user;
+      return next();
+    }
+    
+    return res.status(401).json({ message: 'Não autenticado' });
+  } catch (error) {
+    console.error('Erro na autenticação:', error);
+    return res.status(401).json({ message: 'Erro de autenticação' });
   }
-  
-  if (!req.session.user.isActive) {
-    return res.status(401).json({ message: 'Usuário inativo.' });
-  }
-  
-  next();
 }
 
 /**
@@ -224,11 +253,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
  */
 export function requirePermission(permissionName: string) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session?.user) {
+    // Verificar tanto JWT quanto session
+    const user = (req as any).user || req.session?.user;
+    
+    if (!user) {
       return res.status(401).json({ message: 'Acesso negado. Login necessário.' });
     }
-
-    const user = req.session.user;
     
     // SEGURANÇA: Verificar usando permissões efetivas que incluem overrides individuais
     const hasPermission = user.effectivePermissions.includes(permissionName);
@@ -253,7 +283,10 @@ export function requirePermission(permissionName: string) {
  */
 export function requireAnyPermission(permissionNames: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session?.user) {
+    // Verificar tanto JWT quanto session
+    const user = (req as any).user || req.session?.user;
+    
+    if (!user) {
       return res.status(401).json({ message: 'Acesso negado. Login necessário.' });
     }
 

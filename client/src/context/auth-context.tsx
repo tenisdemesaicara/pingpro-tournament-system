@@ -26,6 +26,7 @@ interface AuthUser {
   isActive: boolean;
   profileImageUrl?: string;
   roles: Role[];
+  token?: string; // JWT token para cross-domain
 }
 
 interface AuthContextType {
@@ -66,11 +67,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const response = await fetch('/api/auth/me');
+      // Verificar se há token JWT armazenado
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/auth/me', {
+        headers,
+        credentials: 'include' // Manter para development
+      });
+      
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
       } else {
+        // Se falhar com token, limpar localStorage
+        if (token) {
+          localStorage.removeItem('authToken');
+        }
         setUser(null);
       }
     } catch (error) {
@@ -85,11 +102,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password }),
+        credentials: 'include' // Manter para development
       });
 
       if (response.ok) {
         const userData = await response.json();
+        
+        // Se receber JWT token, armazenar no localStorage
+        if (userData.token) {
+          localStorage.setItem('authToken', userData.token);
+        }
+        
         setUser(userData);
         return true;
       }
@@ -101,10 +125,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        headers,
+        credentials: 'include'
+      });
     } catch (error) {
       // Logout local mesmo se falhar no servidor
     } finally {
+      // Limpar token do localStorage
+      localStorage.removeItem('authToken');
       setUser(null);
     }
   };
