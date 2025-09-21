@@ -42,6 +42,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Log storage in memory for debugging
+  const debugLogs: string[] = [];
+  const maxLogs = 50;
+  
+  // Interceptar console.log para salvar logs de debug
+  const originalLog = console.log;
+  console.log = (...args) => {
+    const message = args.join(' ');
+    if (message.includes('DEBUG LOGIN')) {
+      debugLogs.push(`${new Date().toISOString()}: ${message}`);
+      if (debugLogs.length > maxLogs) {
+        debugLogs.shift();
+      }
+    }
+    originalLog(...args);
+  };
+
   // DEBUG: Endpoint para verificar se ambos domínios usam mesmo DB
   app.get("/api/debug/env", (req, res) => {
     const dbUrl = process.env.DATABASE_URL || 'no-db-url';
@@ -54,6 +71,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       origin: req.headers.origin,
       database_hash: dbHash,
       node_env: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // DEBUG: Endpoint para ver logs de login em memória
+  app.get("/api/debug/logs", (req, res) => {
+    res.json({
+      logs: debugLogs,
+      count: debugLogs.length,
       timestamp: new Date().toISOString()
     });
   });
