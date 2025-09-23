@@ -52,13 +52,13 @@ export default function Athletes() {
   });
 
   const { data: athletes, isLoading } = useQuery<Athlete[]>({
-    queryKey: ['/api/athletes'],
+    queryKey: ['/api/athletes/all'],
   });
 
   const deleteAthleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/athletes/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Atleta excluído com sucesso.",
@@ -77,7 +77,7 @@ export default function Athletes() {
     mutationFn: ({ id, status }: { id: string; status: string }) => 
       apiRequest('PATCH', `/api/athletes/${id}`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Status do atleta atualizado.",
@@ -111,7 +111,7 @@ export default function Athletes() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Atleta cadastrado com sucesso!",
@@ -185,7 +185,7 @@ export default function Athletes() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Atleta atualizado com sucesso!",
@@ -274,7 +274,7 @@ export default function Athletes() {
   const approveAthleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('PATCH', `/api/athletes/${id}`, { status: 'approved' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Atleta aprovado com sucesso.",
@@ -285,7 +285,7 @@ export default function Athletes() {
   const rejectAthleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('PATCH', `/api/athletes/${id}`, { status: 'rejected' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Atleta reprovado.",
@@ -296,7 +296,7 @@ export default function Athletes() {
   const inactivateAthleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('PATCH', `/api/athletes/${id}`, { status: 'inactive' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Atleta inativado.",
@@ -307,7 +307,7 @@ export default function Athletes() {
   const reactivateAthleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('PATCH', `/api/athletes/${id}`, { status: 'approved' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/athletes/all'] });
       toast({
         title: "Sucesso!",
         description: "Atleta reativado.",

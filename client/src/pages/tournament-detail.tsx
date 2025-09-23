@@ -519,6 +519,7 @@ export default function TournamentDetail() {
               athletes={athletes || []}
               categories={tournament.categories || []}
               existingParticipants={tournament.participants || []}
+              tournament={tournament}
             />
           </TabsContent>
 

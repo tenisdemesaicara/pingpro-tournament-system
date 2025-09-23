@@ -82,7 +82,8 @@ export const tournamentParticipants = pgTable("tournament_participants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tournamentId: varchar("tournament_id").notNull(),
   athleteId: varchar("athlete_id").notNull(),
-  categoryId: varchar("category_id").notNull(), // categoria específica da inscrição
+  categoryId: varchar("category_id").notNull(), // categoria de idade (automática por idade)
+  technicalCategoryId: varchar("technical_category_id"), // categoria técnica (A, B, C, D, Iniciante) - opcional
   registrationNumber: varchar("registration_number"), // Número único de inscrição por torneio
   seed: integer("seed"),
   registeredAt: timestamp("registered_at").defaultNow(),
@@ -154,7 +155,7 @@ export const insertAthleteSchema = z.object({
   // Campos opcionais
   cpf: z.string().optional(),
   rg: z.string().optional(),
-  photoUrl: z.string().optional(),
+  photoUrl: z.string().min(1, "Foto é obrigatória"),
   category: z.string().optional(),
   street: z.string().optional(),
   phone: z.string().optional(),
@@ -365,7 +366,7 @@ export const selfRegistrationAthleteSchema = z.object({
   cpf: z.string().optional(),
   rg: z.string().optional(),
   street: z.string().optional(),
-  photoUrl: z.string().optional(),
+  photoUrl: z.string().min(1, "Foto é obrigatória"),
   observations: z.string().optional(),
 });
 
@@ -503,7 +504,8 @@ export type Consent = typeof consents.$inferSelect;
 export const tournamentRegistrationSchema = z.object({
   // Tournament and participation data
   tournamentId: z.string().uuid("ID do torneio inválido"),
-  category: z.string().uuid("ID da categoria inválido"), // This is actually categoryId
+  category: z.string().uuid("ID da categoria inválido"), // This is actually categoryId (age category)
+  technicalCategory: z.string().uuid("ID da categoria técnica inválido").optional(), // Technical category (A, B, C, D, Iniciante)
   athleteId: z.string().uuid().nullish(), // For existing athletes - allows null/undefined for new athletes
   
   // Athlete data (required for new athletes)
@@ -519,7 +521,7 @@ export const tournamentRegistrationSchema = z.object({
   // Optional athlete fields
   cpf: z.string().optional(),
   rg: z.string().optional(),
-  photoUrl: z.string().optional(),
+  photoUrl: z.string().min(1, "Foto é obrigatória"),
   street: z.string().optional(),
   phone: z.string().optional(),
   complement: z.string().optional(),

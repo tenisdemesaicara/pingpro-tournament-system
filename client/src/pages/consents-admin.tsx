@@ -60,7 +60,7 @@ export default function ConsentsAdmin() {
   });
 
   const { data: athletes = [], isLoading: loadingAthletes } = useQuery<Athlete[]>({
-    queryKey: ["/api/athletes"],
+    queryKey: ["/api/athletes/all"],
   });
 
   const deleteConsentMutation = useMutation({

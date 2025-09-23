@@ -16,7 +16,7 @@ export default function Navbar() {
   const isActive = (path: string) => location === path;
 
   const navigationItems = [
-    { href: "/", label: "Início", testId: "nav-home" },
+    { href: "/dashboard", label: "Início", testId: "nav-home" },
     { href: "/tournaments", label: "Torneios", testId: "nav-tournaments" },
     { href: "/ranking", label: "Ranking", testId: "nav-ranking" },
     { href: "/financeiro", label: "Financeiro", testId: "nav-financeiro" },
@@ -33,7 +33,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand */}
-          <Link href="/" className="flex items-center space-x-3" data-testid="logo-link">
+          <Link href="/dashboard" className="flex items-center space-x-3" data-testid="logo-link">
             <div className="ping-pong-ball animate-bounce-light"></div>
             <h1 className="text-2xl font-bold text-primary">Pong Pro</h1>
           </Link>

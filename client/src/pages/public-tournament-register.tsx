@@ -57,7 +57,8 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
     neighborhood: '', // Campo obrigatório no banco
     zipCode: '', // Campo obrigatório no banco
     club: '',
-    category: '',
+    category: '', // Categoria de idade (automática)
+    technicalCategory: '', // Categoria técnica (A, B, C, D, Iniciante)
     photoUrl: '' // Campo de foto
   });
 
@@ -148,6 +149,7 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
         cpf: data.cpf,
         phone: data.phone ? unformatPhone(data.phone) : '',
         tournamentId,
+        technicalCategory: data.technicalCategory || null,
         consentData,
         athleteId: foundAthlete?.id || null
       };
@@ -214,7 +216,8 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
     const requiredFields = {
       name: "Nome é obrigatório",
       email: "Email é obrigatório", 
-      category: "Categoria é obrigatória",
+      category: "Categoria por idade é obrigatória",
+      technicalCategory: "Categoria técnica é obrigatória",
       neighborhood: "Bairro é obrigatório",
       zipCode: "CEP é obrigatório",
       city: "Cidade é obrigatória",
@@ -238,6 +241,16 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       toast({
         title: "Email inválido",
         description: "Por favor, insira um email válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validação da foto obrigatória
+    if (!formData.photoUrl) {
+      toast({
+        title: "Foto obrigatória",
+        description: "Por favor, adicione sua foto para completar a inscrição.",
         variant: "destructive",
       });
       return;
@@ -492,20 +505,38 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="category">Categoria *</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
-                      <SelectTrigger data-testid="select-category">
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableCategories().map((category: any) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="category">Categoria por Idade *</Label>
+                      <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Selecione a categoria por idade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableCategories().map((category: any) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="technicalCategory">Categoria Técnica *</Label>
+                      <Select value={formData.technicalCategory} onValueChange={(value) => setFormData({...formData, technicalCategory: value})}>
+                        <SelectTrigger data-testid="select-technical-category">
+                          <SelectValue placeholder="Selecione a categoria técnica" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A">A - Avançado</SelectItem>
+                          <SelectItem value="B">B - Intermediário Plus</SelectItem>
+                          <SelectItem value="C">C - Intermediário</SelectItem>
+                          <SelectItem value="D">D - Iniciante Plus</SelectItem>
+                          <SelectItem value="Iniciante">Iniciante</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               )}
@@ -624,20 +655,38 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="category">Categoria *</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
-                      <SelectTrigger data-testid="select-category">
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableCategories().map((category: any) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="category">Categoria por Idade *</Label>
+                      <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Selecione a categoria por idade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableCategories().map((category: any) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="technicalCategory">Categoria Técnica *</Label>
+                      <Select value={formData.technicalCategory} onValueChange={(value) => setFormData({...formData, technicalCategory: value})}>
+                        <SelectTrigger data-testid="select-technical-category">
+                          <SelectValue placeholder="Selecione a categoria técnica" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A">A - Avançado</SelectItem>
+                          <SelectItem value="B">B - Intermediário Plus</SelectItem>
+                          <SelectItem value="C">C - Intermediário</SelectItem>
+                          <SelectItem value="D">D - Iniciante Plus</SelectItem>
+                          <SelectItem value="Iniciante">Iniciante</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   {/* Campo de foto do atleta */}

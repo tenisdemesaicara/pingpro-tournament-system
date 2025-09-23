@@ -143,6 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Limpar token do localStorage
       localStorage.removeItem('authToken');
       setUser(null);
+      // Redirecionar para a página de apresentação
+      window.location.href = '/';
     }
   };
 

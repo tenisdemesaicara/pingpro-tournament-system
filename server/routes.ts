@@ -811,11 +811,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
       const athletes = await storage.getAllAthletes();
-      // Retorna TODOS os atletas - o frontend faz a segmentação por status
-      res.json(athletes);
+      // Filtrar apenas atletas aprovados para evitar seleção de inativos
+      const approvedAthletes = athletes.filter(athlete => athlete.status === "approved");
+      res.json(approvedAthletes);
     } catch (error) {
       console.error("Error fetching athletes:", error);
       res.status(500).json({ error: "Failed to fetch athletes", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Endpoint para buscar TODOS os atletas (incluindo pendentes/rejeitados) - PROTEGIDO
+  app.get("/api/athletes/all", requireAuth, async (req, res) => {
+    try {
+      const athletes = await storage.getAllAthletes();
+      res.json(athletes);
+    } catch (error) {
+      console.error("Error fetching all athletes:", error);
+      res.status(500).json({ error: "Failed to fetch all athletes" });
     }
   });
 
@@ -1449,7 +1461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedData = tournamentRegistrationSchema.parse(req.body);
         console.log("✅ Input validation passed");
         
-        const { tournamentId, category: categoryId, athleteId, consentData, ...athleteData } = validatedData;
+        const { tournamentId, category: categoryId, technicalCategory: technicalCategoryId, athleteId, consentData, ...athleteData } = validatedData;
         
         // 2. Validate tournament exists and is accepting registrations
         console.log(`🏆 Validating tournament ${tournamentId}...`);
@@ -1590,7 +1602,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const participation = await storage.addParticipant({
           tournamentId,
           athleteId: finalAthleteId,
-          categoryId
+          categoryId,
+          technicalCategoryId
         });
         
         console.log(`✅ Registration completed successfully:`, {
@@ -1702,7 +1715,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .map(tournament => ({
           id: tournament.id,
           name: tournament.name,
-          date: tournament.date,
+          startDate: tournament.startDate,
+          endDate: tournament.endDate,
           location: tournament.location || 'Local a definir',
           format: tournament.format,
           status: tournament.status,
@@ -2976,6 +2990,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating category:", error);
       res.status(500).json({ error: "Failed to create category" });
+    }
+  });
+
+  // Remover categoria de um torneio
+  app.delete("/api/tournaments/:tournamentId/categories/:categoryId", requireAuth, async (req, res) => {
+    try {
+      const { tournamentId, categoryId } = req.params;
+      
+      // Verificar se a categoria pertence ao torneio
+      const tournamentCategories = await storage.getTournamentCategories(tournamentId);
+      const categoryExists = tournamentCategories.some(cat => cat.id === categoryId);
+      
+      if (!categoryExists) {
+        return res.status(404).json({ 
+          error: "Categoria não encontrada neste torneio" 
+        });
+      }
+      
+      // Verificar se há participantes nesta categoria
+      const participants = await storage.getTournamentParticipantsWithCategories(tournamentId);
+      const categoryParticipants = participants.filter(p => p.categoryId === categoryId);
+      
+      if (categoryParticipants.length > 0) {
+        return res.status(400).json({
+          error: "Não é possível remover categoria com participantes",
+          message: `Esta categoria possui ${categoryParticipants.length} participante(s) inscrito(s). Remova os participantes primeiro.`,
+          participantCount: categoryParticipants.length
+        });
+      }
+      
+      // Verificar se há partidas nesta categoria
+      const matches = await storage.getMatchesByCategory(tournamentId, categoryId);
+      if (matches.length > 0) {
+        return res.status(400).json({
+          error: "Não é possível remover categoria com partidas",
+          message: "Esta categoria possui partidas registradas. Remova as partidas primeiro."
+        });
+      }
+      
+      // Remover a categoria do torneio
+      await storage.removeTournamentCategory(tournamentId, categoryId);
+      
+      res.json({ 
+        success: true,
+        message: "Categoria removida do torneio com sucesso" 
+      });
+      
+    } catch (error) {
+      console.error("Error removing tournament category:", error);
+      res.status(500).json({ error: "Failed to remove category from tournament" });
     }
   });
 

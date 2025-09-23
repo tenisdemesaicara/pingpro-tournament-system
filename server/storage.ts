@@ -45,6 +45,7 @@ export interface IStorage {
   updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
   getTournamentCategories(tournamentId: string): Promise<Category[]>;
+  removeTournamentCategory(tournamentId: string, categoryId: string): Promise<boolean>;
 
   // Payments
   getPayment(id: string): Promise<Payment | undefined>;
@@ -242,15 +243,15 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Se houver categorias para atualizar, limpar e recriar
-      if (categories && Array.isArray(categories)) {
-        console.log("Updating categories:", categories.length);
+      if (tournamentCategoriesData && Array.isArray(tournamentCategoriesData)) {
+        console.log("Updating categories:", tournamentCategoriesData.length);
         
         // Remover categorias existentes do torneio
         await db.delete(tournamentCategories).where(eq(tournamentCategories.tournamentId, id));
         console.log("Existing tournament categories removed");
         
         // Criar novas categorias e associar
-        for (const categoryData of categories) {
+        for (const categoryData of tournamentCategoriesData) {
           // Criar a categoria
           const newCategory = {
             id: randomUUID(),
@@ -404,6 +405,7 @@ export class DatabaseStorage implements IStorage {
       // Dados do participante
       participantId: tournamentParticipants.id,
       categoryId: tournamentParticipants.categoryId,
+      technicalCategoryId: tournamentParticipants.technicalCategoryId,
       // status: tournamentParticipants.status, // Campo não existe na tabela atual
       seed: tournamentParticipants.seed,
       // Dados do atleta
@@ -812,13 +814,26 @@ export class DatabaseStorage implements IStorage {
       minAge: categories.minAge,
       maxAge: categories.maxAge,
       gender: categories.gender,
-      isActive: categories.isActive
+      isActive: categories.isActive,
+      format: tournamentCategories.format,
+      maxParticipants: tournamentCategories.maxParticipants,
+      currentParticipants: tournamentCategories.currentParticipants
     })
     .from(tournamentCategories)
     .innerJoin(categories, eq(tournamentCategories.categoryId, categories.id))
     .where(eq(tournamentCategories.tournamentId, tournamentId));
     
     return results;
+  }
+
+  async removeTournamentCategory(tournamentId: string, categoryId: string): Promise<boolean> {
+    const result = await db.delete(tournamentCategories)
+      .where(and(
+        eq(tournamentCategories.tournamentId, tournamentId),
+        eq(tournamentCategories.categoryId, categoryId)
+      ));
+      
+    return true;
   }
 
   // Buscar dados específicos de uma categoria no torneio (com formato)

@@ -70,6 +70,29 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
     }
   });
 
+  // Mutation para remover categoria do torneio
+  const removeCategoryMutation = useMutation({
+    mutationFn: (categoryId: string) => 
+      apiRequest('DELETE', `/api/tournaments/${tournament.id}/categories/${categoryId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id, 'categories-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+      toast({
+        title: "Categoria Removida",
+        description: "A categoria foi removida do torneio com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Erro ao remover categoria:", error);
+      const errorMessage = error?.message || "Não foi possível remover a categoria.";
+      toast({
+        title: "Erro",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  });
+
   const getCategoryStatusBadge = (category: CategoryWithStats) => {
     if (category.matchCount > 0) {
       return <Badge variant="default" className="bg-green-100 text-green-800">✓ Chaveamento OK</Badge>;
@@ -181,6 +204,25 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                           Alterar Chaveamento
                         </Button>
                       </div>
+                    )}
+                    
+                    {/* Botão de remover categoria - só aparece se não há participantes nem partidas */}
+                    {category.participantCount === 0 && category.matchCount === 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (confirm(`Tem certeza que deseja remover a categoria "${category.name}" deste torneio?`)) {
+                            removeCategoryMutation.mutate(category.id);
+                          }
+                        }}
+                        disabled={removeCategoryMutation.isPending}
+                        data-testid={`button-remove-category-${category.id}`}
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <span className="material-icons text-sm mr-1">delete</span>
+                        Remover
+                      </Button>
                     )}
                   </div>
                 </div>

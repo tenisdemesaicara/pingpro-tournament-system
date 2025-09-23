@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { X } from "lucide-react";
 import { type Category } from "@shared/schema";
 
 interface ManageTournamentCategoriesProps {
@@ -52,7 +53,20 @@ export default function ManageTournamentCategories({
   ];
 
   const [selectedCategories, setSelectedCategories] = useState<{[key: string]: string[]}>({});
+  const [categoryFormats, setCategoryFormats] = useState<{[key: string]: string}>({});
+  const [categoryLeagueSettings, setCategoryLeagueSettings] = useState<{[key: string]: {isRoundTrip: boolean}}>({});
   const [customCategories, setCustomCategories] = useState<any[]>([]);
+
+  // Opções de formato disponíveis
+  const formatOptions = [
+    { value: "single_elimination", label: "Eliminação Simples", description: "Mata-mata tradicional" },
+    { value: "double_elimination", label: "Eliminação Dupla", description: "Segunda chance para todos os participantes" },
+    { value: "round_robin", label: "Todos contra Todos", description: "Cada participante enfrenta todos os outros" },
+    { value: "swiss", label: "Sistema Suíço", description: "Emparelhamentos baseados na performance" },
+    { value: "league", label: "Liga", description: "Sistema de pontos corridos" },
+    { value: "cup", label: "Copa", description: "Sistema de copa" },
+    { value: "group_stage_knockout", label: "Grupos + Eliminatórias", description: "Fase de grupos seguida de mata-mata" },
+  ];
 
   // Update tournament categories mutation
   const updateCategoriesMutation = useMutation({
@@ -75,6 +89,28 @@ export default function ManageTournamentCategories({
     }
   });
 
+  // Remove tournament category mutation
+  const removeCategoryMutation = useMutation({
+    mutationFn: (categoryId: string) => 
+      apiRequest('DELETE', `/api/tournaments/${tournamentId}/categories/${categoryId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      toast({
+        title: "Categoria Removida",
+        description: "A categoria foi removida do torneio com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Erro ao remover categoria:", error);
+      const errorMessage = error?.message || "Não foi possível remover a categoria.";
+      toast({
+        title: "Erro",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleCategoryGenderToggle = (categoryName: string, gender: string) => {
     setSelectedCategories(prev => {
       const current = prev[categoryName] || [];
@@ -89,6 +125,20 @@ export default function ManageTournamentCategories({
     });
   };
 
+  const handleCategoryFormatChange = (categoryName: string, format: string) => {
+    setCategoryFormats(prev => ({
+      ...prev,
+      [categoryName]: format
+    }));
+  };
+
+  const handleLeagueSettingChange = (categoryName: string, isRoundTrip: boolean) => {
+    setCategoryLeagueSettings(prev => ({
+      ...prev,
+      [categoryName]: { isRoundTrip }
+    }));
+  };
+
   const addCustomCategory = () => {
     const newCategory = {
       id: `custom-${Date.now()}`,
@@ -96,6 +146,7 @@ export default function ManageTournamentCategories({
       description: "",
       minAge: null as number | null,
       maxAge: null as number | null,
+      format: "single_elimination",
     };
     
     setCustomCategories(prev => [...prev, newCategory]);
@@ -112,27 +163,79 @@ export default function ManageTournamentCategories({
   };
 
   const handleSave = () => {
-    // Same logic as tournament creation
+    // Get existing categories
+    const existingCategoriesData = currentCategories.map(cat => ({
+      name: cat.name,
+      description: cat.description,
+      minAge: cat.minAge,
+      maxAge: cat.maxAge,
+      gender: cat.gender,
+      isActive: cat.isActive,
+      format: (cat as any).format || 'single_elimination',
+    }));
+
+    // Build new categories from selections
     const allCategories = [...defaultCategories, ...customCategories];
     
-    const selectedCategoriesToSend = Object.entries(selectedCategories).flatMap(([categoryName, genders]) => 
+    const newCategoriesToAdd = Object.entries(selectedCategories).flatMap(([categoryName, genders]) => 
       genders.map(gender => {
         const baseCategory = allCategories.find(c => c.name === categoryName);
         
+        const fullCategoryName = `${categoryName} ${gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : 'Misto'}`;
+        const categoryFormat = categoryFormats[categoryName] || 'single_elimination';
+        
         return {
-          name: `${categoryName} ${gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : 'Misto'}`,
+          name: fullCategoryName,
           description: baseCategory?.description || '',
           minAge: baseCategory?.minAge || null,
           maxAge: baseCategory?.maxAge || null,
           gender: gender,
           isActive: true,
-          participantLimit: 0,
-          format: 'single_elimination',
+          format: categoryFormat,
         };
       })
     );
+
+    // Adicionar categorias customizadas completas
+    const customCategoriesToAdd = customCategories
+      .filter(cat => cat.name.trim() !== '')
+      .flatMap(customCat => {
+        const selectedGenders = selectedCategories[customCat.name] || [];
+        return selectedGenders.map(gender => {
+          const categoryFormat = customCat.format || 'single_elimination';
+          
+          return {
+            name: `${customCat.name} ${gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : 'Misto'}`,
+            description: customCat.description || '',
+            minAge: customCat.minAge,
+            maxAge: customCat.maxAge,
+            gender: gender,
+            isActive: true,
+            format: categoryFormat,
+          };
+        });
+      });
+
+    // Combinar todas as novas categorias
+    const allNewCategories = [...newCategoriesToAdd, ...customCategoriesToAdd];
     
-    updateCategoriesMutation.mutate(selectedCategoriesToSend);
+    // Filter out duplicates based on category name
+    const existingNames = new Set(existingCategoriesData.map(cat => cat.name));
+    const uniqueNewCategories = allNewCategories.filter(cat => !existingNames.has(cat.name));
+
+    if (uniqueNewCategories.length === 0) {
+      toast({
+        title: "Aviso",
+        description: "Nenhuma categoria nova foi selecionada ou todas já existem no torneio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Combine existing + new categories
+    const allCategoriesToSend = [...existingCategoriesData, ...uniqueNewCategories];
+    
+    updateCategoriesMutation.mutate(allCategoriesToSend);
   };
 
   const allCategories = [...defaultCategories, ...customCategories];
@@ -156,14 +259,43 @@ export default function ManageTournamentCategories({
             <div className="flex flex-wrap gap-2 mt-2 min-h-[2.5rem] p-3 border rounded-lg">
               {currentCategories.length > 0 ? (
                 currentCategories.map((category) => (
-                  <Badge key={category.id} variant="secondary" className="text-xs">
-                    {category.name}
-                  </Badge>
+                  <div key={category.id} className="relative group flex items-center">
+                    <Badge variant="secondary" className="text-xs pr-8">
+                      {category.name}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Tem certeza que deseja remover a categoria "${category.name}" deste torneio?`)) {
+                          removeCategoryMutation.mutate(category.id);
+                        }
+                      }}
+                      disabled={removeCategoryMutation.isPending}
+                      className="absolute -top-1 -right-1 h-5 w-5 p-0 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                      data-testid={`remove-category-${category.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
                 ))
               ) : (
                 <p className="text-muted-foreground text-sm">Nenhuma categoria definida</p>
               )}
             </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Como Adicionar Categorias:</h4>
+            <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              <li>• Selecione os naipes (Masculino, Feminino, Misto) para as categorias desejadas</li>
+              <li>• Escolha o formato do jogo para cada categoria (Eliminação Simples, Round Robin, etc.)</li>
+              <li>• Clique em "Adicionar Categorias Selecionadas" para incluir no torneio</li>
+              <li>• As novas categorias serão adicionadas às já existentes</li>
+              <li>• Use o X vermelho para remover categorias existentes</li>
+            </ul>
           </div>
 
           {/* Category selection */}
@@ -176,22 +308,83 @@ export default function ManageTournamentCategories({
                     <p className="text-sm text-muted-foreground">{category.description}</p>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label className="text-sm">Selecionar Naipe:</Label>
-                    <div className="flex gap-3">
-                      {['masculino', 'feminino', 'misto'].map((gender) => (
-                        <div key={gender} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${category.id}-${gender}`}
-                            checked={selectedCategories[category.name]?.includes(gender) || false}
-                            onCheckedChange={() => handleCategoryGenderToggle(category.name, gender)}
-                          />
-                          <Label htmlFor={`${category.id}-${gender}`} className="text-sm capitalize">
-                            {gender}
-                          </Label>
-                        </div>
-                      ))}
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-sm">Selecionar Naipe:</Label>
+                      <div className="flex gap-3 mt-1">
+                        {['masculino', 'feminino', 'misto'].map((gender) => (
+                          <div key={gender} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${category.id}-${gender}`}
+                              checked={selectedCategories[category.name]?.includes(gender) || false}
+                              onCheckedChange={() => handleCategoryGenderToggle(category.name, gender)}
+                            />
+                            <Label htmlFor={`${category.id}-${gender}`} className="text-sm capitalize">
+                              {gender}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                    
+                    {/* Formato apenas para categorias padrão (não customizadas) */}
+                    {!category.id.startsWith('custom-') && (
+                      <div>
+                        <Label className="text-sm">Formato do Jogo:</Label>
+                        <Select 
+                          value={categoryFormats[category.name] || 'single_elimination'} 
+                          onValueChange={(value) => handleCategoryFormatChange(category.name, value)}
+                        >
+                          <SelectTrigger className="w-full mt-1">
+                            <SelectValue placeholder="Selecione o formato" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {formatOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                <div>
+                                  <div className="font-medium">{option.label}</div>
+                                  <div className="text-xs text-muted-foreground">{option.description}</div>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        
+                        {/* Configurações específicas para Liga */}
+                        {(categoryFormats[category.name] || 'single_elimination') === 'league' && (
+                          <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <Label className="text-sm font-medium">Configuração da Liga:</Label>
+                            <div className="mt-2 space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`${category.id}-single-round`}
+                                  checked={!(categoryLeagueSettings[category.name]?.isRoundTrip ?? false)}
+                                  onCheckedChange={() => handleLeagueSettingChange(category.name, false)}
+                                />
+                                <Label htmlFor={`${category.id}-single-round`} className="text-sm">
+                                  Apenas ida (1 rodada)
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`${category.id}-round-trip`}
+                                  checked={categoryLeagueSettings[category.name]?.isRoundTrip ?? false}
+                                  onCheckedChange={() => handleLeagueSettingChange(category.name, true)}
+                                />
+                                <Label htmlFor={`${category.id}-round-trip`} className="text-sm">
+                                  Ida e volta (2 rodadas)
+                                </Label>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {(categoryLeagueSettings[category.name]?.isRoundTrip ?? false) 
+                                ? "Cada jogador enfrentará todos os outros duas vezes (casa e fora)"
+                                : "Cada jogador enfrentará todos os outros uma vez"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -244,6 +437,61 @@ export default function ManageTournamentCategories({
                       placeholder="Ex: 35"
                     />
                   </div>
+                  <div className="md:col-span-2">
+                    <Label>Formato do Jogo</Label>
+                    <Select 
+                      value={category.format || 'single_elimination'} 
+                      onValueChange={(value) => updateCustomCategory(category.id, 'format', value)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione o formato" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formatOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div>
+                              <div className="font-medium">{option.label}</div>
+                              <div className="text-xs text-muted-foreground">{option.description}</div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {/* Configurações específicas para Liga */}
+                    {(category.format || 'single_elimination') === 'league' && (
+                      <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <Label className="text-sm font-medium">Configuração da Liga:</Label>
+                        <div className="mt-2 space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${category.id}-single-round`}
+                              checked={!(categoryLeagueSettings[category.name]?.isRoundTrip ?? false)}
+                              onCheckedChange={() => handleLeagueSettingChange(category.name, false)}
+                            />
+                            <Label htmlFor={`${category.id}-single-round`} className="text-sm">
+                              Apenas ida (1 rodada)
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${category.id}-round-trip`}
+                              checked={categoryLeagueSettings[category.name]?.isRoundTrip ?? false}
+                              onCheckedChange={() => handleLeagueSettingChange(category.name, true)}
+                            />
+                            <Label htmlFor={`${category.id}-round-trip`} className="text-sm">
+                              Ida e volta (2 rodadas)
+                            </Label>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {(categoryLeagueSettings[category.name]?.isRoundTrip ?? false) 
+                            ? "Cada jogador enfrentará todos os outros duas vezes (casa e fora)"
+                            : "Cada jogador enfrentará todos os outros uma vez"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-end mt-3">
                   <Button variant="outline" size="sm" onClick={() => removeCustomCategory(category.id)}>
@@ -254,18 +502,47 @@ export default function ManageTournamentCategories({
             ))}
           </div>
 
+          {/* Selection summary */}
+          {Object.keys(selectedCategories).length > 0 && (
+            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">Categorias Selecionadas para Adicionar:</h4>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(selectedCategories).flatMap(([categoryName, genders]) => 
+                  genders.map(gender => (
+                    <Badge key={`${categoryName}-${gender}`} variant="outline" className="text-xs bg-green-100 dark:bg-green-900">
+                      {categoryName} {gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : 'Misto'}
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Action buttons */}
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSave}
-              disabled={updateCategoriesMutation.isPending}
-              data-testid="save-categories-btn"
-            >
-              {updateCategoriesMutation.isPending ? "Salvando..." : "Salvar Categorias"}
-            </Button>
+          <div className="flex justify-between">
+            <div className="flex gap-2">
+              {Object.keys(selectedCategories).length > 0 && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedCategories({})}
+                  data-testid="clear-selections-btn"
+                >
+                  Limpar Seleções
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleSave}
+                disabled={updateCategoriesMutation.isPending || Object.keys(selectedCategories).length === 0}
+                data-testid="save-categories-btn"
+              >
+                {updateCategoriesMutation.isPending ? "Adicionando..." : "Adicionar Categorias Selecionadas"}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -10,7 +10,8 @@ import { ptBR } from "date-fns/locale";
 interface Tournament {
   id: string;
   name: string;
-  date: string;
+  startDate: string;
+  endDate?: string;
   location: string;
   format: string;
   status: string;
@@ -82,7 +83,7 @@ export default function PublicTournamentsView() {
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
                           <span data-testid={`text-tournament-date-${tournament.id}`}>
-                            {format(new Date(tournament.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                            {tournament.startDate ? format(new Date(tournament.startDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Data a definir'}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">

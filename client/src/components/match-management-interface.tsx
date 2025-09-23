@@ -81,12 +81,32 @@ export default function MatchManagementInterface({
     return Array.from(new Set(gendersInCategory));
   };
 
-  // Obter fases disponíveis para a categoria selecionada
+  // Obter fases disponíveis para a categoria selecionada baseado no formato
   const getAvailablePhases = () => {
     if (!selectedCategory) return [];
     
-    // Sempre mostrar ambas as fases para qualquer categoria selecionada
-    return ['group', 'knockout'];
+    // Encontrar a categoria selecionada e seu formato
+    const category = tournament.categories?.find(c => c.name === selectedCategory);
+    const format = (category as any)?.format || tournament.format || 'single_elimination';
+    
+    // Retornar fases baseadas no formato da categoria
+    switch (format) {
+      case 'groups_elimination':
+      case 'group_stage_knockout':
+        return ['group', 'knockout'];
+      case 'single_elimination':
+      case 'double_elimination':
+        return ['knockout'];
+      case 'round_robin':
+      case 'league':
+        return ['round_robin'];
+      case 'swiss':
+        return ['swiss'];
+      case 'cup':
+        return ['group', 'knockout'];
+      default:
+        return ['round_robin']; // Padrão para formatos não reconhecidos
+    }
   };
 
   // Obter grupos disponíveis para a fase selecionada
@@ -113,6 +133,8 @@ export default function MatchManagementInterface({
     switch (phase) {
       case 'group': return 'Fase de Grupos';
       case 'knockout': return 'Eliminatórias';
+      case 'round_robin': return 'Pontos Corridos';
+      case 'swiss': return 'Sistema Suíço';
       case 'round_of_32': return '32avos de Final';
       case 'round_of_16': return 'Oitavas de Final';
       case 'quarterfinal': return 'Quartas de Final';

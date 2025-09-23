@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,21 +9,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, UserPlus } from "lucide-react";
-import type { Athlete, Category } from "@shared/schema";
+import { Plus, UserPlus, X } from "lucide-react";
+import type { Athlete, Category, Tournament } from "@shared/schema";
+import { isEligibleForCategory } from "@shared/utils";
 
 interface DirectEnrollmentInterfaceProps {
   tournamentId: string;
   athletes?: Athlete[];
   categories?: Category[];
   existingParticipants?: any[];
+  tournament?: Tournament;
 }
 
 export function DirectEnrollmentInterface({ 
   tournamentId, 
   athletes = [], 
   categories = [],
-  existingParticipants = []
+  existingParticipants = [],
+  tournament
 }: DirectEnrollmentInterfaceProps) {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -37,10 +40,44 @@ export function DirectEnrollmentInterface({
   );
 
   // Filtrar atletas por termo de busca
-  const filteredAthletes = availableAthletes.filter(athlete =>
+  let filteredAthletes = availableAthletes.filter(athlete =>
     athlete.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (athlete.club && athlete.club.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // Filtrar atletas por categoria selecionada (idade E gênero)
+  if (selectedCategory && tournament) {
+    const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
+    if (selectedCategoryData) {
+      const parsed = parseInt(String(tournament.season ?? ""), 10);
+      const tournamentYear = Number.isFinite(parsed) ? parsed : new Date().getFullYear();
+      
+      filteredAthletes = filteredAthletes.filter(athlete => {
+        // Filtro por idade (se a categoria tem limites de idade)
+        const ageEligible = isEligibleForCategory(
+          athlete.birthDate,
+          tournamentYear,
+          selectedCategoryData.minAge,
+          selectedCategoryData.maxAge
+        );
+        
+        // Filtro por gênero (se a categoria especifica um gênero)
+        let genderEligible = true;
+        if (selectedCategoryData.gender && 
+            selectedCategoryData.gender.toLowerCase() !== 'misto' && 
+            selectedCategoryData.gender.toLowerCase() !== 'mixed') {
+          genderEligible = athlete.gender?.toLowerCase() === selectedCategoryData.gender.toLowerCase();
+        }
+        
+        return ageEligible && genderEligible;
+      });
+    }
+  }
+
+  // Limpar seleções quando a categoria muda (para evitar inscrições de atletas não elegíveis)
+  useEffect(() => {
+    setSelectedAthletes([]);
+  }, [selectedCategory]);
 
   const enrollAthletesMutation = useMutation({
     mutationFn: async (data: { athleteIds: string[], categoryId?: string }) => {
@@ -60,6 +97,28 @@ export function DirectEnrollmentInterface({
       toast({
         title: "Erro",
         description: error?.message || "Falha ao inscrever atletas",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation para remover participante do torneio
+  const removeParticipantMutation = useMutation({
+    mutationFn: async (athleteId: string) => {
+      return apiRequest('DELETE', `/api/tournaments/${tournamentId}/participants/${athleteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants'] });
+      toast({
+        title: "Participante Removido",
+        description: "Atleta foi removido do torneio com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error?.message || "Falha ao remover atleta do torneio",
         variant: "destructive",
       });
     },
@@ -232,9 +291,9 @@ export function DirectEnrollmentInterface({
                 </div>
               ) : (
                 existingParticipants.map((participant, index) => (
-                  <Card key={participant.id || index}>
+                  <Card key={participant.id || index} className="relative">
                     <CardContent className="p-3">
-                      <div>
+                      <div className="pr-8">
                         <p className="font-medium text-sm">{participant.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {participant.club && `${participant.club} - `}
@@ -246,6 +305,20 @@ export function DirectEnrollmentInterface({
                           </Badge>
                         )}
                       </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm(`Tem certeza que deseja remover ${participant.name} do torneio?`)) {
+                            removeParticipantMutation.mutate(participant.athleteId || participant.id);
+                          }
+                        }}
+                        disabled={removeParticipantMutation.isPending}
+                        className="absolute top-2 right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        data-testid={`button-remove-participant-${participant.id || index}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </CardContent>
                   </Card>
                 ))
