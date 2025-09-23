@@ -311,7 +311,7 @@ export class DatabaseStorage implements IStorage {
       let tournamentMatches: any[] = [];
       
       try {
-        participants = await this.getTournamentParticipants(id);
+        participants = await this.getTournamentParticipantsWithCategories(id);
         console.log("Storage: Participants loaded:", participants.length);
       } catch (error) {
         console.log("Storage: Error loading participants:", error);

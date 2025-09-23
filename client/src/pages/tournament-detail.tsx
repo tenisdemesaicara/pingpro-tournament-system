@@ -17,6 +17,7 @@ import ManageTournamentCategories from "@/components/manage-tournament-categorie
 import ScoringSystemExplanation from "@/components/scoring-system-explanation";
 import CategoryBracketManagement from "@/components/category-bracket-management";
 import DirectEnrollmentInterface from "@/components/direct-enrollment-interface";
+import ParticipantsWithFilters from "@/components/participants-with-filters";
 
 export default function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -478,32 +479,10 @@ export default function TournamentDetail() {
           </TabsContent>
 
           <TabsContent value="participants" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Participantes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {tournament.participants && tournament.participants.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {tournament.participants.map((participant) => (
-                      <div key={participant.id} className="p-4 border rounded-lg">
-                        <h4 className="font-semibold text-sm md:text-base break-words">{participant.name}</h4>
-                        <div className="text-xs md:text-sm text-muted-foreground mt-2 space-y-1">
-                          {participant.club && <p>Clube: {participant.club}</p>}
-                          {participant.city && participant.state && (
-                            <p>{participant.city}, {participant.state}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-8">
-                    Nenhum participante inscrito ainda.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <ParticipantsWithFilters 
+              tournament={tournament}
+              athletes={athletes || []}
+            />
           </TabsContent>
 
           <TabsContent value="registration" className="mt-6">

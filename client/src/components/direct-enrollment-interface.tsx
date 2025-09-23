@@ -30,8 +30,36 @@ export function DirectEnrollmentInterface({
 }: DirectEnrollmentInterfaceProps) {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedGender, setSelectedGender] = useState<string>("");
   const [selectedAthletes, setSelectedAthletes] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Obter gêneros disponíveis para a categoria selecionada
+  const getAvailableGenders = () => {
+    if (!selectedCategory) return [];
+    
+    const category = categories.find(c => c.id === selectedCategory);
+    if (!category) return [];
+
+    const categoryGender = category.gender?.toLowerCase();
+
+    // Se categoria é mista, permitir escolher masculino E feminino
+    if (categoryGender === 'misto' || categoryGender === 'mixed') {
+      return ['masculino', 'feminino'];
+    }
+
+    // Para categorias específicas, usar apenas o gênero da categoria
+    if (categoryGender === 'masculino' || categoryGender === 'feminino') {
+      return [categoryGender];
+    }
+
+    // Fallback: obter gêneros dos atletas disponíveis
+    const genders = athletes
+      .map(a => a.gender?.toLowerCase())
+      .filter(Boolean);
+    
+    return Array.from(new Set(genders));
+  };
 
   // Filtrar atletas que já não estão inscritos
   const enrolledAthleteIds = existingParticipants.map(p => p.athleteId || p.id);
@@ -39,20 +67,24 @@ export function DirectEnrollmentInterface({
     !enrolledAthleteIds.includes(athlete.id)
   );
 
-  // Filtrar atletas por termo de busca
-  let filteredAthletes = availableAthletes.filter(athlete =>
-    athlete.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (athlete.club && athlete.club.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Filtrar atletas baseado nos filtros selecionados
+  let filteredAthletes: Athlete[] = [];
 
-  // Filtrar atletas por categoria selecionada (idade E gênero)
-  if (selectedCategory && tournament) {
+  // Só mostrar atletas se categoria E gênero estiverem selecionados
+  if (selectedCategory && selectedGender && tournament) {
     const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
     if (selectedCategoryData) {
       const parsed = parseInt(String(tournament.season ?? ""), 10);
       const tournamentYear = Number.isFinite(parsed) ? parsed : new Date().getFullYear();
       
-      filteredAthletes = filteredAthletes.filter(athlete => {
+      // Primeiro, filtrar por busca
+      let filtered = availableAthletes.filter(athlete =>
+        athlete.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (athlete.club && athlete.club.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+
+      // Depois, filtrar por categoria (idade) E gênero selecionado
+      filteredAthletes = filtered.filter(athlete => {
         // Filtro por idade (se a categoria tem limites de idade)
         const ageEligible = isEligibleForCategory(
           athlete.birthDate,
@@ -61,22 +93,22 @@ export function DirectEnrollmentInterface({
           selectedCategoryData.maxAge
         );
         
-        // Filtro por gênero (se a categoria especifica um gênero)
-        let genderEligible = true;
-        if (selectedCategoryData.gender && 
-            selectedCategoryData.gender.toLowerCase() !== 'misto' && 
-            selectedCategoryData.gender.toLowerCase() !== 'mixed') {
-          genderEligible = athlete.gender?.toLowerCase() === selectedCategoryData.gender.toLowerCase();
-        }
+        // Filtro por gênero selecionado
+        const genderEligible = athlete.gender?.toLowerCase() === selectedGender.toLowerCase();
         
         return ageEligible && genderEligible;
       });
     }
   }
 
-  // Limpar seleções quando a categoria muda (para evitar inscrições de atletas não elegíveis)
+  // Limpar seleções quando a categoria ou gênero mudam
   useEffect(() => {
     setSelectedAthletes([]);
+  }, [selectedCategory, selectedGender]);
+
+  // Limpar gênero quando categoria muda
+  useEffect(() => {
+    setSelectedGender("");
   }, [selectedCategory]);
 
   const enrollAthletesMutation = useMutation({
@@ -92,6 +124,7 @@ export function DirectEnrollmentInterface({
       });
       setSelectedAthletes([]);
       setSelectedCategory("");
+      setSelectedGender("");
     },
     onError: (error: any) => {
       toast({
@@ -171,8 +204,52 @@ export function DirectEnrollmentInterface({
           </TabsList>
           
           <TabsContent value="select" className="space-y-4">
-            {/* Filtros */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Filtros Obrigatórios */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="select-category">Categoria *</Label>
+                <Select 
+                  value={selectedCategory} 
+                  onValueChange={(value) => {
+                    setSelectedCategory(value || "");
+                    setSelectedGender(""); // Limpar gênero ao mudar categoria
+                  }}
+                >
+                  <SelectTrigger data-testid="select-enrollment-category">
+                    <SelectValue placeholder="Escolha uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro por Naipe/Gênero */}
+              {selectedCategory && getAvailableGenders().length > 0 && (
+                <div>
+                  <Label htmlFor="select-gender">Naipe *</Label>
+                  <Select 
+                    value={selectedGender} 
+                    onValueChange={(value) => setSelectedGender(value || "")}
+                  >
+                    <SelectTrigger data-testid="select-enrollment-gender">
+                      <SelectValue placeholder="Escolha o naipe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableGenders().map((gender) => (
+                        <SelectItem key={gender} value={gender}>
+                          {gender === 'masculino' ? 'Masculino' : 'Feminino'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="search-athletes">Buscar Atletas</Label>
                 <Input
@@ -181,48 +258,56 @@ export function DirectEnrollmentInterface({
                   placeholder="Nome do atleta ou clube..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={!selectedCategory || !selectedGender}
                 />
               </div>
-              {categories.length > 0 && (
-                <div>
-                  <Label htmlFor="select-category">Categoria (Opcional)</Label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger data-testid="select-enrollment-category">
-                      <SelectValue placeholder="Selecione a categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name} ({category.gender === 'mixed' ? 'Misto' : category.gender})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
 
             {/* Lista de Atletas Disponíveis */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Atletas Disponíveis ({filteredAthletes.length})</Label>
-                {selectedAthletes.length > 0 && (
-                  <Badge variant="secondary">
-                    {selectedAthletes.length} selecionado(s)
-                  </Badge>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto border rounded-lg p-4">
-                {filteredAthletes.length === 0 ? (
-                  <div className="col-span-full text-center text-muted-foreground py-8">
-                    {availableAthletes.length === 0 
-                      ? "Todos os atletas já estão inscritos no torneio"
-                      : "Nenhum atleta encontrado com este filtro"
-                    }
+              {!selectedCategory || !selectedGender ? (
+                <div className="text-center py-12">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="text-6xl opacity-20">👥</div>
+                    <p className="text-muted-foreground text-lg font-medium">
+                      {!selectedCategory 
+                        ? 'Selecione uma categoria para continuar'
+                        : 'Selecione um naipe para ver os atletas'
+                      }
+                    </p>
+                    <p className="text-muted-foreground text-sm max-w-md">
+                      {!selectedCategory 
+                        ? 'Escolha uma categoria no filtro acima.'
+                        : 'Escolha o naipe para visualizar os atletas elegíveis para inscrição.'
+                      }
+                    </p>
                   </div>
-                ) : (
-                  filteredAthletes.map((athlete) => (
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <Label>
+                      Atletas Disponíveis ({filteredAthletes.length})
+                      {selectedCategory && selectedGender && (
+                        <span className="text-sm font-normal text-muted-foreground ml-2">
+                          - {categories.find(c => c.id === selectedCategory)?.name} ({selectedGender === 'masculino' ? 'Masculino' : 'Feminino'})
+                        </span>
+                      )}
+                    </Label>
+                    {selectedAthletes.length > 0 && (
+                      <Badge variant="secondary">
+                        {selectedAthletes.length} selecionado(s)
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto border rounded-lg p-4">
+                    {filteredAthletes.length === 0 ? (
+                      <div className="col-span-full text-center text-muted-foreground py-8">
+                        Nenhum atleta encontrado com este filtro
+                      </div>
+                    ) : (
+                      filteredAthletes.map((athlete) => (
                     <Card 
                       key={athlete.id} 
                       className={`cursor-pointer transition-colors ${
@@ -260,10 +345,12 @@ export function DirectEnrollmentInterface({
                           />
                         </div>
                       </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
+                      </Card>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Botão de Inscrição */}

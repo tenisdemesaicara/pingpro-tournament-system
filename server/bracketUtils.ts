@@ -44,28 +44,90 @@ export async function generateGroupStageMatches(tournamentId: string, categoryId
   return matches;
 }
 
-export async function generateRoundRobinMatches(tournamentId: string, categoryId: string, participants: any[]) {
+export async function generateRoundRobinMatches(tournamentId: string, categoryId: string, participants: any[], isDouble: boolean = false) {
   const matches = [];
   let matchNumber = 1;
+  const numParticipants = participants.length;
   
-  // Todos contra todos
-  for (let i = 0; i < participants.length; i++) {
-    for (let j = i + 1; j < participants.length; j++) {
-      matches.push({
-        tournamentId,
-        categoryId,
-        player1Id: participants[i].athleteId,
-        player2Id: participants[j].athleteId,
-        round: 1,
-        matchNumber: matchNumber++,
-        status: 'pending',
-        phase: 'group',
-        bestOfSets: 3
-      });
+  console.log(`Generating ${isDouble ? 'double ' : ''}round-robin for ${numParticipants} participants`);
+  
+  if (numParticipants < 2) {
+    console.log("Not enough participants for round-robin");
+    return matches;
+  }
+  
+  // Algoritmo de round-robin usando o método circular
+  const rounds = numParticipants % 2 === 0 ? numParticipants - 1 : numParticipants;
+  const participantsForRounds = [...participants];
+  
+  // Se número ímpar, adicionar um "bye" virtual (que não gera jogos)
+  if (numParticipants % 2 === 1) {
+    participantsForRounds.push({ athleteId: 'BYE', isVirtualBye: true });
+  }
+  
+  const totalParticipants = participantsForRounds.length;
+  
+  // Gerar todas as rodadas
+  for (let round = 1; round <= rounds; round++) {
+    const roundMatches = [];
+    
+    // Gerar confrontos da rodada
+    for (let i = 0; i < totalParticipants / 2; i++) {
+      const player1 = participantsForRounds[i];
+      const player2 = participantsForRounds[totalParticipants - 1 - i];
+      
+      // Não criar jogo se um dos participantes é BYE virtual
+      if (!player1.isVirtualBye && !player2.isVirtualBye) {
+        roundMatches.push({
+          tournamentId,
+          categoryId,
+          player1Id: player1.athleteId,
+          player2Id: player2.athleteId,
+          round: round,
+          matchNumber: matchNumber++,
+          status: 'pending',
+          phase: 'league',
+          bestOfSets: 3
+        });
+      }
+    }
+    
+    matches.push(...roundMatches);
+    
+    // Rotacionar participantes (método circular) - fixo primeiro, roda os outros
+    if (totalParticipants > 2) {
+      const fixed = participantsForRounds[0];
+      const rotating = participantsForRounds.slice(1);
+      
+      // Mover último para o segundo lugar, outros descem uma posição
+      const rotated = [rotating[rotating.length - 1], ...rotating.slice(0, -1)];
+      participantsForRounds.splice(0, participantsForRounds.length, fixed, ...rotated);
     }
   }
   
-  console.log(`Generated ${matches.length} round-robin matches`);
+  // Se é ida e volta, duplicar todos os jogos invertendo as posições
+  if (isDouble) {
+    const totalRounds = rounds;
+    const returnMatches = [];
+    
+    for (let round = 1; round <= rounds; round++) {
+      const roundMatches = matches.filter(m => m.round === round);
+      
+      for (const match of roundMatches) {
+        returnMatches.push({
+          ...match,
+          player1Id: match.player2Id, // Inverter posições
+          player2Id: match.player1Id,
+          round: totalRounds + round, // Segunda metade das rodadas
+          matchNumber: matchNumber++
+        });
+      }
+    }
+    
+    matches.push(...returnMatches);
+  }
+  
+  console.log(`Generated ${matches.length} ${isDouble ? 'double ' : ''}round-robin matches in ${isDouble ? rounds * 2 : rounds} rounds`);
   return matches;
 }
 

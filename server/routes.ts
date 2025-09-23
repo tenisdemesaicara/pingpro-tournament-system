@@ -2035,7 +2035,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Request body:", req.body);
       
       // Verificar permissões (só admin pode gerar chaveamento)
-      if (req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user' !== 'admin') {
+      const userRole = req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user';
+      if (userRole !== 'admin') {
         return res.status(403).json({ error: "Apenas administradores podem gerar chaveamento" });
       }
       
@@ -2091,6 +2092,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let matches = [];
       const format = tournamentCategory.format;
       
+      console.log(`🔍 DEBUG FORMAT: "${format}" (type: ${typeof format})`);
+      console.log(`🔍 FORMAT COMPARISON:`);
+      console.log(`   format === 'league': ${format === 'league'}`);
+      console.log(`   format === 'round_robin': ${format === 'round_robin'}`);
+      console.log(`   format.trim() === 'league': ${format?.trim?.() === 'league'}`);
+      
       switch (format) {
         case 'group_stage_knockout':
           // Para grupos + mata-mata, precisa de configurações dinâmicas
@@ -2110,8 +2117,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
           
         case 'round_robin':
-          console.log("Creating round-robin (todos contra todos) matches...");
-          matches = await generateRoundRobinMatches(req.params.id, req.params.categoryId, participants);
+        case 'league': // Liga simples (ida)
+        case 'round_robin_double':
+        case 'league_double': // Liga dupla (ida e volta)
+          console.log(`Creating round-robin matches for format: ${format}...`);
+          const isDouble = format.includes('double') || req.body.isDoubleRoundRobin;
+          matches = await generateRoundRobinMatches(req.params.id, req.params.categoryId, participants, isDouble);
           break;
           
         case 'single_elimination':
@@ -2227,7 +2238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("User:", req.session.user?.username, "Role:", req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user');
       
       // Verificar permissões (só admin pode gerar chaveamento)
-      if (req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user' !== 'admin') {
+      const userRole = req.session.user?.roles?.some(r => r.name === 'admin') ? 'admin' : 'user';
+      if (userRole !== 'admin') {
         return res.status(403).json({ error: "Apenas administradores podem gerar chaveamento" });
       }
       
