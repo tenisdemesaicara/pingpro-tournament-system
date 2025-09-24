@@ -20,6 +20,12 @@ interface BracketViewProps {
 interface BracketMatch extends Match {
   player1Name?: string;
   player2Name?: string;
+  player1Photo?: string;
+  player2Photo?: string;
+  player1City?: string;
+  player2City?: string;
+  player1State?: string;
+  player2State?: string;
   player1Club?: string;
   player2Club?: string;
 }
@@ -116,11 +122,32 @@ const getPlayerPlaceholder = (playerSource: string | null, matches: BracketMatch
 };
 
 // Componente de Avatar do Atleta - estilo Copa do Mundo
-function AthleteAvatar({ athleteName, className = "" }: { athleteName: string | null; className?: string }) {
+function AthleteAvatar({ 
+  athleteName, 
+  athletePhoto, 
+  className = "" 
+}: { 
+  athleteName: string | null; 
+  athletePhoto?: string | null;
+  className?: string; 
+}) {
   if (!athleteName) {
     return (
       <div className={`w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300 ${className}`}>
         <User className="w-6 h-6 text-gray-400" />
+      </div>
+    );
+  }
+
+  // Se há foto, usar ela
+  if (athletePhoto) {
+    return (
+      <div className={`w-14 h-14 rounded-full border-2 border-white shadow-md overflow-hidden ${className}`}>
+        <img 
+          src={athletePhoto} 
+          alt={athleteName}
+          className="w-full h-full object-cover"
+        />
       </div>
     );
   }
@@ -162,7 +189,7 @@ function WorldCupMatchCard({ match, matches, className = "" }: {
   const player2Name = match.player2Name || (match.status === 'bye' ? 'BYE' : getPlayerPlaceholder(match.player2Source, matches));
   
   return (
-    <Card className={`${className} min-w-80 max-w-96 hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-300 bg-gradient-to-br from-white via-blue-50 to-purple-50`} data-testid={`match-card-${match.id}`}>
+    <Card className={`${className} w-full sm:min-w-[18rem] md:min-w-[22rem] sm:max-w-96 hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-300 bg-gradient-to-br from-white via-blue-50 to-purple-50`} data-testid={`match-card-${match.id}`}>
       <CardHeader className="pb-3 text-center bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
         <div className="flex items-center justify-between">
           <div className="text-xs font-medium opacity-90">
@@ -186,15 +213,17 @@ function WorldCupMatchCard({ match, matches, className = "" }: {
           
           {/* Jogador 1 - estilo Copa */}
           <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 transition-all">
-            <AthleteAvatar athleteName={player1Name} />
+            <AthleteAvatar athleteName={player1Name} athletePhoto={match.player1Photo} />
             <div className="flex-1 min-w-0">
               <div className={`font-bold text-lg truncate ${match.winnerId === match.player1Id ? 'text-green-600' : 'text-gray-800'}`}>
                 {player1Name}
               </div>
-              {match.player1Club && (
+              {(match.player1City || match.player1State || match.player1Club) && (
                 <div className="text-sm text-blue-600 flex items-center gap-1 font-medium">
                   <MapPin className="w-3 h-3" />
-                  {match.player1Club}
+                  <span className="truncate">
+                    {[match.player1City, match.player1State, match.player1Club].filter(Boolean).join(', ')}
+                  </span>
                 </div>
               )}
             </div>
@@ -216,15 +245,17 @@ function WorldCupMatchCard({ match, matches, className = "" }: {
 
           {/* Jogador 2 - estilo Copa */}
           <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-150 transition-all">
-            <AthleteAvatar athleteName={player2Name} />
+            <AthleteAvatar athleteName={player2Name} athletePhoto={match.player2Photo} />
             <div className="flex-1 min-w-0">
               <div className={`font-bold text-lg truncate ${match.winnerId === match.player2Id ? 'text-green-600' : 'text-gray-800'}`}>
                 {player2Name}
               </div>
-              {match.player2Club && (
+              {(match.player2City || match.player2State || match.player2Club) && (
                 <div className="text-sm text-red-600 flex items-center gap-1 font-medium">
                   <MapPin className="w-3 h-3" />
-                  {match.player2Club}
+                  <span className="truncate">
+                    {[match.player2City, match.player2State, match.player2Club].filter(Boolean).join(', ')}
+                  </span>
                 </div>
               )}
             </div>
@@ -275,42 +306,44 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
   // Flag derivada para mostrar eliminatórias
   const showElims = selectedPhase === PHASE_ELIMS;
   
-  // Debug temporário - remover depois
-  console.log("🔍 DEBUG - selectedPhase:", selectedPhase, "showElims:", showElims);
+  // Log limpo
   
   const { data: bracketData, isLoading, error } = useQuery<BracketData>({
     queryKey: [`/api/tournaments/${tournamentId}/categories/${categoryId}/bracket`],
   });
 
+  // Normalizar dados do bracket para evitar erros de console
+  const normalizedBracketData = bracketData ? {
+    ...bracketData,
+    group: bracketData.group ?? [],
+    round_of_32: bracketData.round_of_32 ?? [],
+    round_of_16: bracketData.round_of_16 ?? [],
+    quarterfinal: bracketData.quarterfinal ?? [],
+    semifinal: bracketData.semifinal ?? [],
+    final: bracketData.final ?? [],
+    third_place: bracketData.third_place ?? []
+  } : null;
+  
   // SEMPRE calcular estas variáveis para manter hooks consistentes
   const eliminationPhases: PhaseType[] = ['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final', 'third_place'];
-  const hasGroupData = Array.isArray(bracketData?.group) && bracketData!.group!.length > 0;
+  const hasGroupData = normalizedBracketData?.group && normalizedBracketData.group.length > 0;
   const hasEliminationData = eliminationPhases.some(phase => 
-    Array.isArray(bracketData?.[phase]) && (bracketData?.[phase]?.length ?? 0) > 0
+    normalizedBracketData?.[phase] && normalizedBracketData[phase].length > 0
   );
   
-  // DEBUG CRÍTICO - URGENT FIX
-  console.log("🚨 URGENT DEBUG - bracketData:", bracketData);
-  eliminationPhases.forEach(phase => {
-    const data = bracketData?.[phase];
-    console.log(`🚨 Fase ${phase}:`, Array.isArray(data) ? data.length : "não é array", data);
-  });
+  // Debug removido para limpar console
   
   // Calcular opções do dropdown - SEMPRE chamado
   const phaseOptions: Array<{value: string, label: string}> = [];
   if (hasGroupData) phaseOptions.push({ value: PHASE_GROUP, label: "Fase de Grupos" });
   if (hasEliminationData) phaseOptions.push({ value: PHASE_ELIMS, label: "Eliminatórias" });
   
-  // Debug extra - CRITICAL
-  console.log("🚨 URGENT - hasGroupData:", hasGroupData, "hasEliminationData:", hasEliminationData);
-  console.log("🚨 URGENT - phaseOptions:", phaseOptions);
-  console.log("🚨 URGENT - phaseOptions.length:", phaseOptions.length);
+  // Debug simplificado
   
   // CRÍTICO: Forçar seleção de eliminatórias quando disponível
   useEffect(() => {
     // Se há dados de eliminatórias e ainda estamos em grupos, mudar para eliminatórias
     if (hasEliminationData && selectedPhase === PHASE_GROUP) {
-      console.log("🚨 FORCING eliminatorias selection!");
       setSelectedPhase(PHASE_ELIMS);
     }
     // Se só há uma opção disponível, selecionar automaticamente
@@ -331,7 +364,7 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
     );
   }
 
-  if (error || !bracketData) {
+  if (error || !normalizedBracketData) {
     return (
       <div className={`${className} flex items-center justify-center py-12`}>
         <div className="text-center">
@@ -342,22 +375,22 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
     );
   }
 
-  // Processar dados APÓS confirmar que bracketData existe
+  // Processar dados APÓS confirmar que normalizedBracketData existe
   const allMatches: BracketMatch[] = [];
   
   for (const phase of eliminationPhases) {
-    if (bracketData[phase] && Array.isArray(bracketData[phase])) {
-      allMatches.push(...bracketData[phase]);
+    if (normalizedBracketData[phase] && Array.isArray(normalizedBracketData[phase])) {
+      allMatches.push(...normalizedBracketData[phase]);
     }
   }
 
   // Verificar se há standings de grupos
-  const hasGroupStandings = bracketData.groupStandings && Array.isArray(bracketData.groupStandings);
+  const hasGroupStandings = normalizedBracketData.groupStandings && Array.isArray(normalizedBracketData.groupStandings);
 
   // Agrupar partidas por fase usando os dados do servidor
   const matchesByPhase = eliminationPhases.reduce((acc, phase) => {
-    if (bracketData[phase] && Array.isArray(bracketData[phase])) {
-      acc[phase] = bracketData[phase].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
+    if (normalizedBracketData[phase] && Array.isArray(normalizedBracketData[phase])) {
+      acc[phase] = normalizedBracketData[phase].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
     } else {
       acc[phase] = [];
     }
@@ -386,7 +419,7 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
         <div className="flex items-center justify-between">
           <h3 className="text-2xl font-bold">Chaveamento</h3>
           <Select value={selectedPhase} onValueChange={(value) => {
-            console.log("🔄 Select onChange - novo valor:", value);
+            // Log removido
             setSelectedPhase(value);
           }}>
             <SelectTrigger className="w-48" data-testid="select-phase">
@@ -412,7 +445,7 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
             <div className="flex items-center justify-between">
               <h3 className="text-2xl font-bold">Fase de Grupos</h3>
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                👥 {bracketData.group?.length || 0} partidas
+                👥 {normalizedBracketData.group?.length || 0} partidas
               </Badge>
             </div>
             
@@ -421,7 +454,7 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
               <div className="space-y-4">
                 <h4 className="text-lg font-semibold">Classificação</h4>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {bracketData.groupStandings.map((groupData: any, index: number) => (
+                  {normalizedBracketData.groupStandings?.map((groupData: any, index: number) => (
                     <Card key={index} className="p-4">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-center">
@@ -455,10 +488,12 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
             {/* Partidas da fase de grupos */}
             <div className="space-y-4">
               <h4 className="text-lg font-semibold">Partidas da Fase de Grupos</h4>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {bracketData.group.map((match: BracketMatch) => (
-                  <MatchCard key={match.id} match={match} matches={bracketData.group} className="" />
-                ))}
+              <div className="w-full overflow-x-auto px-2 sm:px-4">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {normalizedBracketData.group?.map((match: BracketMatch) => (
+                    <MatchCard key={match.id} match={match} matches={normalizedBracketData.group || []} className="" />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

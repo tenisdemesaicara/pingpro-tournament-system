@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,36 +26,26 @@ export default function ManageTournamentCategories({
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  // Same system as tournament creation: fixed categories + custom categories
-  const defaultCategories = [
-    { id: "sub07", name: 'Sub-07', description: 'Atletas de até 7 anos', minAge: null, maxAge: 7 },
-    { id: "sub09", name: 'Sub-09', description: 'Atletas de até 9 anos', minAge: null, maxAge: 9 },
-    { id: "sub11", name: 'Sub-11', description: 'Atletas de até 11 anos', minAge: null, maxAge: 11 },
-    { id: "sub13", name: 'Sub-13', description: 'Atletas de até 13 anos', minAge: null, maxAge: 13 },
-    { id: "sub15", name: 'Sub-15', description: 'Atletas de até 15 anos', minAge: null, maxAge: 15 },
-    { id: "sub19", name: 'Sub-19', description: 'Atletas de até 19 anos', minAge: null, maxAge: 19 },
-    { id: "sub21", name: 'Sub-21', description: 'Atletas de até 21 anos', minAge: null, maxAge: 21 },
-    { id: "adulto", name: 'Adulto', description: 'Atletas de 22 a 29 anos', minAge: 22, maxAge: 29 },
-    { id: "senior30", name: 'Sênior/Lady 30', description: 'Atletas de 30 a 34 anos', minAge: 30, maxAge: 34 },
-    { id: "senior35", name: 'Sênior/Lady 35', description: 'Atletas de 35 a 39 anos', minAge: 35, maxAge: 39 },
-    { id: "veterano40", name: 'Veterano 40', description: 'Atletas de 40 a 44 anos', minAge: 40, maxAge: 44 },
-    { id: "veterano45", name: 'Veterano 45', description: 'Atletas de 45 a 49 anos', minAge: 45, maxAge: 49 },
-    { id: "veterano50", name: 'Veterano 50', description: 'Atletas de 50 a 54 anos', minAge: 50, maxAge: 54 },
-    { id: "veterano55", name: 'Veterano 55', description: 'Atletas de 55 a 59 anos', minAge: 55, maxAge: 59 },
-    { id: "veterano60", name: 'Veterano 60', description: 'Atletas de 60 a 64 anos', minAge: 60, maxAge: 64 },
-    { id: "veterano65", name: 'Veterano 65', description: 'Atletas de 65 a 69 anos', minAge: 65, maxAge: 69 },
-    { id: "veterano70", name: 'Veterano 70', description: 'Atletas de 70 a 74 anos', minAge: 70, maxAge: 74 },
-    { id: "veterano75", name: 'Veterano 75', description: 'Atletas de 75 anos ou mais', minAge: 75, maxAge: null },
-    { id: "absolutoa", name: 'Absoluto A', description: 'Maior Pontuação', minAge: 14, maxAge: 100 },
-    { id: "absolutob", name: 'Absoluto B', description: '2ª Divisão', minAge: 14, maxAge: 100 },
-    { id: "absolutoc", name: 'Absoluto C', description: '3ª Divisão', minAge: 14, maxAge: 100 },
-    { id: "absolutod", name: 'Absoluto D', description: '4ª Divisão', minAge: 14, maxAge: 100 },
-  ];
+  // Buscar todas as categorias ativas do banco
+  const { data: allDatabaseCategories = [] } = useQuery({
+    queryKey: ['/api/categories'],
+    queryFn: () => fetch('/api/categories').then(res => res.json()),
+    enabled: open
+  });
 
   const [selectedCategories, setSelectedCategories] = useState<{[key: string]: string[]}>({});
   const [categoryFormats, setCategoryFormats] = useState<{[key: string]: string}>({});
   const [categoryLeagueSettings, setCategoryLeagueSettings] = useState<{[key: string]: {isRoundTrip: boolean}}>({});
   const [customCategories, setCustomCategories] = useState<any[]>([]);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editCategoryFormats, setEditCategoryFormats] = useState<{[key: string]: string}>({});
+
+  // Função para obter o nome de exibição do formato
+  const getFormatDisplayName = (format: string) => {
+    if (format === 'league_round_trip') return 'Liga (Ida e Volta)';
+    if (format === 'league_single') return 'Liga (Ida)';
+    return formatOptions.find(f => f.value === format)?.label || 'Eliminação Simples';
+  };
 
   // Opções de formato disponíveis
   const formatOptions = [
@@ -139,6 +129,60 @@ export default function ManageTournamentCategories({
     }));
   };
 
+  // Update existing category format mutation
+  const updateCategoryFormatMutation = useMutation({
+    mutationFn: async ({ categoryId, format, leagueSettings }: { categoryId: string, format: string, leagueSettings?: { isRoundTrip: boolean } }) => {
+      const payload: any = { format };
+      if (leagueSettings) {
+        payload.leagueSettings = leagueSettings;
+      }
+      return apiRequest('PATCH', `/api/tournaments/${tournamentId}/categories/${categoryId}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      toast({
+        title: "Sucesso!",
+        description: "Formato da categoria atualizado com sucesso!",
+      });
+      setEditingCategory(null);
+      setEditCategoryFormats({});
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar formato da categoria.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleEditCategoryFormat = (categoryId: string, currentFormat: string) => {
+    setEditingCategory(categoryId);
+    setEditCategoryFormats(prev => ({
+      ...prev,
+      [categoryId]: currentFormat
+    }));
+  };
+
+  const saveEditedCategoryFormat = (categoryId: string) => {
+    const newFormat = editCategoryFormats[categoryId];
+    if (newFormat && newFormat !== '') {
+      // Buscar nome da categoria para as configurações de Liga
+      const category = currentCategories.find(c => c.id === categoryId);
+      const categoryName = category?.name || '';
+      
+      // Preparar payload com configurações de Liga se necessário
+      const payload: any = { categoryId, format: newFormat };
+      
+      if (newFormat === 'league') {
+        const leagueSettings = categoryLeagueSettings[categoryName];
+        payload.leagueSettings = leagueSettings || { isRoundTrip: false };
+      }
+      
+      updateCategoryFormatMutation.mutate(payload);
+    }
+  };
+
   const addCustomCategory = () => {
     const newCategory = {
       id: `custom-${Date.now()}`,
@@ -174,18 +218,27 @@ export default function ManageTournamentCategories({
       format: (cat as any).format || 'single_elimination',
     }));
 
-    // Build new categories from selections
-    const allCategories = [...defaultCategories, ...customCategories];
+    // Função para normalizar nome base da categoria (remover sufixos de gênero)
+    const normalizeBaseName = (name: string) => {
+      return name.replace(/ (Masculino|Feminino|Misto)$/, '');
+    };
+
+    // Função para criar nome completo da categoria
+    const createFullCategoryName = (baseName: string, gender: string) => {
+      const normalizedBase = normalizeBaseName(baseName);
+      return `${normalizedBase} ${gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : 'Misto'}`;
+    };
+
+    // Build new categories from selections (incluindo tanto banco quanto customizadas)
+    const allCategoriesForSearch = [...availableDatabaseCategories, ...customCategories];
     
     const newCategoriesToAdd = Object.entries(selectedCategories).flatMap(([categoryName, genders]) => 
       genders.map(gender => {
-        const baseCategory = allCategories.find(c => c.name === categoryName);
-        
-        const fullCategoryName = `${categoryName} ${gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : 'Misto'}`;
+        const baseCategory = allCategoriesForSearch.find(c => c.name === categoryName);
         const categoryFormat = categoryFormats[categoryName] || 'single_elimination';
         
         return {
-          name: fullCategoryName,
+          name: createFullCategoryName(categoryName, gender),
           description: baseCategory?.description || '',
           minAge: baseCategory?.minAge || null,
           maxAge: baseCategory?.maxAge || null,
@@ -196,28 +249,8 @@ export default function ManageTournamentCategories({
       })
     );
 
-    // Adicionar categorias customizadas completas
-    const customCategoriesToAdd = customCategories
-      .filter(cat => cat.name.trim() !== '')
-      .flatMap(customCat => {
-        const selectedGenders = selectedCategories[customCat.name] || [];
-        return selectedGenders.map(gender => {
-          const categoryFormat = customCat.format || 'single_elimination';
-          
-          return {
-            name: `${customCat.name} ${gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : 'Misto'}`,
-            description: customCat.description || '',
-            minAge: customCat.minAge,
-            maxAge: customCat.maxAge,
-            gender: gender,
-            isActive: true,
-            format: categoryFormat,
-          };
-        });
-      });
-
-    // Combinar todas as novas categorias
-    const allNewCategories = [...newCategoriesToAdd, ...customCategoriesToAdd];
+    // Não duplicar - todas as categorias (banco + customizadas) já foram processadas acima
+    const allNewCategories = newCategoriesToAdd;
     
     // Filter out duplicates based on category name
     const existingNames = new Set(existingCategoriesData.map(cat => cat.name));
@@ -238,7 +271,85 @@ export default function ManageTournamentCategories({
     updateCategoriesMutation.mutate(allCategoriesToSend);
   };
 
-  const allCategories = [...defaultCategories, ...customCategories];
+  // Obter categorias disponíveis do banco de dados
+  const getAvailableDatabaseCategories = () => {
+    // Função para normalizar nome da categoria (remover sufixos de gênero)
+    const normalizeBaseName = (name: string) => {
+      return name.replace(/\s+(Masculino|Feminino|Misto|Mixed)$/i, '').trim();
+    };
+
+    // DEBUG: Vamos ver o que está acontecendo
+    console.log('🔍 DEBUG - Categorias atuais do torneio:', currentCategories.map(cat => ({
+      name: cat.name,
+      gender: cat.gender,
+      baseName: normalizeBaseName(cat.name)
+    })));
+
+    // Criar mapa das categorias atuais por nome base (sem Masculino/Feminino/Misto)
+    const currentCategoryMap = new Map();
+    currentCategories.forEach(cat => {
+      // Extrair nome base removendo sufixos de gênero
+      const baseName = normalizeBaseName(cat.name);
+      
+      if (!currentCategoryMap.has(baseName)) {
+        currentCategoryMap.set(baseName, []);
+      }
+      currentCategoryMap.get(baseName).push(cat.gender);
+    });
+
+    console.log('🔍 DEBUG - Mapa de categorias usadas:', Array.from(currentCategoryMap.entries()));
+
+    // Filtrar categorias do banco que ainda têm naipes disponíveis
+    const result = allDatabaseCategories
+      .filter((cat: any) => cat.isActive) // Apenas categorias ativas
+      .map((cat: any) => {
+        // Normalizar nome da categoria do banco também
+        const categoryBaseName = normalizeBaseName(cat.name);
+        const usedGenders = currentCategoryMap.get(categoryBaseName) || [];
+        const availableGenders = ['masculino', 'feminino', 'misto'].filter(
+          (gender: string) => !usedGenders.includes(gender)
+        );
+
+        console.log(`🔍 DEBUG - Categoria "${cat.name}" (base: "${categoryBaseName}"):`, {
+          usedGenders,
+          availableGenders
+        });
+        
+        return {
+          ...cat,
+          availableGenders
+        };
+      })
+      .filter((cat: any) => cat.availableGenders.length > 0); // Apenas categorias com naipes disponíveis
+
+    return result;
+  };
+
+  const availableDatabaseCategories = getAvailableDatabaseCategories();
+  const allCategories = [...availableDatabaseCategories, ...customCategories];
+
+  // Limpar seleções inválidas quando categorias mudarem
+  useEffect(() => {
+    const newSelectedCategories = { ...selectedCategories };
+    let hasChanges = false;
+
+    Object.keys(selectedCategories).forEach(categoryName => {
+      const category = allCategories.find(cat => cat.name === categoryName);
+      if (category && category.availableGenders) {
+        const validGenders = selectedCategories[categoryName].filter((gender: string) => 
+          category.availableGenders.includes(gender)
+        );
+        if (validGenders.length !== selectedCategories[categoryName].length) {
+          newSelectedCategories[categoryName] = validGenders;
+          hasChanges = true;
+        }
+      }
+    });
+
+    if (hasChanges) {
+      setSelectedCategories(newSelectedCategories);
+    }
+  }, [availableDatabaseCategories, customCategories]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -256,28 +367,125 @@ export default function ManageTournamentCategories({
           {/* Current categories display */}
           <div>
             <Label className="text-base font-semibold">Categorias Atuais do Torneio</Label>
-            <div className="flex flex-wrap gap-2 mt-2 min-h-[2.5rem] p-3 border rounded-lg">
+            <div className="space-y-3 mt-2 min-h-[2.5rem] p-3 border rounded-lg">
               {currentCategories.length > 0 ? (
                 currentCategories.map((category) => (
-                  <div key={category.id} className="relative group flex items-center">
-                    <Badge variant="secondary" className="text-xs pr-8">
-                      {category.name}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Tem certeza que deseja remover a categoria "${category.name}" deste torneio?`)) {
-                          removeCategoryMutation.mutate(category.id);
-                        }
-                      }}
-                      disabled={removeCategoryMutation.isPending}
-                      className="absolute -top-1 -right-1 h-5 w-5 p-0 bg-red-500 hover:bg-red-600 text-white rounded-full"
-                      data-testid={`remove-category-${category.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                  <div key={category.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary" className="text-sm">
+                        {category.name}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Formato: {getFormatDisplayName((category as any).format)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {editingCategory === category.id ? (
+                        <div className="flex items-center gap-2">
+                          <Select 
+                            value={editCategoryFormats[category.id] || (category as any).format || 'single_elimination'}
+                            onValueChange={(value) => setEditCategoryFormats(prev => ({ ...prev, [category.id]: value }))}
+                          >
+                            <SelectTrigger className="w-48">
+                              <SelectValue placeholder="Formato" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {formatOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  <div>
+                                    <div className="font-medium">{option.label}</div>
+                                    <div className="text-xs text-muted-foreground">{option.description}</div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex flex-col gap-2">
+                            {/* Configurações específicas para Liga quando editando */}
+                            {editCategoryFormats[category.id] === 'league' && (
+                              <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <Label className="text-sm font-medium">Configuração da Liga:</Label>
+                                <div className="mt-2 space-y-2">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`edit-${category.id}-single-round`}
+                                      checked={!(categoryLeagueSettings[category.name]?.isRoundTrip ?? false)}
+                                      onCheckedChange={() => handleLeagueSettingChange(category.name, false)}
+                                    />
+                                    <Label htmlFor={`edit-${category.id}-single-round`} className="text-sm">
+                                      Apenas ida (1 rodada)
+                                    </Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`edit-${category.id}-round-trip`}
+                                      checked={categoryLeagueSettings[category.name]?.isRoundTrip ?? false}
+                                      onCheckedChange={() => handleLeagueSettingChange(category.name, true)}
+                                    />
+                                    <Label htmlFor={`edit-${category.id}-round-trip`} className="text-sm">
+                                      Ida e volta (2 rodadas)
+                                    </Label>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  {(categoryLeagueSettings[category.name]?.isRoundTrip ?? false) 
+                                    ? "Cada jogador enfrentará todos os outros duas vezes (casa e fora)"
+                                    : "Cada jogador enfrentará todos os outros uma vez"}
+                                </p>
+                              </div>
+                            )}
+                            
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => saveEditedCategoryFormat(category.id)}
+                                disabled={updateCategoryFormatMutation.isPending}
+                                data-testid={`save-format-${category.id}`}
+                              >
+                                Salvar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingCategory(null);
+                                  setEditCategoryFormats({});
+                                }}
+                                data-testid={`cancel-edit-${category.id}`}
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditCategoryFormat(category.id, (category as any).format || 'single_elimination')}
+                            data-testid={`edit-format-${category.id}`}
+                          >
+                            Editar Formato
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Tem certeza que deseja remover a categoria "${category.name}" deste torneio?`)) {
+                                removeCategoryMutation.mutate(category.id);
+                              }
+                            }}
+                            disabled={removeCategoryMutation.isPending}
+                            data-testid={`remove-category-${category.id}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (
@@ -290,10 +498,11 @@ export default function ManageTournamentCategories({
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Como Adicionar Categorias:</h4>
             <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              <li>• As categorias listadas abaixo são do sistema e estão ativas</li>
+              <li>• Apenas naipes ainda não usados neste torneio aparecerão disponíveis</li>
               <li>• Selecione os naipes (Masculino, Feminino, Misto) para as categorias desejadas</li>
               <li>• Escolha o formato do jogo para cada categoria (Eliminação Simples, Round Robin, etc.)</li>
               <li>• Clique em "Adicionar Categorias Selecionadas" para incluir no torneio</li>
-              <li>• As novas categorias serão adicionadas às já existentes</li>
               <li>• Use o X vermelho para remover categorias existentes</li>
             </ul>
           </div>
@@ -312,7 +521,8 @@ export default function ManageTournamentCategories({
                     <div>
                       <Label className="text-sm">Selecionar Naipe:</Label>
                       <div className="flex gap-3 mt-1">
-                        {['masculino', 'feminino', 'misto'].map((gender) => (
+                        {/* Para categorias do banco, usar apenas naipes disponíveis */}
+                        {(category.availableGenders || ['masculino', 'feminino', 'misto']).map((gender) => (
                           <div key={gender} className="flex items-center space-x-2">
                             <Checkbox
                               id={`${category.id}-${gender}`}
@@ -325,6 +535,15 @@ export default function ManageTournamentCategories({
                           </div>
                         ))}
                       </div>
+                      {/* Mostrar informação sobre naipes já em uso */}
+                      {category.availableGenders && category.availableGenders.length < 3 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {3 - category.availableGenders.length === 1 
+                            ? "1 naipe já está sendo usado neste torneio"
+                            : `${3 - category.availableGenders.length} naipes já estão sendo usados neste torneio`
+                          }
+                        </p>
+                      )}
                     </div>
                     
                     {/* Formato apenas para categorias padrão (não customizadas) */}

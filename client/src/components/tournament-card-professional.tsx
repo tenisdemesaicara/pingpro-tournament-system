@@ -37,7 +37,7 @@ export default function TournamentCardProfessional({ tournament, onViewClick, on
     switch (format) {
       case "single_elimination": return "Eliminação Simples";
       case "double_elimination": return "Eliminação Dupla";
-      case "round_robin": return "Round Robin";
+      case "round_robin": return "Rodada Única";
       case "swiss": return "Sistema Suíço";
       case "league": return "Liga";
       case "cup": return "Copa";

@@ -33,10 +33,17 @@ export interface IStorage {
   updateMatch(id: string, match: Partial<InsertMatch>): Promise<Match | undefined>;
   deleteMatch(id: string): Promise<boolean>;
   
+  // Remoção inteligente de atletas
+  getMatchesByAthleteAndCategory(athleteId: string, tournamentId: string, categoryId: string): Promise<Match[]>;
+  removeAthleteFromMatch(matchId: string, athleteId: string): Promise<boolean>;
+  renumberMatches(tournamentId: string, categoryId: string): Promise<boolean>;
+  
   // Bracket functions
   computeGroupStandings(tournamentId: string, categoryId: string): Promise<{group: string, standings: any[]}[]>;
   createMatchesBulk(matches: InsertMatch[]): Promise<Match[]>;
   getMatchesByCategoryPhase(tournamentId: string, categoryId: string, phase: string): Promise<Match[]>;
+  getCategoryRounds(tournamentId: string, categoryId: string): Promise<{ round: number; phase: string; matchCount: number }[]>;
+  getMatchesByRound(tournamentId: string, categoryId: string, round: number, phase?: string): Promise<any[]>;
 
   // Categories
   getCategory(id: string): Promise<Category | undefined>;
@@ -46,6 +53,7 @@ export interface IStorage {
   deleteCategory(id: string): Promise<boolean>;
   getTournamentCategories(tournamentId: string): Promise<Category[]>;
   removeTournamentCategory(tournamentId: string, categoryId: string): Promise<boolean>;
+  updateTournamentCategory(categoryId: string, updates: { format: string }): Promise<Category | undefined>;
 
   // Payments
   getPayment(id: string): Promise<Payment | undefined>;
@@ -244,40 +252,102 @@ export class DatabaseStorage implements IStorage {
       
       // Se houver categorias para atualizar, limpar e recriar
       if (tournamentCategoriesData && Array.isArray(tournamentCategoriesData)) {
-        console.log("Updating categories:", tournamentCategoriesData.length);
+        console.log("🔄 SAFE UPDATE: Preserving participants while updating categories:", tournamentCategoriesData.length);
         
-        // Remover categorias existentes do torneio
-        await db.delete(tournamentCategories).where(eq(tournamentCategories.tournamentId, id));
-        console.log("Existing tournament categories removed");
+        // **SAFE APPROACH**: Get existing categories first to avoid orphaning participants
+        const existingCategories = await db
+          .select({
+            categoryId: tournamentCategories.categoryId,
+            categoryName: categories.name,
+            categoryFormat: tournamentCategories.format
+          })
+          .from(tournamentCategories)
+          .leftJoin(categories, eq(tournamentCategories.categoryId, categories.id))
+          .where(eq(tournamentCategories.tournamentId, id));
         
-        // Criar novas categorias e associar
-        for (const categoryData of tournamentCategoriesData) {
-          // Criar a categoria
-          const newCategory = {
-            id: randomUUID(),
-            name: categoryData.name,
-            description: categoryData.description || '',
-            minAge: categoryData.minAge,
-            maxAge: categoryData.maxAge,
-            gender: categoryData.gender,
-            isActive: categoryData.isActive ?? true,
-          };
-          
-          await db.insert(categories).values(newCategory);
-          
-          // Associar categoria ao torneio
-          const tournamentCategory = {
-            id: randomUUID(),
-            tournamentId: id,
-            categoryId: newCategory.id,
-            format: categoryData.format || 'single_elimination',
-            maxParticipants: categoryData.participantLimit || null,
-          };
-          
-          await db.insert(tournamentCategories).values(tournamentCategory);
+        console.log("🔍 Found existing categories:", existingCategories.length);
+        
+        // **CRITICAL**: Create map of existing categories to preserve participants
+        const existingCategoryMap = new Map();
+        for (const cat of existingCategories) {
+          existingCategoryMap.set(cat.categoryName, {
+            id: cat.categoryId,
+            format: cat.categoryFormat
+          });
         }
         
-        console.log("Categories updated successfully");
+        // **SMART UPDATE**: Update existing, create new, preserve participants
+        for (const newCategoryData of tournamentCategoriesData) {
+          const existingCat = existingCategoryMap.get(newCategoryData.name);
+          
+          if (existingCat) {
+            console.log(`✅ PRESERVING category with participants: ${newCategoryData.name} (ID: ${existingCat.id})`);
+            
+            // **CRITICAL**: Check if category has participants before making changes
+            const participantCount = await db
+              .select({ count: sql`count(*)` })
+              .from(tournamentParticipants)
+              .where(and(
+                eq(tournamentParticipants.tournamentId, id),
+                eq(tournamentParticipants.categoryId, existingCat.id)
+              ));
+            
+            const hasParticipants = Number(participantCount[0]?.count) > 0;
+            console.log(`📊 Category ${newCategoryData.name} has ${participantCount[0]?.count} participants`);
+            
+            if (hasParticipants) {
+              console.log(`🛡️ PROTECTING participants - updating in place for ${newCategoryData.name}`);
+            }
+            
+            // Update format and properties (safe - doesn't affect participants)
+            await db.update(tournamentCategories)
+              .set({ format: newCategoryData.format || 'single_elimination' })
+              .where(and(
+                eq(tournamentCategories.tournamentId, id),
+                eq(tournamentCategories.categoryId, existingCat.id)
+              ));
+              
+            await db.update(categories)
+              .set({
+                description: newCategoryData.description || '',
+                minAge: newCategoryData.minAge,
+                maxAge: newCategoryData.maxAge,
+                gender: newCategoryData.gender
+              })
+              .where(eq(categories.id, existingCat.id));
+              
+            console.log(`🔄 Updated ${newCategoryData.name}: ${existingCat.format} → ${newCategoryData.format}`);
+            existingCategoryMap.delete(newCategoryData.name);
+          } else {
+            console.log(`🆕 CREATING new category: ${newCategoryData.name}`);
+            
+            // Create new category
+            const newCategory = {
+              id: randomUUID(),
+              name: newCategoryData.name,
+              description: newCategoryData.description || '',
+              minAge: newCategoryData.minAge,
+              maxAge: newCategoryData.maxAge,
+              gender: newCategoryData.gender,
+              isActive: newCategoryData.isActive ?? true,
+            };
+            
+            await db.insert(categories).values(newCategory);
+            
+            // Associate with tournament
+            const tournamentCategory = {
+              id: randomUUID(),
+              tournamentId: id,
+              categoryId: newCategory.id,
+              format: newCategoryData.format || 'single_elimination',
+              maxParticipants: newCategoryData.participantLimit || null,
+            };
+            
+            await db.insert(tournamentCategories).values(tournamentCategory);
+          }
+        }
+        
+        console.log("✅ SAFE category update completed - participant data preserved!");
       }
       
       return this.getTournament(id);
@@ -597,7 +667,7 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  // Buscar partidas de uma categoria com nomes dos jogadores
+  // Buscar partidas de uma categoria com dados completos dos jogadores
   async getMatchesByCategoryWithPlayers(tournamentId: string, categoryId: string): Promise<any[]> {
     const results = await db
       .select({
@@ -621,14 +691,44 @@ export class DatabaseStorage implements IStorage {
         needsAttention: matches.needsAttention,
         player1Name: sql<string>`
           (SELECT a.name FROM athletes a 
-           INNER JOIN tournament_participants tp ON a.id = tp.athlete_id 
-           WHERE tp.id = matches.player1_id)
+           WHERE a.id = matches.player1_id)
         `.as('player1Name'),
+        player1Photo: sql<string>`
+          (SELECT a.photo_url FROM athletes a 
+           WHERE a.id = matches.player1_id)
+        `.as('player1Photo'),
+        player1City: sql<string>`
+          (SELECT a.city FROM athletes a 
+           WHERE a.id = matches.player1_id)
+        `.as('player1City'),
+        player1State: sql<string>`
+          (SELECT a.state FROM athletes a 
+           WHERE a.id = matches.player1_id)
+        `.as('player1State'),
+        player1Club: sql<string>`
+          (SELECT a.club FROM athletes a 
+           WHERE a.id = matches.player1_id)
+        `.as('player1Club'),
         player2Name: sql<string>`
           (SELECT a.name FROM athletes a 
-           INNER JOIN tournament_participants tp ON a.id = tp.athlete_id 
-           WHERE tp.id = matches.player2_id)
-        `.as('player2Name')
+           WHERE a.id = matches.player2_id)
+        `.as('player2Name'),
+        player2Photo: sql<string>`
+          (SELECT a.photo_url FROM athletes a 
+           WHERE a.id = matches.player2_id)
+        `.as('player2Photo'),
+        player2City: sql<string>`
+          (SELECT a.city FROM athletes a 
+           WHERE a.id = matches.player2_id)
+        `.as('player2City'),
+        player2State: sql<string>`
+          (SELECT a.state FROM athletes a 
+           WHERE a.id = matches.player2_id)
+        `.as('player2State'),
+        player2Club: sql<string>`
+          (SELECT a.club FROM athletes a 
+           WHERE a.id = matches.player2_id)
+        `.as('player2Club')
       })
       .from(matches)
       .where(
@@ -655,6 +755,87 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMatch(matchId: string): Promise<boolean> {
     await db.delete(matches).where(eq(matches.id, matchId));
+    return true;
+  }
+
+  // REMOÇÃO INTELIGENTE DE ATLETAS
+  async getMatchesByAthleteAndCategory(athleteId: string, tournamentId: string, categoryId: string): Promise<Match[]> {
+    const result = await db
+      .select()
+      .from(matches)
+      .where(
+        and(
+          eq(matches.tournamentId, tournamentId),
+          eq(matches.categoryId, categoryId),
+          or(
+            eq(matches.player1Id, athleteId),
+            eq(matches.player2Id, athleteId)
+          )
+        )
+      )
+      .orderBy(matches.round, matches.matchNumber);
+    
+    return result;
+  }
+
+  async removeAthleteFromMatch(matchId: string, athleteId: string): Promise<boolean> {
+    const match = await this.getMatch(matchId);
+    if (!match) return false;
+    
+    const updates: Partial<InsertMatch> = {};
+    
+    if (match.player1Id === athleteId) {
+      updates.player1Id = null;
+    }
+    
+    if (match.player2Id === athleteId) {
+      updates.player2Id = null;
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      await db.update(matches).set(updates).where(eq(matches.id, matchId));
+      return true;
+    }
+    
+    return false;
+  }
+
+  async renumberMatches(tournamentId: string, categoryId: string): Promise<boolean> {
+    // Buscar todas as partidas da categoria ordenadas por rodada e número da partida
+    const categoryMatches = await db
+      .select()
+      .from(matches)
+      .where(
+        and(
+          eq(matches.tournamentId, tournamentId),
+          eq(matches.categoryId, categoryId)
+        )
+      )
+      .orderBy(matches.round, matches.matchNumber);
+    
+    // Agrupar por rodada e renumerar
+    const matchesByRound = new Map<number, Match[]>();
+    
+    for (const match of categoryMatches) {
+      if (!matchesByRound.has(match.round)) {
+        matchesByRound.set(match.round, []);
+      }
+      matchesByRound.get(match.round)!.push(match);
+    }
+    
+    // Renumerar partidas em cada rodada
+    for (const [round, roundMatches] of matchesByRound.entries()) {
+      for (let i = 0; i < roundMatches.length; i++) {
+        const newMatchNumber = i + 1;
+        if (roundMatches[i].matchNumber !== newMatchNumber) {
+          await db
+            .update(matches)
+            .set({ matchNumber: newMatchNumber })
+            .where(eq(matches.id, roundMatches[i].id));
+        }
+      }
+    }
+    
     return true;
   }
 
@@ -779,6 +960,153 @@ export class DatabaseStorage implements IStorage {
       .orderBy(matches.round, matches.matchNumber);
   }
 
+  async getCategoryRounds(tournamentId: string, categoryId: string): Promise<{ round: number; phase: string; matchCount: number }[]> {
+    const roundsQuery = await db
+      .select({
+        round: matches.round,
+        phase: matches.phase,
+        matchCount: sql<number>`count(*)`
+      })
+      .from(matches)
+      .where(
+        and(
+          eq(matches.tournamentId, tournamentId),
+          eq(matches.categoryId, categoryId)
+        )
+      )
+      .groupBy(matches.round, matches.phase)
+      .orderBy(matches.round, matches.phase);
+    
+    return roundsQuery.map(row => ({
+      round: row.round,
+      phase: row.phase || 'knockout',
+      matchCount: Number(row.matchCount)
+    }));
+  }
+
+  async getMatchesByRound(tournamentId: string, categoryId: string, round: number, phase?: string): Promise<any[]> {
+    try {
+      console.log('getMatchesByRound called:', { tournamentId, categoryId, round, phase });
+      
+      // Validar parâmetros
+      if (!tournamentId || !categoryId || round === null || round === undefined) {
+        console.warn('Invalid parameters for getMatchesByRound:', { tournamentId, categoryId, round, phase });
+        return [];
+      }
+      
+      // **SOLUÇÃO TEMPORÁRIA**: usar função existente e filtrar por rodada
+      console.log('🔧 USANDO SOLUÇÃO TEMPORÁRIA - função existente + filtro');
+      
+      // Buscar todas as partidas da categoria (que sabemos que funciona)
+      const allMatches = await db
+        .select({
+          id: matches.id,
+          tournamentId: matches.tournamentId,
+          categoryId: matches.categoryId,
+          round: matches.round,
+          phase: matches.phase,
+          groupName: matches.groupName,
+          matchNumber: matches.matchNumber,
+          player1Id: matches.player1Id,
+          player2Id: matches.player2Id,
+          winnerId: matches.winnerId,
+          score: matches.score,
+          sets: matches.sets,
+          status: matches.status,
+          scheduledAt: matches.scheduledAt,
+          completedAt: matches.completedAt,
+          notes: matches.notes
+        })
+        .from(matches)
+        .where(
+          and(
+            eq(matches.tournamentId, tournamentId),
+            eq(matches.categoryId, categoryId)
+          )
+        );
+
+      console.log('All category matches found:', allMatches.length);
+      
+      // Filtrar por rodada e fase no JavaScript (temporário)
+      let filteredMatches = allMatches.filter(match => match.round === round);
+      
+      if (phase) {
+        filteredMatches = filteredMatches.filter(match => match.phase === phase);
+      }
+      
+      console.log('Filtered matches for round', round, ':', filteredMatches.length);
+      
+      if (filteredMatches.length === 0) {
+        return [];
+      }
+
+      // Buscar dados dos jogadores
+      const matchesWithPlayers = await Promise.all(
+        filteredMatches.map(async (match) => {
+          let player1Data = null;
+          let player2Data = null;
+          
+          // Buscar jogador 1
+          if (match.player1Id) {
+            try {
+              const player1Result = await db
+                .select({
+                  name: athletes.name,
+                  photoUrl: athletes.photoUrl,
+                  city: athletes.city,
+                  state: athletes.state
+                })
+                .from(athletes)
+                .where(eq(athletes.id, match.player1Id));
+              
+              player1Data = player1Result[0] || null;
+            } catch (err) {
+              console.error('Error fetching player1:', err);
+            }
+          }
+          
+          // Buscar jogador 2
+          if (match.player2Id) {
+            try {
+              const player2Result = await db
+                .select({
+                  name: athletes.name,
+                  photoUrl: athletes.photoUrl,
+                  city: athletes.city,
+                  state: athletes.state
+                })
+                .from(athletes)
+                .where(eq(athletes.id, match.player2Id));
+              
+              player2Data = player2Result[0] || null;
+            } catch (err) {
+              console.error('Error fetching player2:', err);
+            }
+          }
+          
+          return {
+            ...match,
+            player1Name: player1Data?.name || null,
+            player1Photo: player1Data?.photoUrl || null,
+            player1City: player1Data?.city || null,
+            player1State: player1Data?.state || null,
+            player2Name: player2Data?.name || null,
+            player2Photo: player2Data?.photoUrl || null,
+            player2City: player2Data?.city || null,
+            player2State: player2Data?.state || null
+          };
+        })
+      );
+
+      console.log('Final matches with players:', matchesWithPlayers.length);
+      return matchesWithPlayers.sort((a, b) => a.matchNumber - b.matchNumber);
+      
+    } catch (error) {
+      console.error('Error in getMatchesByRound:', error);
+      return [];
+    }
+  }
+
   // Categories
   async getCategory(id: string): Promise<Category | undefined> {
     const results = await db.select().from(categories).where(eq(categories.id, id));
@@ -834,6 +1162,38 @@ export class DatabaseStorage implements IStorage {
       ));
       
     return true;
+  }
+
+  async updateTournamentCategory(categoryId: string, updates: { format: string }): Promise<Category | undefined> {
+    try {
+      // Atualizar o formato da categoria no torneio (tabela tournamentCategories)
+      const [updatedTournamentCategory] = await db.update(tournamentCategories)
+        .set({ format: updates.format })
+        .where(eq(tournamentCategories.categoryId, categoryId))
+        .returning();
+
+      if (!updatedTournamentCategory) {
+        console.error(`Categoria ${categoryId} não encontrada para atualização`);
+        return undefined;
+      }
+
+      // Buscar a categoria completa para retornar
+      const category = await db.select()
+        .from(categories)
+        .where(eq(categories.id, categoryId))
+        .limit(1);
+
+      if (!category[0]) {
+        console.error(`Categoria ${categoryId} não encontrada`);
+        return undefined;
+      }
+
+      console.log(`✅ Categoria ${categoryId} atualizada com formato: ${updates.format}`);
+      return { ...category[0], format: updates.format } as Category;
+    } catch (error) {
+      console.error(`Erro ao atualizar categoria ${categoryId}:`, error);
+      throw error;
+    }
   }
 
   // Buscar dados específicos de uma categoria no torneio (com formato)

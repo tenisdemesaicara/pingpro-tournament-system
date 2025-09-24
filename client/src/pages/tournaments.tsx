@@ -34,7 +34,7 @@ export default function Tournaments() {
     { value: "all", label: "Todos os Formatos" },
     { value: "single_elimination", label: "Eliminação Simples" },
     { value: "double_elimination", label: "Eliminação Dupla" },
-    { value: "round_robin", label: "Round Robin" },
+    { value: "round_robin", label: "Rodada Única" },
     { value: "swiss", label: "Sistema Suíço" },
     { value: "league", label: "Liga" },
     { value: "cup", label: "Copa" },

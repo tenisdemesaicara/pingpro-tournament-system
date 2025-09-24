@@ -145,3 +145,96 @@
     50% { transform: translateY(-10px); }
   }
 }
+
+/* Touch Drag-and-Drop Styles */
+.drag-target-highlight {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgb(59, 130, 246) !important;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5) !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+/* Touch-friendly interaction */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 640px) {
+  /* Smaller padding on mobile */
+  .container-mobile {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  /* Stack cards vertically on mobile */
+  .grid-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Improve tap targets */
+  button, [role="button"], .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Hide decorative elements on small screens */
+  .hide-on-mobile {
+    display: none !important;
+  }
+  
+  /* Better match list spacing */
+  .match-list-mobile {
+    gap: 0.75rem !important;
+  }
+}
+
+/* Long-press visual feedback */
+@keyframes longPressRipple {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0.9;
+  }
+}
+
+/* EFEITO FANTASMA PARA DRAG-AND-DROP */
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.8;
+  transform: rotate(-5deg);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  border: 2px dashed #3B82F6;
+  background: linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.2));
+  transition: none;
+  border-radius: 8px;
+  animation: ghostFloat 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes ghostFloat {
+  0% {
+    transform: rotate(-5deg) scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotate(-3deg) scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.drag-source-highlight {
+  opacity: 0.5 !important;
+  transform: scale(0.95) !important;
+  filter: grayscale(0.5) !important;
+  border: 2px dashed #10B981 !important;
+  transition: all 0.2s ease !important;
+}

@@ -9,6 +9,7 @@ import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import onHeaders from "on-headers";
 import { pool } from "./db";
+import { startSelfPing } from "./self-ping";
 
 // Show dynamic login info on startup
 function showLoginCredentials() {
@@ -133,6 +134,50 @@ app.use((req, res, next) => {
   next();
 });
 
+// ========================================
+// 🚀 ENDPOINTS KEEP-ALIVE (Anti Cold Start)
+// ========================================
+
+// Health check ultra-rápido - NÃO acessa banco de dados
+app.get('/api/healthz', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime() 
+  });
+});
+
+// Warmup endpoint - pré-aquece conexões críticas
+app.post('/api/warmup', async (req, res) => {
+  try {
+    console.log('🔥 Warmup initiated...');
+    const startTime = Date.now();
+    
+    // Teste rápido de conexão - usando uma função simples do storage
+    const testQuery = pool.query('SELECT 1 as test');
+    await testQuery;
+    
+    const duration = Date.now() - startTime;
+    console.log(`✅ Warmup completed in ${duration}ms`);
+    
+    res.status(200).json({ 
+      status: 'warmed',
+      duration: `${duration}ms`,
+      timestamp: new Date().toISOString(),
+      components: {
+        database: 'ok',
+        storage: 'ok'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Warmup failed:', error);
+    res.status(503).json({ 
+      status: 'warmup_failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 (async () => {
   // Mostrar credenciais administrativas
   await createDefaultPasswords();
@@ -169,5 +214,8 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
     showLoginCredentials();
+    
+    // 🚀 Iniciar self-ping automático
+    startSelfPing();
   });
 })();

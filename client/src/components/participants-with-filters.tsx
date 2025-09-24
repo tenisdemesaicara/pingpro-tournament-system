@@ -29,42 +29,52 @@ export default function ParticipantsWithFilters({ tournament, athletes }: Partic
     return map;
   }, [athletes]);
 
-  // Verificar se a categoria selecionada é mista
-  const isMixedCategory = () => {
-    if (!selectedCategory) return false;
-    const category = categories.find(c => c.id === selectedCategory);
-    return category && (
-      category.gender?.toLowerCase() === 'misto' || 
-      category.gender?.toLowerCase() === 'mixed'
-    );
+  // Função para extrair nome base da categoria (sem sufixo de gênero)
+  const getCategoryBaseName = (categoryName: string) => {
+    return categoryName.replace(/\s+(Masculino|Feminino|Misto|Mixed)$/i, '').trim();
   };
 
   // Obter gêneros disponíveis para a categoria selecionada
   const getAvailableGenders = () => {
     if (!selectedCategory) return [];
     
-    const category = categories.find(c => c.id === selectedCategory);
-    if (!category) return [];
+    const selectedCategoryData = categories.find(c => c.id === selectedCategory);
+    if (!selectedCategoryData) return [];
 
-    const categoryGender = category.gender?.toLowerCase();
-
-    // Se categoria é mista, permitir escolher masculino E feminino
-    if (categoryGender === 'misto' || categoryGender === 'mixed') {
-      return ['masculino', 'feminino'];
-    }
-
-    // Para categorias específicas, usar apenas o gênero da categoria
-    if (categoryGender === 'masculino' || categoryGender === 'feminino') {
-      return [categoryGender];
-    }
-
-    // Fallback: obter gêneros dos atletas participantes desta categoria
-    const genders = participants
-      .filter(p => (p as any).categoryId === selectedCategory || (p as any).category === selectedCategory)
-      .map(p => p.gender?.toLowerCase())
-      .filter(Boolean);
+    // Obter nome base da categoria selecionada
+    const baseName = getCategoryBaseName(selectedCategoryData.name);
     
-    return Array.from(new Set(genders));
+    // Encontrar todas as categorias com o mesmo nome base
+    const sameCategoryVariants = categories.filter(cat => 
+      getCategoryBaseName(cat.name) === baseName
+    );
+
+    // Se há múltiplas variantes, mostrar dropdown com os gêneros disponíveis
+    if (sameCategoryVariants.length > 1) {
+      const availableGenders = sameCategoryVariants
+        .map(cat => cat.gender?.toLowerCase())
+        .filter(Boolean)
+        .filter((gender, index, arr) => arr.indexOf(gender) === index); // remove duplicatas
+
+      return availableGenders;
+    }
+
+    // Se há apenas 1 variante (como "Içara X Garopaba Misto"), NÃO mostrar dropdown
+    // Mesmo que seja categoria mista, se não há múltiplas variantes da mesma categoria base,
+    // não mostrar filtro de naipe
+    return [];
+  };
+
+  // Verificar se deve mostrar indicador de categoria mista (só quando não há filtro de naipe)
+  const shouldShowMixedIndicator = () => {
+    if (!selectedCategory) return false;
+    const category = categories.find(c => c.id === selectedCategory);
+    const isMixed = category && (
+      category.gender?.toLowerCase() === 'misto' || 
+      category.gender?.toLowerCase() === 'mixed'
+    );
+    // Só mostra indicador se é mista E não há dropdown de gêneros
+    return isMixed && getAvailableGenders().length === 0;
   };
 
   // Filtrar participantes baseado nos filtros selecionados
@@ -163,7 +173,8 @@ export default function ParticipantsWithFilters({ tournament, athletes }: Partic
                 <SelectContent>
                   {getAvailableGenders().map((gender) => (
                     <SelectItem key={gender} value={gender}>
-                      {gender === 'masculino' ? 'Masculino' : 'Feminino'}
+                      {gender === 'masculino' ? 'Masculino' : 
+                       gender === 'feminino' ? 'Feminino' : 'Misto'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -173,7 +184,7 @@ export default function ParticipantsWithFilters({ tournament, athletes }: Partic
         </div>
 
         {/* Lista de Participantes */}
-        {!selectedCategory || !selectedGender ? (
+        {!selectedCategory || (!selectedGender && getAvailableGenders().length > 0) ? (
           <div className="text-center py-12">
             <div className="flex flex-col items-center space-y-4">
               <div className="text-6xl opacity-20">👥</div>
@@ -194,7 +205,8 @@ export default function ParticipantsWithFilters({ tournament, athletes }: Partic
         ) : filteredParticipants.length > 0 ? (
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground mb-4">
-              Mostrando {filteredParticipants.length} participantes - {getCategoryName(selectedCategory)} ({selectedGender === 'masculino' ? 'Masculino' : 'Feminino'})
+              Mostrando {filteredParticipants.length} participantes - {getCategoryName(selectedCategory)} 
+              {shouldShowMixedIndicator() ? ' (🔀 Categoria Mista - Ambos os gêneros)' : selectedGender ? ` (${selectedGender === 'masculino' ? 'Masculino' : 'Feminino'})` : ''}
             </div>
             
             <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -265,7 +277,10 @@ export default function ParticipantsWithFilters({ tournament, athletes }: Partic
         ) : (
           <div className="text-center py-8">
             <p className="text-muted-foreground">
-              Nenhum participante encontrado nesta categoria e naipe.
+              {shouldShowMixedIndicator() 
+                ? 'Nenhum participante encontrado nesta categoria.'
+                : 'Nenhum participante encontrado nesta categoria e naipe.'
+              }
             </p>
           </div>
         )}

@@ -84,7 +84,7 @@ export default function Navbar() {
                     className="hidden sm:inline-flex"
                     data-testid="button-admin"
                   >
-                    <span className="material-icons mr-2">admin_panel_settings</span>
+                    <span className="material-icons mr-2">sports_tennis</span>
                     {hasPermission('system.manage') ? 'Admin' : 'Operador'}
                     <ChevronDown className="ml-1 h-4 w-4" />
                   </Button>
@@ -259,7 +259,7 @@ export default function Navbar() {
                           data-testid="mobile-button-admin-approvals"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
-                          <span className="material-icons mr-2">admin_panel_settings</span>
+                          <span className="material-icons mr-2">sports_tennis</span>
                           Aprovações
                         </Button>
                       </Link>

@@ -1139,6 +1139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         street: street || '',
         cpf: req.body.cpf || '',
         rg: req.body.rg || '',
+        photoUrl: photoUrl || '',
         status: 'pending' as const,
         type: 'atleta' as const,
         points: 0
@@ -1525,18 +1526,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (athleteData.cpf) {
             const existingCpf = existingAthletes.find(a => a.cpf === athleteData.cpf);
             if (existingCpf) {
-              throw new Error("Este CPF já está cadastrado no sistema. Use a opção 'Buscar Atleta' se você já tem conta.");
+              throw new Error(`Este CPF já está cadastrado para o atleta "${existingCpf.name}". Se você já tem uma conta, use a opção "Buscar Atleta" na página de inscrição.`);
             }
           }
           
           const existingEmail = existingAthletes.find(a => a.email === athleteData.email);
           if (existingEmail) {
-            throw new Error("Este email já está cadastrado no sistema.");
+            throw new Error(`Este email já está cadastrado para o atleta "${existingEmail.name}".`);
           }
           
           // Create new athlete
           const newAthlete = await storage.createAthlete({
             ...athleteData,
+            photoUrl: athleteData.photoUrl || '',
             status: 'pending' // New athletes need approval
           });
           
@@ -1580,8 +1582,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 6. Check for duplicate participation
         console.log(`🔍 Checking for duplicate participation...`);
-        const existingParticipants = await storage.getTournamentParticipants(tournamentId);
-        const alreadyRegistered = existingParticipants.some(p => p.id === finalAthleteId);
+        const existingParticipantsWithCategories = await storage.getTournamentParticipantsWithCategories(tournamentId);
+        const alreadyRegistered = existingParticipantsWithCategories.some(p => p.athleteId === finalAthleteId);
         
         if (alreadyRegistered) {
           throw new Error("Você já está inscrito neste torneio");
@@ -2025,6 +2027,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Buscar rodadas disponíveis de uma categoria específica
+  app.get("/api/tournaments/:id/categories/:categoryId/rounds", async (req, res) => {
+    try {
+      const rounds = await storage.getCategoryRounds(req.params.id, req.params.categoryId);
+      res.json(rounds);
+    } catch (error) {
+      console.error("Error fetching category rounds:", error);
+      res.status(500).json({ error: "Failed to fetch category rounds" });
+    }
+  });
+
+  // Buscar partidas de uma rodada específica de uma categoria
+  app.get("/api/tournaments/:id/categories/:categoryId/rounds/:round/matches", async (req, res) => {
+    try {
+      const round = parseInt(req.params.round);
+      const phase = req.query.phase as string; // 'group' or 'knockout'
+      
+      const matches = await storage.getMatchesByRound(
+        req.params.id, 
+        req.params.categoryId, 
+        round, 
+        phase
+      );
+      res.json(matches);
+    } catch (error) {
+      console.error("Error fetching round matches:", error);
+      res.status(500).json({ error: "Failed to fetch round matches" });
+    }
+  });
+
   // Gerar chaveamento para uma categoria específica (com configuração dinâmica baseada no formato)
   app.post("/api/tournaments/:id/categories/:categoryId/generate-bracket", requireAuth, async (req, res) => {
     try {
@@ -2118,10 +2150,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
         case 'round_robin':
         case 'league': // Liga simples (ida)
+        case 'league_single': // Liga simples (ida)
         case 'round_robin_double':
         case 'league_double': // Liga dupla (ida e volta)
+        case 'league_round_trip': // Liga ida e volta
           console.log(`Creating round-robin matches for format: ${format}...`);
-          const isDouble = format.includes('double') || req.body.isDoubleRoundRobin;
+          const isDouble = format.includes('double') || format.includes('round_trip') || req.body.isDoubleRoundRobin;
           matches = await generateRoundRobinMatches(req.params.id, req.params.categoryId, participants, isDouble);
           break;
           
@@ -2536,6 +2570,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing participant:", error);
       res.status(500).json({ error: "Failed to remove participant" });
+    }
+  });
+
+  // NOVO: Trocar atletas entre partidas (drag-and-drop)
+  app.post("/api/tournaments/:tournamentId/swap-athletes", requireAuth, async (req, res) => {
+    try {
+      const { tournamentId } = req.params;
+      const { sourceMatchId, sourcePosition, targetMatchId, targetPosition } = req.body;
+      
+      console.log(`🔄 TROCAR ATLETAS: ${sourceMatchId}(${sourcePosition}) ↔ ${targetMatchId}(${targetPosition})`);
+      
+      // Buscar as duas partidas
+      const sourceMatch = await storage.getMatch(sourceMatchId);
+      const targetMatch = await storage.getMatch(targetMatchId);
+      
+      if (!sourceMatch || !targetMatch) {
+        return res.status(404).json({ error: "Uma ou ambas as partidas não foram encontradas" });
+      }
+      
+      // Extrair atletas das posições
+      const sourceAthleteId = sourceMatch[sourcePosition + 'Id' as keyof typeof sourceMatch] as string;
+      const targetAthleteId = targetMatch[targetPosition + 'Id' as keyof typeof targetMatch] as string;
+      
+      console.log(`👤 Atletas: ${sourceAthleteId} ↔ ${targetAthleteId}`);
+      
+      // Atualizar partida de origem
+      const sourceUpdate: any = {};
+      sourceUpdate[sourcePosition + 'Id'] = targetAthleteId;
+      await storage.updateMatch(sourceMatchId, sourceUpdate);
+      
+      // Atualizar partida de destino  
+      const targetUpdate: any = {};
+      targetUpdate[targetPosition + 'Id'] = sourceAthleteId;
+      await storage.updateMatch(targetMatchId, targetUpdate);
+      
+      console.log(`✅ Troca realizada com sucesso!`);
+      
+      res.json({
+        message: "Atletas trocados com sucesso",
+        sourceMatch: await storage.getMatch(sourceMatchId),
+        targetMatch: await storage.getMatch(targetMatchId)
+      });
+      
+    } catch (error) {
+      console.error("Erro ao trocar atletas:", error);
+      res.status(500).json({ error: "Falha ao trocar atletas" });
+    }
+  });
+
+  // NOVO: Remoção inteligente de atleta com recálculo automático das partidas
+  app.delete("/api/tournaments/:tournamentId/categories/:categoryId/athletes/:athleteId/smart-remove", requireAuth, async (req, res) => {
+    try {
+      const { tournamentId, categoryId, athleteId } = req.params;
+      
+      console.log(`🧠 REMOÇÃO INTELIGENTE: Removendo atleta ${athleteId} da categoria ${categoryId}`);
+      
+      // 1. Buscar todas as partidas que envolvem este atleta na categoria
+      const affectedMatches = await storage.getMatchesByAthleteAndCategory(athleteId, tournamentId, categoryId);
+      console.log(`📊 Partidas afetadas: ${affectedMatches.length}`);
+      
+      // 2. Remover o atleta de todas as partidas
+      for (const match of affectedMatches) {
+        await storage.removeAthleteFromMatch(match.id, athleteId);
+      }
+      
+      // 3. Buscar partidas atualizadas e remover as que ficaram sem AMBOS os jogadores
+      const emptyMatches = [];
+      
+      for (const match of affectedMatches) {
+        const updatedMatch = await storage.getMatch(match.id);
+        if (updatedMatch && !updatedMatch.player1Id && !updatedMatch.player2Id) {
+          emptyMatches.push(updatedMatch);
+          await storage.deleteMatch(updatedMatch.id);
+        }
+      }
+      
+      // 4. Recalcular numeração das partidas restantes
+      await storage.renumberMatches(tournamentId, categoryId);
+      
+      const removedMatchesCount = emptyMatches.length;
+      
+      res.json({
+        success: true,
+        message: `Atleta removido com sucesso`,
+        statistics: {
+          affectedMatches: affectedMatches.length,
+          removedMatches: removedMatchesCount,
+          remainingMatches: affectedMatches.length - removedMatchesCount
+        }
+      });
+      
+    } catch (error) {
+      console.error("Erro na remoção inteligente:", error);
+      res.status(500).json({ error: "Falha na remoção inteligente do atleta" });
     }
   });
 
@@ -3006,6 +3134,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Remover categoria de um torneio
+  // Update tournament category format
+  app.patch("/api/tournaments/:tournamentId/categories/:categoryId", requireAuth, async (req, res) => {
+    try {
+      const { tournamentId, categoryId } = req.params;
+      const { format, leagueSettings } = req.body;
+
+      console.log(`📝 Atualizando formato da categoria: ${categoryId} para: ${format}`, { leagueSettings });
+
+      if (!format) {
+        return res.status(400).json({ error: "Formato é obrigatório" });
+      }
+
+      // Verificar se o torneio existe
+      const tournament = await storage.getTournament(tournamentId);
+      if (!tournament) {
+        return res.status(404).json({ error: "Torneio não encontrado" });
+      }
+
+      // Buscar a categoria específica do torneio
+      const categories = await storage.getTournamentCategories(tournamentId);
+      const category = categories.find(c => c.id === categoryId);
+
+      if (!category) {
+        return res.status(404).json({ error: "Categoria não encontrada no torneio" });
+      }
+
+      // Preparar formato completo para Liga
+      let finalFormat = format;
+      if (format === 'league' && leagueSettings) {
+        finalFormat = leagueSettings.isRoundTrip ? 'league_round_trip' : 'league_single';
+        console.log(`🏆 Liga configurada como: ${finalFormat}`);
+      }
+
+      // Atualizar o formato da categoria
+      const updatedCategory = await storage.updateTournamentCategory(categoryId, { format: finalFormat });
+
+      console.log(`✅ Formato da categoria "${category.name}" atualizado para: ${finalFormat}`);
+
+      res.json({
+        success: true,
+        message: "Formato da categoria atualizado com sucesso",
+        category: updatedCategory
+      });
+
+    } catch (error) {
+      console.error("Error updating category format:", error);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
   app.delete("/api/tournaments/:tournamentId/categories/:categoryId", requireAuth, async (req, res) => {
     try {
       const { tournamentId, categoryId } = req.params;
@@ -3630,44 +3808,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dynamic favicon endpoint
+  // Dynamic favicon endpoint - simplified and secure
   app.get("/api/favicon", async (req, res) => {
     try {
       const faviconSetting = await storage.getSystemSetting('favicon');
       
+      // Headers para compatibilidade e cache
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      
       if (faviconSetting && faviconSetting.fileUrl) {
-        // Serve the uploaded favicon directly
-        const faviconPath = path.join(process.cwd(), 'client', 'public', faviconSetting.fileUrl);
-        if (fs.existsSync(faviconPath)) {
-          // Determine content type based on file extension
-          const ext = path.extname(faviconPath).toLowerCase();
-          let contentType = 'image/x-icon';
-          if (ext === '.png') contentType = 'image/png';
-          else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
-          else if (ext === '.gif') contentType = 'image/gif';
-          else if (ext === '.svg') contentType = 'image/svg+xml';
+        // Validação de segurança: só aceitar arquivos em uploads
+        const fileUrl = faviconSetting.fileUrl;
+        
+        // Verificar se o path é seguro (dentro de uploads)
+        if (!fileUrl.startsWith('/uploads/') && !fileUrl.startsWith('uploads/')) {
+          console.warn(`Favicon path outside uploads directory: ${fileUrl}`);
+        } else {
+          // Normalizar path e validar
+          const safePath = fileUrl.replace(/^\/+/, ''); // Remove barras iniciais
+          const faviconPath = path.join(process.cwd(), 'client', 'public', safePath);
           
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
-          res.sendFile(faviconPath);
-        } else {
-          console.warn(`Favicon file not found: ${faviconPath}`);
-          res.status(404).json({ error: "Configured favicon file not found" });
-        }
-      } else {
-        // Return default favicon if none configured
-        const defaultFaviconPath = path.join(process.cwd(), 'client', 'public', 'favicon.png');
-        if (fs.existsSync(defaultFaviconPath)) {
-          res.setHeader('Content-Type', 'image/png');
-          res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
-          res.sendFile(defaultFaviconPath);
-        } else {
-          // No favicon found at all
-          res.status(404).json({ error: "Favicon not found" });
+          // Verificar se o path resolve dentro do diretório uploads
+          const uploadsDir = path.join(process.cwd(), 'client', 'public', 'uploads');
+          if (faviconPath.startsWith(uploadsDir) && fs.existsSync(faviconPath)) {
+            // Determinar content type
+            const ext = path.extname(faviconPath).toLowerCase();
+            let contentType = 'image/x-icon';
+            
+            if (ext === '.png') contentType = 'image/png';
+            else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+            else if (ext === '.gif') contentType = 'image/gif';
+            else if (ext === '.svg') contentType = 'image/svg+xml';
+            
+            res.setHeader('Content-Type', contentType);
+            return res.sendFile(path.resolve(faviconPath));
+          } else {
+            console.warn(`Favicon file not accessible: ${faviconPath}`);
+          }
         }
       }
-    } catch (error) {
-      console.error("Error serving favicon:", error);
+      
+      // Fallback para favicon padrão
+      const defaultPaths = [
+        path.join(process.cwd(), 'client', 'public', 'favicon.ico'),
+        path.join(process.cwd(), 'client', 'public', 'favicon.png')
+      ];
+      
+      for (const defaultPath of defaultPaths) {
+        if (fs.existsSync(defaultPath)) {
+          const ext = path.extname(defaultPath).toLowerCase();
+          const contentType = ext === '.png' ? 'image/png' : 'image/x-icon';
+          res.setHeader('Content-Type', contentType);
+          return res.sendFile(path.resolve(defaultPath));
+        }
+      }
+      
+      // Favicon inline como último recurso
+      res.setHeader('Content-Type', 'image/svg+xml');
+      res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+        <rect width="32" height="32" fill="#8A05FF"/>
+        <text x="16" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="16" font-weight="bold">P</text>
+      </svg>`);
+      
+    } catch (error: any) {
+      console.error("Error serving favicon:", error.message || error);
       res.status(500).json({ error: "Failed to serve favicon" });
     }
   });

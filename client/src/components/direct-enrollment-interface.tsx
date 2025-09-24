@@ -34,6 +34,15 @@ export function DirectEnrollmentInterface({
   const [selectedAthletes, setSelectedAthletes] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Verificar se categoria selecionada é mista
+  const isSelectedCategoryMixed = () => {
+    if (!selectedCategory) return false;
+    const category = categories.find(c => c.id === selectedCategory);
+    if (!category) return false;
+    const categoryGender = category.gender?.toLowerCase();
+    return categoryGender === 'misto' || categoryGender === 'mixed';
+  };
+
   // Obter gêneros disponíveis para a categoria selecionada
   const getAvailableGenders = () => {
     if (!selectedCategory) return [];
@@ -43,9 +52,9 @@ export function DirectEnrollmentInterface({
 
     const categoryGender = category.gender?.toLowerCase();
 
-    // Se categoria é mista, permitir escolher masculino E feminino
+    // Se categoria é mista, NÃO mostrar seletor de gênero (return vazio)
     if (categoryGender === 'misto' || categoryGender === 'mixed') {
-      return ['masculino', 'feminino'];
+      return [];
     }
 
     // Para categorias específicas, usar apenas o gênero da categoria
@@ -61,17 +70,22 @@ export function DirectEnrollmentInterface({
     return Array.from(new Set(genders));
   };
 
-  // Filtrar atletas que já não estão inscritos
-  const enrolledAthleteIds = existingParticipants.map(p => p.athleteId || p.id);
+  // Filtrar atletas que já não estão inscritos E que estejam aprovados
+  // CORRIGIDO: usar p.athlete.id em vez de p.id (que é o ID da participação)
+  // CORRIGIDO: usar status 'approved' em vez de 'active'
+  const enrolledAthleteIds = existingParticipants.map(p => p.athlete?.id || p.athleteId || p.id);
   const availableAthletes = athletes.filter(athlete => 
-    !enrolledAthleteIds.includes(athlete.id)
+    !enrolledAthleteIds.includes(athlete.id) && athlete.status === 'approved'
   );
 
   // Filtrar atletas baseado nos filtros selecionados
   let filteredAthletes: Athlete[] = [];
 
-  // Só mostrar atletas se categoria E gênero estiverem selecionados
-  if (selectedCategory && selectedGender && tournament) {
+  // Para categorias mistas: só precisa categoria selecionada
+  // Para outras categorias: precisa categoria E gênero selecionados
+  const shouldShowAthletes = selectedCategory && (isSelectedCategoryMixed() || selectedGender);
+
+  if (shouldShowAthletes && tournament) {
     const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
     if (selectedCategoryData) {
       const parsed = parseInt(String(tournament.season ?? ""), 10);
@@ -83,7 +97,7 @@ export function DirectEnrollmentInterface({
         (athlete.club && athlete.club.toLowerCase().includes(searchTerm.toLowerCase()))
       );
 
-      // Depois, filtrar por categoria (idade) E gênero selecionado
+      // Depois, filtrar por categoria (idade) e gênero (se necessário)
       filteredAthletes = filtered.filter(athlete => {
         // Filtro por idade (se a categoria tem limites de idade)
         const ageEligible = isEligibleForCategory(
@@ -93,9 +107,13 @@ export function DirectEnrollmentInterface({
           selectedCategoryData.maxAge
         );
         
-        // Filtro por gênero selecionado
-        const genderEligible = athlete.gender?.toLowerCase() === selectedGender.toLowerCase();
+        // Para categorias mistas: aceitar qualquer gênero
+        if (isSelectedCategoryMixed()) {
+          return ageEligible;
+        }
         
+        // Para outras categorias: filtrar por gênero selecionado
+        const genderEligible = athlete.gender?.toLowerCase() === selectedGender.toLowerCase();
         return ageEligible && genderEligible;
       });
     }
@@ -228,25 +246,39 @@ export function DirectEnrollmentInterface({
                 </Select>
               </div>
 
-              {/* Filtro por Naipe/Gênero */}
-              {selectedCategory && getAvailableGenders().length > 0 && (
+              {/* Filtro por Naipe/Gênero OU Indicação de Categoria Mista */}
+              {selectedCategory && (
                 <div>
-                  <Label htmlFor="select-gender">Naipe *</Label>
-                  <Select 
-                    value={selectedGender} 
-                    onValueChange={(value) => setSelectedGender(value || "")}
-                  >
-                    <SelectTrigger data-testid="select-enrollment-gender">
-                      <SelectValue placeholder="Escolha o naipe" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableGenders().map((gender) => (
-                        <SelectItem key={gender} value={gender}>
-                          {gender === 'masculino' ? 'Masculino' : 'Feminino'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {getAvailableGenders().length > 0 ? (
+                    // Categoria com gênero específico - mostrar seletor
+                    <>
+                      <Label htmlFor="select-gender">Naipe *</Label>
+                      <Select 
+                        value={selectedGender} 
+                        onValueChange={(value) => setSelectedGender(value || "")}
+                      >
+                        <SelectTrigger data-testid="select-enrollment-gender">
+                          <SelectValue placeholder="Escolha o naipe" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableGenders().map((gender) => (
+                            <SelectItem key={gender} value={gender}>
+                              {gender === 'masculino' ? 'Masculino' : 'Feminino'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  ) : isSelectedCategoryMixed() ? (
+                    // Categoria mista - mostrar indicação clara
+                    <>
+                      <Label>Naipe</Label>
+                      <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" data-testid="text-mixed-category-indicator">
+                        <span className="text-foreground">🔀 Categoria Mista (Ambos os gêneros)</span>
+                        <Badge variant="secondary" className="ml-2">Misto</Badge>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               )}
 
@@ -258,26 +290,30 @@ export function DirectEnrollmentInterface({
                   placeholder="Nome do atleta ou clube..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={!selectedCategory || !selectedGender}
+                  disabled={!selectedCategory || (!isSelectedCategoryMixed() && !selectedGender)}
                 />
               </div>
             </div>
 
             {/* Lista de Atletas Disponíveis */}
             <div className="space-y-2">
-              {!selectedCategory || !selectedGender ? (
+              {!shouldShowAthletes ? (
                 <div className="text-center py-12">
                   <div className="flex flex-col items-center space-y-4">
                     <div className="text-6xl opacity-20">👥</div>
                     <p className="text-muted-foreground text-lg font-medium">
                       {!selectedCategory 
                         ? 'Selecione uma categoria para continuar'
+                        : isSelectedCategoryMixed()
+                        ? 'Atletas carregando para categoria mista...'
                         : 'Selecione um naipe para ver os atletas'
                       }
                     </p>
                     <p className="text-muted-foreground text-sm max-w-md">
                       {!selectedCategory 
                         ? 'Escolha uma categoria no filtro acima.'
+                        : isSelectedCategoryMixed()
+                        ? 'Esta categoria aceita atletas de ambos os gêneros.'
                         : 'Escolha o naipe para visualizar os atletas elegíveis para inscrição.'
                       }
                     </p>
@@ -288,9 +324,13 @@ export function DirectEnrollmentInterface({
                   <div className="flex items-center justify-between">
                     <Label>
                       Atletas Disponíveis ({filteredAthletes.length})
-                      {selectedCategory && selectedGender && (
+                      {selectedCategory && (
                         <span className="text-sm font-normal text-muted-foreground ml-2">
-                          - {categories.find(c => c.id === selectedCategory)?.name} ({selectedGender === 'masculino' ? 'Masculino' : 'Feminino'})
+                          - {categories.find(c => c.id === selectedCategory)?.name}
+                          {isSelectedCategoryMixed() 
+                            ? ' (Ambos os gêneros)' 
+                            : selectedGender ? ` (${selectedGender === 'masculino' ? 'Masculino' : 'Feminino'})` : ''
+                          }
                         </span>
                       )}
                     </Label>
