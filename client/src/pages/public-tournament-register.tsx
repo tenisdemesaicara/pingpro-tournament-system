@@ -85,6 +85,7 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       id: c.id 
     })));
     console.log("📋 Total de categorias disponíveis:", tournamentData.categories.length);
+    console.log("🎯 Auto-deploy ativo - enviando correções...");
     
     return tournamentData.categories;
   };
