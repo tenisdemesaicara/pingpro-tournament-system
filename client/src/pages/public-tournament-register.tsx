@@ -72,17 +72,46 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
   const tournamentData = tournament as any;
 
 
-  // Filtrar categorias elegíveis baseado na idade do atleta
+  // Filtrar categorias elegíveis baseado na idade E GÊNERO do atleta
   const getAvailableCategories = () => {
-    if (!tournamentData?.categories || !formData.birthDate) {
-      return tournamentData?.categories || [];
+    if (!tournamentData?.categories || !formData.birthDate || !formData.gender) {
+      console.log("🚫 FILTER DEBUG: Missing data", {
+        hasCategories: !!tournamentData?.categories,
+        hasBirthDate: !!formData.birthDate,
+        hasGender: !!formData.gender
+      });
+      return [];
     }
+
+    console.log("🔍 FILTER DEBUG: Starting filter", {
+      userGender: formData.gender,
+      totalCategories: tournamentData.categories.length,
+      allCategories: tournamentData.categories.map(c => ({ name: c.name, gender: c.gender }))
+    });
 
     const tournamentYear = extractYearFromDate(tournamentData.startDate);
     
-    return tournamentData.categories.filter((category: any) => {
-      // Categorias "Absoluto" sempre disponíveis
+    const filtered = tournamentData.categories.filter((category: any) => {
+      // ✅ FILTRO POR GÊNERO PRIMEIRO
+      const categoryGender = category.gender?.toLowerCase();
+      const userGender = formData.gender?.toLowerCase();
+      
+      console.log("🎯 CATEGORY DEBUG:", {
+        categoryName: category.name,
+        categoryGender: categoryGender,
+        userGender: userGender,
+        isMatch: categoryGender === 'misto' || categoryGender === userGender
+      });
+      
+      // Só mostrar categorias do mesmo gênero ou mistas
+      if (categoryGender !== 'misto' && categoryGender !== userGender) {
+        console.log("❌ REJECTED BY GENDER:", category.name);
+        return false;
+      }
+      
+      // Categorias "Absoluto" sempre disponíveis (se gênero bater)
       if (category.name.toLowerCase().includes('absoluto')) {
+        console.log("✅ ACCEPTED ABSOLUTO:", category.name);
         return true;
       }
       
@@ -93,8 +122,14 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
         [category]
       );
       
-      return eligibleCategories.length > 0;
+      const ageEligible = eligibleCategories.length > 0;
+      console.log("📅 AGE CHECK:", category.name, "eligible:", ageEligible);
+      
+      return ageEligible;
     });
+
+    console.log("✅ FINAL FILTERED CATEGORIES:", filtered.map(c => ({ name: c.name, gender: c.gender })));
+    return filtered; // Deploy trigger
   };
 
   // Verificar consentimento e processar resultado da busca
@@ -529,11 +564,10 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                           <SelectValue placeholder="Selecione a categoria técnica" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="A">A - Avançado</SelectItem>
-                          <SelectItem value="B">B - Intermediário Plus</SelectItem>
-                          <SelectItem value="C">C - Intermediário</SelectItem>
-                          <SelectItem value="D">D - Iniciante Plus</SelectItem>
-                          <SelectItem value="Iniciante">Iniciante</SelectItem>
+                          <SelectItem value="A">Absoluto A</SelectItem>
+                          <SelectItem value="B">Absoluto B</SelectItem>
+                          <SelectItem value="C">Absoluto C</SelectItem>
+                          <SelectItem value="D">Absoluto D</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -679,11 +713,10 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                           <SelectValue placeholder="Selecione a categoria técnica" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="A">A - Avançado</SelectItem>
-                          <SelectItem value="B">B - Intermediário Plus</SelectItem>
-                          <SelectItem value="C">C - Intermediário</SelectItem>
-                          <SelectItem value="D">D - Iniciante Plus</SelectItem>
-                          <SelectItem value="Iniciante">Iniciante</SelectItem>
+                          <SelectItem value="A">Absoluto A</SelectItem>
+                          <SelectItem value="B">Absoluto B</SelectItem>
+                          <SelectItem value="C">Absoluto C</SelectItem>
+                          <SelectItem value="D">Absoluto D</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -692,8 +725,8 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                   {/* Campo de foto do atleta */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      <span>📷 Foto do Atleta</span>
-                      <span className="text-xs text-gray-500">(opcional)</span>
+                      <span>📷 Foto do Atleta *</span>
+                      <span className="text-xs text-red-500">(obrigatória)</span>
                     </Label>
                     <p className="text-sm text-gray-600">Sua foto aparecerá na página pública do torneio</p>
                     <ImageUpload

@@ -1595,7 +1595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Note: maxParticipants per category would need to be added to the schema
         // For now, checking global tournament limit
-        if (tournament.maxParticipants && existingParticipants.length >= tournament.maxParticipants) {
+        if (tournament.maxParticipants && existingParticipantsWithCategories.length >= tournament.maxParticipants) {
           throw new Error("Torneio já atingiu o limite máximo de participantes");
         }
         

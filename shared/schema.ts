@@ -505,7 +505,9 @@ export const tournamentRegistrationSchema = z.object({
   // Tournament and participation data
   tournamentId: z.string().uuid("ID do torneio inválido"),
   category: z.string().uuid("ID da categoria inválido"), // This is actually categoryId (age category)
-  technicalCategory: z.string().uuid("ID da categoria técnica inválido").optional(), // Technical category (A, B, C, D, Iniciante)
+  technicalCategory: z.enum(["A", "B", "C", "D"], { 
+    errorMap: () => ({ message: "Categoria técnica deve ser A, B, C ou D" }) 
+  }).optional(), // Technical category (A, B, C, D)
   athleteId: z.string().uuid().nullish(), // For existing athletes - allows null/undefined for new athletes
   
   // Athlete data (required for new athletes)
