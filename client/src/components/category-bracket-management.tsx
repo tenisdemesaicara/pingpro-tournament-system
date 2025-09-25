@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,11 +49,22 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
     bestOfSets: 3
   });
   
-  // Estados para touch drag-and-drop
-  const [dragState, setDragState] = useState<DragState | null>(null);
+  // Estados para edição mobile simples (apenas tap-to-swap)
   const [tapState, setTapState] = useState<TapState>({ selectedMatchId: null, selectedPosition: null });
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Estados para drag (mantidos para compatibilidade mas simplificados no mobile)
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Buscar categorias do torneio com estatísticas
   const { data: categoriesWithStats, isLoading } = useQuery<CategoryWithStats[]>({
@@ -98,6 +109,8 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
         .then(res => res.json()) : [],
     enabled: !!selectedCategory && (!categoryRounds || (categoryRounds && categoryRounds.reduce((sum, r) => sum + r.matchCount, 0) < 50)),
   });
+
+  // Não precisamos mais buscar atletas separadamente, os dados já vêm nas partidas
 
   // Mutation para gerar chaveamento automático por categoria
   const generateCategoryBracketMutation = useMutation({
@@ -306,9 +319,11 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
       dragSourceElement.classList.add('drag-source-highlight');
     }
     
-    // Desabilitar scroll da página durante drag
-    document.body.style.touchAction = 'none';
-    document.body.style.userSelect = 'none';
+    // **IMPORTANTE**: No mobile, NÃO manipular document.body para não travar navegação
+    if (!isMobile) {
+      document.body.style.touchAction = 'none';
+      document.body.style.userSelect = 'none';
+    }
     
     console.log('🚀 TOUCH DRAG INICIADO:', { matchId, position });
   };
@@ -411,9 +426,11 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
       longPressTimer.current = null;
     }
     
-    // Restaurar scroll da página
-    document.body.style.touchAction = '';
-    document.body.style.userSelect = '';
+    // **IMPORTANTE**: Apenas restaurar se não for mobile
+    if (!isMobile) {
+      document.body.style.touchAction = '';
+      document.body.style.userSelect = '';
+    }
     
     // Remover highlights
     document.querySelectorAll('[data-player-slot]').forEach(el => {
@@ -441,6 +458,131 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
     }
   };
 
+  // **MOBILE ONLY**: Função simplificada para tap-to-swap
+  const handlePlayerSlotClick = (matchId: string, position: 'player1' | 'player2', playerId: string | null) => {
+    if (!editMode || !playerId) return;
+    
+    if (tapState.selectedMatchId && tapState.selectedPosition) {
+      // Segunda seleção - executar troca se for diferente
+      if (tapState.selectedMatchId !== matchId || tapState.selectedPosition !== position) {
+        swapAthletes(tapState.selectedMatchId, tapState.selectedPosition, matchId, position);
+      }
+      // Limpar seleção sempre
+      setTapState({ selectedMatchId: null, selectedPosition: null });
+    } else {
+      // Primeira seleção
+      setTapState({ selectedMatchId: matchId, selectedPosition: position });
+      console.log('👆 MOBILE TAP-TO-SWAP:', { matchId, position });
+    }
+  };
+
+  // **MOBILE MATCH CARD COMPONENT**
+  const MobileMatchCard = ({ match }: { match: any }) => {
+    // Os dados dos jogadores já vêm no objeto match!
+    const player1Name = match.player1Name || 'A definir';
+    const player2Name = match.player2Name || 'A definir';
+    const player1Photo = match.player1Photo;
+    const player2Photo = match.player2Photo;
+    const player1City = match.player1City;
+    const player2City = match.player2City;
+    
+    const isSelected = (matchId: string, position: 'player1' | 'player2') => {
+      return editMode && tapState.selectedMatchId === matchId && tapState.selectedPosition === position;
+    };
+    
+    return (
+      <div className="bg-white border rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm text-gray-500">
+            {match.phase === 'group' && `Grupo ${match.group_name || match.group_id} - Rodada ${match.round}`}
+            {match.phase === 'knockout' && `${match.round_name || 'Eliminatórias'}`}
+          </div>
+          <div className="text-xs bg-gray-100 px-2 py-1 rounded">
+            #{match.matchNumber || 'N/A'}
+          </div>
+        </div>
+        
+        <div className="space-y-3">
+          {/* Player 1 */}
+          <div 
+            className={`flex items-center gap-3 p-3 rounded-lg border-2 ${
+              isSelected(match.id, 'player1') 
+                ? 'border-blue-500 bg-blue-50' 
+                : editMode && match.player1Id 
+                ? 'border-orange-200 bg-orange-50' 
+                : 'border-gray-200'
+            }`}
+            onClick={() => editMode && match.player1Id && handlePlayerSlotClick(match.id, 'player1', match.player1Id)}
+          >
+            {player1Photo ? (
+              <img 
+                src={player1Photo} 
+                alt={player1Name}
+                className="w-10 h-10 rounded-full object-cover border"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 text-sm font-semibold">
+                {player1Name?.substring(0, 2)?.toUpperCase() || '?'}
+              </div>
+            )}
+            <div className="flex-1">
+              <div className="font-medium">{player1Name}</div>
+              {player1City && <div className="text-sm text-gray-500">{player1City}</div>}
+            </div>
+            {editMode && match.player1Id && (
+              <span className="material-icons text-orange-500">touch_app</span>
+            )}
+          </div>
+          
+          {/* VS */}
+          <div className="text-center">
+            <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">VS</span>
+          </div>
+          
+          {/* Player 2 */}
+          <div 
+            className={`flex items-center gap-3 p-3 rounded-lg border-2 ${
+              isSelected(match.id, 'player2') 
+                ? 'border-blue-500 bg-blue-50' 
+                : editMode && match.player2Id 
+                ? 'border-orange-200 bg-orange-50' 
+                : 'border-gray-200'
+            }`}
+            onClick={() => editMode && match.player2Id && handlePlayerSlotClick(match.id, 'player2', match.player2Id)}
+          >
+            {player2Photo ? (
+              <img 
+                src={player2Photo} 
+                alt={player2Name}
+                className="w-10 h-10 rounded-full object-cover border"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 text-sm font-semibold">
+                {player2Name?.substring(0, 2)?.toUpperCase() || '?'}
+              </div>
+            )}
+            <div className="flex-1">
+              <div className="font-medium">{player2Name}</div>
+              {player2City && <div className="text-sm text-gray-500">{player2City}</div>}
+            </div>
+            {editMode && match.player2Id && (
+              <span className="material-icons text-orange-500">touch_app</span>
+            )}
+          </div>
+        </div>
+        
+        {/* Status */}
+        {match.score && (
+          <div className="mt-3 pt-3 border-t text-center">
+            <div className="text-sm font-medium text-green-600">
+              Resultado: {match.score}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // **PlayerSlot Component** - Componente reutilizável para jogadores com touch drag-and-drop
   const PlayerSlot = ({ 
     match, 
@@ -466,8 +608,8 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
     return (
       <div 
         className={`
-          flex items-center gap-1 lg:gap-2 flex-1 min-w-0 touch-manipulation overflow-hidden
-          ${editMode && playerId ? `cursor-grab active:cursor-grabbing p-2 lg:p-3 rounded border-2 border-dashed ${borderColors[borderColor]} transition-all` : 'p-1 lg:p-2'}
+          flex items-center gap-2 lg:gap-2 flex-1 min-w-0 touch-manipulation overflow-hidden player-slot-mobile
+          ${editMode && playerId ? `cursor-grab active:cursor-grabbing p-3 lg:p-3 rounded-lg border-2 border-dashed ${borderColors[borderColor]} transition-all` : 'p-2 lg:p-2'}
           ${isSelected ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''}
           ${dragState?.sourceMatchId === match.id && dragState?.sourcePosition === position ? 'opacity-50' : ''}
         `}
@@ -476,12 +618,13 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
         data-slot={position}
         data-player-id={playerId}
         data-testid={`slot-${position}-${match.id}`}
-        onPointerDown={(e) => handlePointerDown(e, match.id, position, playerId)}
-        onPointerMove={dragState?.isDragging ? handlePointerMove : undefined}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        onPointerLeave={handlePointerLeave}
-        style={{ touchAction: dragState?.isDragging ? 'none' : 'auto' }}
+        onClick={isMobile ? () => handlePlayerSlotClick(match.id, position, playerId) : undefined}
+        onPointerDown={!isMobile ? (e) => handlePointerDown(e, match.id, position, playerId) : undefined}
+        onPointerMove={!isMobile && dragState?.isDragging ? handlePointerMove : undefined}
+        onPointerUp={!isMobile ? handlePointerUp : undefined}
+        onPointerCancel={!isMobile ? handlePointerCancel : undefined}
+        onPointerLeave={!isMobile ? handlePointerLeave : undefined}
+        style={{ touchAction: (!isMobile && dragState?.isDragging) ? 'none' : 'auto' }}
       >
         {playerPhoto ? (
           <img 
@@ -536,6 +679,258 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
     );
   }
 
+  // **MOBILE LAYOUT COMPLETAMENTE NOVO**
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header Móvel Fixo */}
+        <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
+          <div className="flex items-center justify-between p-4">
+            <h1 className="text-lg font-bold text-gray-800">Chaveamento</h1>
+            <Badge variant={allCategoriesReady ? "default" : "secondary"} className="text-xs">
+              {categoriesWithStats?.filter(c => c.hasCompleteDraws).length || 0}/{categoriesWithStats?.length || 0} OK
+            </Badge>
+          </div>
+        </div>
+
+        {/* Lista de Categorias Móvel */}
+        {!selectedCategory && (
+          <div className="p-4 space-y-4">
+            <div className="text-center py-6">
+              <h2 className="text-xl font-semibold mb-2">Selecione uma Categoria</h2>
+              <p className="text-gray-600 text-sm">Toque em uma categoria para ver ou editar seu chaveamento</p>
+            </div>
+            
+            {categoriesWithStats?.map((category) => (
+              <div 
+                key={category.id} 
+                className="bg-white border rounded-xl p-4 shadow-sm active:bg-gray-50"
+                onClick={() => setSelectedCategory(category.id)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg mb-1">{category.name}</h3>
+                    <div className="flex items-center gap-3 text-sm text-gray-600">
+                      <span>👥 {category.participantCount}</span>
+                      <span>⚡ {category.matchCount} partidas</span>
+                    </div>
+                  </div>
+                  {getCategoryStatusBadge(category)}
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-500">
+                    {category.matchCount === 0 ? 'Precisar gerar chaveamento' : 'Chaveamento pronto'}
+                  </div>
+                  <div className="flex items-center text-blue-600">
+                    <span className="text-sm font-medium mr-1">Abrir</span>
+                    <span className="material-icons text-sm">chevron_right</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Categoria Selecionada - Mobile */}
+        {selectedCategory && (
+          <div className="min-h-screen bg-white">
+            {/* Header da Categoria */}
+            <div className="sticky top-16 z-40 bg-white border-b">
+              <div className="flex items-center gap-3 p-4">
+                <button 
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setSelectedRound(null);
+                    setEditMode(false);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <span className="material-icons">arrow_back</span>
+                </button>
+                <div className="flex-1">
+                  <h2 className="font-semibold text-lg">
+                    {categoriesWithStats?.find(c => c.id === selectedCategory)?.name}
+                  </h2>
+                  {selectedRound && (
+                    <p className="text-sm text-gray-600">Rodada {selectedRound}</p>
+                  )}
+                </div>
+                {!editMode ? (
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  >
+                    Editar
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setEditMode(false);
+                      setTapState({ selectedMatchId: null, selectedPosition: null });
+                    }}
+                    className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  >
+                    Salvar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Conteúdo da Categoria Mobile */}
+            <div className="p-4">
+              {(() => {
+                const category = categoriesWithStats?.find(c => c.id === selectedCategory);
+                const hasMatches = (categoryMatches && categoryMatches.length > 0) || (category && category.matchCount > 0);
+                
+                if (!hasMatches) {
+                  return (
+                    <div className="text-center py-12">
+                      <div className="bg-blue-50 rounded-xl p-6 mb-6">
+                        <span className="material-icons text-4xl text-blue-500 mb-4 block">sports_tennis</span>
+                        <h3 className="text-lg font-semibold mb-2">Sem Chaveamento</h3>
+                        <p className="text-gray-600 mb-4">Esta categoria ainda não tem chaveamento gerado.</p>
+                        
+                        {category && category.participantCount >= 2 ? (
+                          <button
+                            onClick={() => generateCategoryBracketMutation.mutate({ categoryId: category.id, method: 'auto' })}
+                            disabled={generateCategoryBracketMutation.isPending}
+                            className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium w-full"
+                          >
+                            {generateCategoryBracketMutation.isPending ? 'Gerando...' : 'Gerar Chaveamento Automático'}
+                          </button>
+                        ) : (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <p className="text-yellow-800 text-sm">
+                              Precisa de pelo menos 2 participantes para gerar chaveamento.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const totalMatches = categoryRounds?.reduce((sum, r) => sum + r.matchCount, 0) || category?.matchCount || 0;
+                const hasManyMatches = totalMatches > 10; // Limite menor para mobile
+                
+                // Se tem muitas partidas, mostrar seletor de rodada
+                if (hasManyMatches && categoryRounds && categoryRounds.length > 0) {
+                  if (selectedRound === null) {
+                    return (
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 rounded-xl p-6 text-center">
+                          <span className="material-icons text-4xl text-blue-500 mb-4 block">sports_tennis</span>
+                          <h3 className="text-lg font-semibold mb-2">Escolha uma Rodada</h3>
+                          <p className="text-gray-600 text-sm mb-6">
+                            Esta categoria tem {totalMatches} partidas em {categoryRounds.length} rodadas
+                          </p>
+                        </div>
+                        
+                        {categoryRounds.map(round => (
+                          <div 
+                            key={round.round}
+                            onClick={() => setSelectedRound(round.round)}
+                            className="bg-white border rounded-xl p-4 shadow-sm active:bg-gray-50"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-semibold">Rodada {round.round}</h4>
+                                <p className="text-sm text-gray-600">
+                                  {round.phase === 'group' && 'Fase de Grupos'}
+                                  {round.phase === 'knockout' && 'Eliminatórias'}
+                                  {' • '}{round.matchCount} partidas
+                                </p>
+                              </div>
+                              <span className="material-icons text-blue-600">chevron_right</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  
+                  // Mostrar partidas da rodada selecionada
+                  return (
+                    <div className="space-y-4">
+                      {/* Navigation */}
+                      <div className="flex items-center gap-2 mb-6">
+                        <button
+                          onClick={() => setSelectedRound(null)}
+                          className="p-2 hover:bg-gray-100 rounded-lg"
+                        >
+                          <span className="material-icons">arrow_back</span>
+                        </button>
+                        <div className="flex-1">
+                          <h3 className="font-semibold">Rodada {selectedRound}</h3>
+                          <p className="text-sm text-gray-600">
+                            {categoryRounds.find(r => r.round === selectedRound)?.matchCount || 0} partidas
+                          </p>
+                        </div>
+                        
+                        {/* Previous/Next */}
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              const currentIndex = categoryRounds.findIndex(r => r.round === selectedRound);
+                              if (currentIndex > 0) {
+                                setSelectedRound(categoryRounds[currentIndex - 1].round);
+                              }
+                            }}
+                            disabled={!categoryRounds || categoryRounds.findIndex(r => r.round === selectedRound) <= 0}
+                            className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                          >
+                            <span className="material-icons">chevron_left</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              const currentIndex = categoryRounds.findIndex(r => r.round === selectedRound);
+                              if (currentIndex < categoryRounds.length - 1) {
+                                setSelectedRound(categoryRounds[currentIndex + 1].round);
+                              }
+                            }}
+                            disabled={!categoryRounds || categoryRounds.findIndex(r => r.round === selectedRound) >= categoryRounds.length - 1}
+                            className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+                          >
+                            <span className="material-icons">chevron_right</span>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Matches */}
+                      {roundMatchesLoading ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                          <p className="text-gray-500">Carregando...</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {(roundMatches || []).map((match: any) => (
+                            <MobileMatchCard key={match.id} match={match} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                
+                // Todas as partidas (para categorias pequenas)
+                return (
+                  <div className="space-y-3">
+                    {(categoryMatches || []).map((match: any) => (
+                      <MobileMatchCard key={match.id} match={match} />
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // **LAYOUT DESKTOP ORIGINAL**
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4">
       {/* Status geral */}
@@ -668,16 +1063,17 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                 <span className="material-icons text-blue-500">category</span>
                 Chaveamento - {categoriesWithStats?.find(c => c.id === selectedCategory)?.name}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {!editMode ? (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setEditMode(true)}
-                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                    className="text-orange-600 border-orange-200 hover:bg-orange-50 btn-mobile text-xs lg:text-sm"
                   >
                     <span className="material-icons text-sm mr-1">edit</span>
-                    Alterar Chaveamento
+                    <span className="hidden lg:inline">Alterar Chaveamento</span>
+                    <span className="lg:hidden">Editar</span>
                   </Button>
                 ) : (
                   <>
@@ -688,10 +1084,11 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                         setEditMode(false);
                         setSelectedMatches([]);
                       }}
-                      className="text-green-600 border-green-200 hover:bg-green-50"
+                      className="text-green-600 border-green-200 hover:bg-green-50 btn-mobile text-xs lg:text-sm"
                     >
                       <span className="material-icons text-sm mr-1">check</span>
-                      Finalizar Edição
+                      <span className="hidden lg:inline">Finalizar Edição</span>
+                      <span className="lg:hidden">OK</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -700,6 +1097,7 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                         setEditMode(false);
                         setSelectedMatches([]);
                       }}
+                      className="btn-mobile text-xs lg:text-sm"
                     >
                       <span className="material-icons text-sm mr-1">close</span>
                       Cancelar
@@ -710,8 +1108,9 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectedCategory(null)}
+                  className="btn-mobile text-xs lg:text-sm ml-auto lg:ml-0"
                 >
-                  ✕ Fechar
+                  ✕ <span className="hidden lg:inline">Fechar</span>
                 </Button>
               </div>
             </CardTitle>
@@ -731,14 +1130,14 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                     if (selectedRound === null) {
                       // Show central round selector overlay
                       return (
-                        <div className="text-center py-12 space-y-6">
+                        <div className="text-center py-6 lg:py-12 space-y-4 lg:space-y-6 mobile-container">
                           <div className="max-w-md mx-auto">
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-100 p-8 rounded-xl border shadow-sm">
-                              <span className="material-icons text-5xl mb-4 block text-blue-500">sports_tennis</span>
-                              <h3 className="text-xl font-bold text-gray-800 mb-3">
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-100 p-4 lg:p-8 rounded-xl border shadow-sm round-selector-mobile">
+                              <span className="material-icons text-4xl lg:text-5xl mb-3 lg:mb-4 block text-blue-500">sports_tennis</span>
+                              <h3 className="text-lg lg:text-xl font-bold text-gray-800 mb-2 lg:mb-3">
                                 Selecione uma Rodada para Visualizar
                               </h3>
-                              <p className="text-gray-600 mb-6 text-sm">
+                              <p className="text-gray-600 mb-4 lg:mb-6 text-sm lg:text-sm">
                                 Esta categoria tem <strong>{totalMatches} partidas</strong> em <strong>{categoryRounds.length} rodadas</strong>. 
                                 Para melhor performance, selecione a rodada que deseja visualizar.
                               </p>
@@ -755,14 +1154,18 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                                     }}
                                   >
                                     <SelectTrigger 
-                                      className="w-full h-12 text-base font-medium" 
+                                      className="w-full h-12 lg:h-12 text-base font-medium select-trigger btn-mobile" 
                                       data-testid="select-round-main"
                                     >
                                       <SelectValue placeholder="🏓 Selecionar Rodada" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="max-h-64">
                                       {categoryRounds.map(roundInfo => (
-                                        <SelectItem key={roundInfo.round} value={roundInfo.round.toString()}>
+                                        <SelectItem 
+                                          key={roundInfo.round} 
+                                          value={roundInfo.round.toString()}
+                                          className="py-3 px-4 text-base"
+                                        >
                                           Rodada {roundInfo.round} 
                                           {roundInfo.phase === 'group' && ' (Grupos)'} 
                                           {roundInfo.phase === 'knockout' && ' (Eliminatórias)'} 
@@ -798,36 +1201,94 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                     const currentRoundInfo = categoryRounds.find(r => r.round === selectedRound);
                     return (
                       <div className="space-y-4">
-                        {/* Round Switcher Bar */}
-                        <div className="bg-gray-50 p-4 rounded-lg border">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <h4 className="font-semibold">
+                        {/* Breadcrumb navigation - Mobile focused */}
+                        <div className="flex lg:hidden items-center gap-2 text-sm text-gray-600 px-2">
+                          <span>{category?.name}</span>
+                          <span className="material-icons text-sm">chevron_right</span>
+                          <span className="text-blue-600 font-medium">
+                            Rodada {selectedRound}
+                            {currentRoundInfo?.phase === 'group' && ' (Grupos)'}
+                            {currentRoundInfo?.phase === 'knockout' && ' (Elim.)'}
+                          </span>
+                        </div>
+
+                        {/* Round Switcher Bar - Mobile Optimized */}
+                        <div className="bg-gray-50 p-3 lg:p-4 rounded-lg border mobile-container">
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-0">
+                            <div className="flex items-center gap-2 lg:gap-3">
+                              <h4 className="font-semibold text-sm lg:text-base">
                                 Rodada {selectedRound}
-                                {currentRoundInfo?.phase === 'group' && ' (Grupos)'}
-                                {currentRoundInfo?.phase === 'knockout' && ' (Eliminatórias)'}
+                                <span className="hidden lg:inline">
+                                  {currentRoundInfo?.phase === 'group' && ' (Grupos)'}
+                                  {currentRoundInfo?.phase === 'knockout' && ' (Eliminatórias)'}
+                                </span>
                               </h4>
-                              <Badge variant="secondary">
+                              <Badge variant="secondary" className="text-xs">
                                 {currentRoundInfo?.matchCount || 0} partidas
                               </Badge>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <Label htmlFor="round-switch" className="text-sm text-gray-600">
+                            {/* Mobile: Navigation arrows + select | Desktop: original layout */}
+                            <div className="flex items-center gap-2 w-full lg:w-auto">
+                              {/* Mobile: Previous/Next arrows */}
+                              <div className="flex lg:hidden items-center gap-1 flex-shrink-0">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const currentIndex = categoryRounds.findIndex(r => r.round === selectedRound);
+                                    if (currentIndex > 0) {
+                                      setSelectedRound(categoryRounds[currentIndex - 1].round);
+                                    }
+                                  }}
+                                  disabled={!categoryRounds || categoryRounds.findIndex(r => r.round === selectedRound) <= 0}
+                                  className="h-10 w-10 p-0"
+                                  title="Rodada anterior"
+                                >
+                                  <span className="material-icons text-sm">chevron_left</span>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const currentIndex = categoryRounds.findIndex(r => r.round === selectedRound);
+                                    if (currentIndex < categoryRounds.length - 1) {
+                                      setSelectedRound(categoryRounds[currentIndex + 1].round);
+                                    }
+                                  }}
+                                  disabled={!categoryRounds || categoryRounds.findIndex(r => r.round === selectedRound) >= categoryRounds.length - 1}
+                                  className="h-10 w-10 p-0"
+                                  title="Próxima rodada"
+                                >
+                                  <span className="material-icons text-sm">chevron_right</span>
+                                </Button>
+                              </div>
+
+                              {/* Desktop label */}
+                              <Label htmlFor="round-switch" className="text-sm text-gray-600 hidden lg:block">
                                 Trocar:
                               </Label>
+                              
+                              {/* Round selector */}
                               <Select 
                                 value={selectedRound?.toString() || ""} 
                                 onValueChange={(value) => {
                                   setSelectedRound(parseInt(value));
                                 }}
                               >
-                                <SelectTrigger className="w-48" data-testid="select-round-switch">
-                                  <SelectValue placeholder="Rodada" />
+                                <SelectTrigger 
+                                  className="flex-1 lg:w-48 h-10 lg:h-10 btn-mobile text-sm lg:text-sm" 
+                                  data-testid="select-round-switch"
+                                >
+                                  <SelectValue placeholder="Trocar Rodada" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="max-h-64">
                                   {categoryRounds.map(roundInfo => (
-                                    <SelectItem key={roundInfo.round} value={roundInfo.round.toString()}>
+                                    <SelectItem 
+                                      key={roundInfo.round} 
+                                      value={roundInfo.round.toString()}
+                                      className="py-3 px-4 text-sm lg:text-sm"
+                                    >
                                       Rodada {roundInfo.round} 
                                       {roundInfo.phase === 'group' && ' (Grupos)'} 
                                       {roundInfo.phase === 'knockout' && ' (Eliminatórias)'} 
@@ -836,13 +1297,17 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                                   ))}
                                 </SelectContent>
                               </Select>
+                              
+                              {/* Back button */}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setSelectedRound(null)}
                                 title="Voltar à seleção de rodadas"
+                                className="btn-mobile flex-shrink-0 h-10 lg:h-8 px-3"
                               >
                                 <span className="material-icons text-sm">arrow_back</span>
+                                <span className="ml-1 lg:hidden text-xs">Voltar</span>
                               </Button>
                             </div>
                           </div>
@@ -855,11 +1320,11 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
                             <p className="text-gray-500">Carregando partidas da rodada {selectedRound}...</p>
                           </div>
                         ) : (
-                          <div className="space-y-3 match-list-mobile">
+                          <div className="space-y-3 match-list-mobile mobile-container">
                             {(roundMatches || []).map((match: any) => (
                         <div 
                           key={match.id} 
-                          className="flex flex-col lg:flex-row lg:items-start justify-between p-3 lg:p-4 border rounded transition-colors hover:bg-gray-50 gap-3 lg:gap-4 min-h-fit overflow-hidden"
+                          className="flex flex-col lg:flex-row lg:items-start justify-between p-4 lg:p-4 border rounded-lg lg:rounded transition-colors hover:bg-gray-50 gap-3 lg:gap-4 min-h-fit overflow-hidden match-card shadow-sm"
                         >
                           <div className="flex flex-wrap items-center gap-2 lg:gap-4 min-w-0 flex-shrink-0">
                             <span className="font-medium text-sm lg:text-base whitespace-nowrap">Partida {match.matchNumber}</span>
