@@ -72,64 +72,21 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
   const tournamentData = tournament as any;
 
 
-  // Filtrar categorias elegíveis baseado na idade E GÊNERO do atleta
+  // SIMPLIFICADO: Mostrar TODAS as categorias do torneio
   const getAvailableCategories = () => {
-    if (!tournamentData?.categories || !formData.birthDate || !formData.gender) {
-      console.log("🚫 FILTER DEBUG: Missing data", {
-        hasCategories: !!tournamentData?.categories,
-        hasBirthDate: !!formData.birthDate,
-        hasGender: !!formData.gender
-      });
+    if (!tournamentData?.categories) {
+      console.log("🚫 Nenhuma categoria encontrada no torneio");
       return [];
     }
 
-    console.log("🔍 FILTER DEBUG: Starting filter", {
-      userGender: formData.gender,
-      totalCategories: tournamentData.categories.length,
-      allCategories: tournamentData.categories.map(c => ({ name: c.name, gender: c.gender }))
-    });
-
-    const tournamentYear = extractYearFromDate(tournamentData.startDate);
+    console.log("✅ CATEGORIAS DO TORNEIO:", tournamentData.categories.map(c => ({ 
+      name: c.name, 
+      gender: c.gender,
+      id: c.id 
+    })));
+    console.log("📋 Total de categorias disponíveis:", tournamentData.categories.length);
     
-    const filtered = tournamentData.categories.filter((category: any) => {
-      // ✅ FILTRO POR GÊNERO PRIMEIRO
-      const categoryGender = category.gender?.toLowerCase();
-      const userGender = formData.gender?.toLowerCase();
-      
-      console.log("🎯 CATEGORY DEBUG:", {
-        categoryName: category.name,
-        categoryGender: categoryGender,
-        userGender: userGender,
-        isMatch: categoryGender === 'misto' || categoryGender === userGender
-      });
-      
-      // Só mostrar categorias do mesmo gênero ou mistas
-      if (categoryGender !== 'misto' && categoryGender !== userGender) {
-        console.log("❌ REJECTED BY GENDER:", category.name);
-        return false;
-      }
-      
-      // Categorias "Absoluto" sempre disponíveis (se gênero bater)
-      if (category.name.toLowerCase().includes('absoluto')) {
-        console.log("✅ ACCEPTED ABSOLUTO:", category.name);
-        return true;
-      }
-      
-      // Filtrar categorias por idade
-      const eligibleCategories = getEligibleCategoriesForAthlete(
-        formData.birthDate, 
-        tournamentYear, 
-        [category]
-      );
-      
-      const ageEligible = eligibleCategories.length > 0;
-      console.log("📅 AGE CHECK:", category.name, "eligible:", ageEligible);
-      
-      return ageEligible;
-    });
-
-    console.log("✅ FINAL FILTERED CATEGORIES:", filtered.map(c => ({ name: c.name, gender: c.gender })));
-    return filtered; // Deploy trigger
+    return tournamentData.categories;
   };
 
   // Verificar consentimento e processar resultado da busca
