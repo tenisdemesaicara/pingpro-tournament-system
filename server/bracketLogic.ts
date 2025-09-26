@@ -86,7 +86,7 @@ export class BracketManager {
     expectedGroups: number = 2,
     qualifiersPerGroup: number = 2
   ): Promise<FullBracketGeneration | null> {
-    console.log(`[LOG] Criando bracket com placeholders para ${expectedGroups} grupos`);
+    console.log(`[LOG] Criando bracket dinâmico para ${expectedGroups} grupos, ${qualifiersPerGroup} classificados por grupo`);
     
     // Calcular total de classificados
     const totalQualified = expectedGroups * qualifiersPerGroup;
@@ -95,219 +95,24 @@ export class BracketManager {
     if (totalQualified < 4) {
       throw new Error('Não há classificados suficientes para criar eliminatórias (mínimo 4)');
     }
-    
-    const eliminationMatches: any[] = [];
-    let matchNumber = 1;
-    
-    // Determinar fases baseado no número de classificados
-    const phases: string[] = [];
-    if (totalQualified >= 8) phases.push('quarterfinals');
-    if (totalQualified >= 4) phases.push('semifinals');
-    phases.push('final');
-    
-    console.log(`[LOG] Fases eliminatórias a serem criadas: ${phases.join(', ')}`);
-    
-    // Gerar partidas com placeholders baseado no número de classificados
-    if (totalQualified === 4) {
-      // 4 classificados: apenas semifinais + final
-      // Semifinais
-      const semifinal1 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 1,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: '1º A',
-        player2Source: '2º B',
-        status: 'pending',
-        phase: 'semifinal',
-        bestOfSets: 3,
-        nextMatchId: null, // Will be set later
-        nextMatchSlot: 1,
-        tableNumber: 1
-      };
-      
-      const semifinal2 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 1,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: '1º B',
-        player2Source: '2º A',
-        status: 'pending',
-        phase: 'semifinal',
-        bestOfSets: 3,
-        nextMatchId: null, // Will be set later
-        nextMatchSlot: 2,
-        tableNumber: 2
-      };
-      
-      // Final
-      const finalMatch = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 2,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: 'Vencedor Semifinal 1',
-        player2Source: 'Vencedor Semifinal 2',
-        status: 'pending',
-        phase: 'final',
-        bestOfSets: 5,
-        nextMatchId: null,
-        nextMatchSlot: null,
-        tableNumber: 1
-      };
-      
-      // Conectar semifinais com final
-      // CRÍTICO: NÃO definir nextMatchId aqui - será definido após salvar no banco
-      // semifinal1.nextMatchId = finalMatch.id; // IDs temporários - QUEBRADOS!
-      
-      eliminationMatches.push(semifinal1, semifinal2, finalMatch);
-      
-    } else if (totalQualified === 6) {
-      // 6 classificados: quartas (com 2 BYEs) + semifinais + final
-      // Quartas de final
-      const quarter1 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 1,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: '1º A',
-        player2Source: 'BYE',
-        status: 'pending',
-        phase: 'quarterfinal',
-        bestOfSets: 3,
-        nextMatchId: null,
-        nextMatchSlot: 1,
-        tableNumber: 1
-      };
-      
-      const quarter2 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 1,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: '2º B',
-        player2Source: '2º C',
-        status: 'pending',
-        phase: 'quarterfinal',
-        bestOfSets: 3,
-        nextMatchId: null,
-        nextMatchSlot: 2,
-        tableNumber: 2
-      };
-      
-      const quarter3 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 1,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: '1º B',
-        player2Source: 'BYE',
-        status: 'pending',
-        phase: 'quarterfinal',
-        bestOfSets: 3,
-        nextMatchId: null,
-        nextMatchSlot: 1,
-        tableNumber: 3
-      };
-      
-      const quarter4 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 1,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: '1º C',
-        player2Source: '2º A',
-        status: 'pending',
-        phase: 'quarterfinal',
-        bestOfSets: 3,
-        nextMatchId: null,
-        nextMatchSlot: 2,
-        tableNumber: 4
-      };
-      
-      // Semifinais
-      const semifinal1 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 2,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: 'Vencedor Quarta 1',
-        player2Source: 'Vencedor Quarta 2',
-        status: 'pending',
-        phase: 'semifinal',
-        bestOfSets: 3,
-        nextMatchId: null,
-        nextMatchSlot: 1,
-        tableNumber: 1
-      };
-      
-      const semifinal2 = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 2,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: 'Vencedor Quarta 3',
-        player2Source: 'Vencedor Quarta 4',
-        status: 'pending',
-        phase: 'semifinal',
-        bestOfSets: 3,
-        nextMatchId: null,
-        nextMatchSlot: 2,
-        tableNumber: 2
-      };
-      
-      // Final
-      const finalMatch = {
-        id: this.generateId(),
-        tournamentId,
-        categoryId,
-        round: 3,
-        matchNumber: matchNumber++,
-        player1Id: null,
-        player2Id: null,
-        player1Source: 'Vencedor Semifinal 1',
-        player2Source: 'Vencedor Semifinal 2',
-        status: 'pending',
-        phase: 'final',
-        bestOfSets: 5,
-        nextMatchId: null,
-        nextMatchSlot: null,
-        tableNumber: 1
-      };
-      
-      // CRÍTICO: NÃO definir nextMatchId aqui - será definido após salvar no banco
-      // quarter1.nextMatchId = semifinal1.id; // IDs temporários - QUEBRADOS!
-      
-      eliminationMatches.push(quarter1, quarter2, quarter3, quarter4, semifinal1, semifinal2, finalMatch);
-    }
+
+    // ✅ SISTEMA DINÂMICO - Determinar estrutura do bracket automaticamente
+    const bracketStructure = this.calculateBracketStructure(totalQualified);
+    console.log(`[LOG] Estrutura do bracket:`, bracketStructure);
+
+    // ✅ MAPEAMENTO INTELIGENTE - Gerar mapeamento dos grupos para posições
+    const seeding = this.generateIntelligentSeeding(expectedGroups, qualifiersPerGroup);
+    console.log(`[LOG] Seeding inteligente:`, seeding);
+
+    // ✅ GERAÇÃO DINÂMICA - Criar todas as partidas automaticamente
+    const eliminationMatches = this.generateDynamicMatches(
+      tournamentId,
+      categoryId,
+      bracketStructure,
+      seeding
+    );
+
+    console.log(`[LOG] ✅ Bracket dinâmico criado: ${bracketStructure.phases.length} fases, ${eliminationMatches.length} partidas`);
     
     // Salvar todas as partidas eliminatórias
     for (const match of eliminationMatches) {
@@ -320,9 +125,194 @@ export class BracketManager {
     
     return {
       allMatches: eliminationMatches,
-      phases: phases,
-      totalMatches: eliminationMatches.length
+      phases: bracketStructure.phases
     };
+  }
+
+  /**
+   * ✅ NOVO: Calcula estrutura do bracket baseado no número de classificados
+   */
+  private calculateBracketStructure(totalQualified: number): {
+    phases: string[];
+    roundsPerPhase: { [phase: string]: number };
+    matchesPerPhase: { [phase: string]: number };
+    totalRounds: number;
+  } {
+    const phases: string[] = [];
+    const roundsPerPhase: { [phase: string]: number } = {};
+    const matchesPerPhase: { [phase: string]: number } = {};
+    
+    // Determinar próxima potência de 2 maior ou igual ao número de classificados
+    const nextPowerOf2 = Math.pow(2, Math.ceil(Math.log2(totalQualified)));
+    
+    let currentPhaseSize = nextPowerOf2;
+    let round = 1;
+    
+    // Gerar fases do maior para o menor
+    while (currentPhaseSize >= 4) {
+      let phaseName: string;
+      
+      if (currentPhaseSize >= 32) phaseName = 'round_of_32';
+      else if (currentPhaseSize >= 16) phaseName = 'round_of_16';
+      else if (currentPhaseSize >= 8) phaseName = 'quarterfinal';
+      else if (currentPhaseSize >= 4) phaseName = 'semifinal';
+      else break;
+      
+      phases.push(phaseName);
+      roundsPerPhase[phaseName] = round;
+      matchesPerPhase[phaseName] = currentPhaseSize / 2;
+      
+      currentPhaseSize = currentPhaseSize / 2;
+      round++;
+    }
+    
+    // Sempre adicionar final
+    phases.push('final');
+    roundsPerPhase['final'] = round;
+    matchesPerPhase['final'] = 1;
+    
+    return {
+      phases,
+      roundsPerPhase,
+      matchesPerPhase,
+      totalRounds: round
+    };
+  }
+
+  /**
+   * ✅ NOVO: Gera seeding inteligente baseado nos grupos
+   */
+  private generateIntelligentSeeding(groups: number, qualifiersPerGroup: number): string[] {
+    const seeding: string[] = [];
+    
+    // Gerar lista de classificados por posição nos grupos
+    const groupNames = Array.from({ length: groups }, (_, i) => String.fromCharCode(65 + i)); // A, B, C, D...
+    
+    // Distribuir por posição (1º de todos os grupos, depois 2º de todos, etc.)
+    for (let position = 1; position <= qualifiersPerGroup; position++) {
+      for (const groupName of groupNames) {
+        seeding.push(`${position}º ${groupName}`);
+      }
+    }
+    
+    return seeding;
+  }
+
+  /**
+   * ✅ NOVO: Gera partidas dinamicamente para qualquer estrutura
+   */
+  private generateDynamicMatches(
+    tournamentId: string,
+    categoryId: string,
+    structure: any,
+    seeding: string[]
+  ): any[] {
+    const matches: any[] = [];
+    let matchNumber = 1;
+    let tableNumber = 1;
+    
+    // Calcular número de BYEs necessários
+    const nextPowerOf2 = Math.pow(2, Math.ceil(Math.log2(seeding.length)));
+    const byesNeeded = nextPowerOf2 - seeding.length;
+    
+    console.log(`[LOG] BYEs necessários: ${byesNeeded} (${seeding.length} -> ${nextPowerOf2})`);
+    
+    // Criar seeding completo com BYEs
+    const fullSeeding = [...seeding];
+    for (let i = 0; i < byesNeeded; i++) {
+      fullSeeding.push('BYE');
+    }
+    
+    // ✅ ALGORITMO PADRÃO DE BRACKET - Emparelhar oponentes corretamente
+    const bracketPairs = this.generateBracketPairs(fullSeeding);
+    
+    // Gerar partidas para cada fase
+    let currentMatches = bracketPairs;
+    
+    for (const phase of structure.phases) {
+      console.log(`[LOG] Gerando fase: ${phase} (${currentMatches.length} partidas)`);
+      
+      const phaseMatches: any[] = [];
+      
+      for (let i = 0; i < currentMatches.length; i++) {
+        const pair = currentMatches[i];
+        
+        const match = {
+          id: this.generateId(),
+          tournamentId,
+          categoryId,
+          round: structure.roundsPerPhase[phase],
+          matchNumber: matchNumber++,
+          player1Id: null,
+          player2Id: null,
+          player1Source: pair[0],
+          player2Source: pair[1],
+          status: 'pending',
+          phase: phase,
+          bestOfSets: phase === 'final' ? 5 : 3,
+          nextMatchId: null,
+          nextMatchSlot: Math.floor(i / 2) + 1,
+          tableNumber: tableNumber++
+        };
+        
+        phaseMatches.push(match);
+        matches.push(match);
+      }
+      
+      // Preparar próxima fase (vencedores das partidas atuais)
+      if (phase !== 'final') {
+        currentMatches = [];
+        for (let i = 0; i < phaseMatches.length; i += 2) {
+          const match1 = phaseMatches[i];
+          const match2 = phaseMatches[i + 1];
+          
+          if (match2) {
+            currentMatches.push([
+              `Vencedor ${this.getPhaseDisplayName(phase)} ${match1.matchNumber}`,
+              `Vencedor ${this.getPhaseDisplayName(phase)} ${match2.matchNumber}`
+            ]);
+          } else {
+            // Número ímpar de partidas - último vencedor avança automaticamente
+            currentMatches.push([
+              `Vencedor ${this.getPhaseDisplayName(phase)} ${match1.matchNumber}`,
+              'BYE'
+            ]);
+          }
+        }
+      }
+    }
+    
+    return matches;
+  }
+
+  /**
+   * ✅ NOVO: Gera emparelhamentos corretos para bracket
+   */
+  private generateBracketPairs(seeding: string[]): string[][] {
+    const pairs: string[][] = [];
+    const n = seeding.length;
+    
+    // Algoritmo padrão de emparelhamento: 1 vs n, 2 vs n-1, 3 vs n-2, etc.
+    for (let i = 0; i < n / 2; i++) {
+      pairs.push([seeding[i], seeding[n - 1 - i]]);
+    }
+    
+    return pairs;
+  }
+
+  /**
+   * ✅ NOVO: Converte nome técnico da fase para display
+   */
+  private getPhaseDisplayName(phase: string): string {
+    const phaseNames: { [key: string]: string } = {
+      'round_of_32': '32 Avos',
+      'round_of_16': '16 Avos', 
+      'quarterfinal': 'Quarta',
+      'semifinal': 'Semifinal',
+      'final': 'Final'
+    };
+    
+    return phaseNames[phase] || phase;
   }
 
   async generateFullBracket(
@@ -468,7 +458,7 @@ export class BracketManager {
     
     // Ordenar por fase para processar na ordem correta
     const phaseOrder: Record<string, number> = { 'quarterfinals': 1, 'semifinals': 2, 'final': 3, 'round_of_16': 0 };
-    eliminationMatches.sort((a, b) => (phaseOrder[a.phase] || 99) - (phaseOrder[b.phase] || 99));
+    eliminationMatches.sort((a, b) => (phaseOrder[a.phase || ''] || 99) - (phaseOrder[b.phase || ''] || 99));
     
     for (const match of eliminationMatches) {
       // REMOVER GUARDA: processar todas exceto completed
@@ -527,11 +517,11 @@ export class BracketManager {
       for (const match of matches) {
         console.log(`[LOG] Match ${match.id}: p1=${match.player1Id} p1Src=${match.player1Source} p2=${match.player2Id} p2Src=${match.player2Source} status=${match.status}`);
         
-        // Verificar se é uma partida BYE - detecção melhorada
+        // Verificar se é uma partida BYE - CORRIGIDA: só é BYE se explicitamente marcado como 'BYE'
+        // OU se o número total de qualificados for ímpar e temos um jogador sem oponente real
         const isBYE = (match.player1Id && !match.player2Id && match.player2Source === 'BYE') || 
                       (!match.player1Id && match.player2Id && match.player1Source === 'BYE') ||
-                      (match.player1Id && !match.player2Id) || 
-                      (!match.player1Id && match.player2Id);
+                      (match.player1Source === 'BYE' || match.player2Source === 'BYE');
         
         if (isBYE && match.status !== 'completed') {
           const winnerId = match.player1Id || match.player2Id;

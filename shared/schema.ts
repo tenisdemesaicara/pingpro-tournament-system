@@ -66,12 +66,96 @@ export const tournaments = pgTable("tournaments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Formatos de torneio disponíveis
+export const tournamentFormats = z.enum([
+  "single_elimination",
+  "double_elimination", 
+  "round_robin",
+  "swiss",
+  "league",
+  "cup",
+  "group_stage_knockout"
+]);
+
+// Configurações específicas por formato
+export const formatSettings = z.discriminatedUnion("format", [
+  z.object({
+    format: z.literal("single_elimination"),
+    bestOfSets: z.number().min(1).max(9).default(3),
+    thirdPlaceMatch: z.boolean().default(false),
+    seeding: z.enum(["random", "ranking"]).default("random")
+  }),
+  z.object({
+    format: z.literal("double_elimination"),
+    bestOfWinners: z.number().min(1).max(9).default(3),
+    bestOfLosers: z.number().min(1).max(9).default(3),
+    grandFinals: z.enum(["single", "bracket_reset"]).default("single"),
+    seeding: z.enum(["random", "ranking"]).default("random")
+  }),
+  z.object({
+    format: z.literal("round_robin"),
+    isRoundTrip: z.boolean().default(false),
+    bestOfSets: z.number().min(1).max(9).default(3),
+    tiebreakers: z.array(z.enum(["h2h", "game_diff", "point_diff"])).default(["h2h", "game_diff"])
+  }),
+  z.object({
+    format: z.literal("swiss"),
+    rounds: z.number().min(3).max(9).default(5),
+    bestOfSets: z.number().min(1).max(9).default(3),
+    avoidRematches: z.boolean().default(true),
+    tiebreaker: z.enum(["buchholz", "median_buchholz", "sos"]).default("buchholz")
+  }),
+  z.object({
+    format: z.literal("league"),
+    isRoundTrip: z.boolean().default(false),
+    bestOfSets: z.number().min(1).max(9).default(3)
+  }),
+  z.object({
+    format: z.literal("cup"),
+    bestOfSets: z.number().min(1).max(9).default(3),
+    thirdPlaceMatch: z.boolean().default(false),
+    seeding: z.enum(["random", "ranking"]).default("random")
+  }),
+  z.object({
+    format: z.literal("group_stage_knockout"),
+    numGroups: z.number().min(2).max(8).default(2),
+    advancesPerGroup: z.number().min(1).max(4).default(2),
+    groupBestOfSets: z.number().min(1).max(9).default(3),
+    koBestOfSets: z.number().min(1).max(9).default(3)
+  })
+]);
+
+export type FormatSettings = z.infer<typeof formatSettings>;
+
+// Função para obter configurações padrão por formato
+export const getDefaultFormatSettings = (format: string): FormatSettings => {
+  switch (format) {
+    case "single_elimination":
+      return { format: "single_elimination", bestOfSets: 3, thirdPlaceMatch: false, seeding: "random" };
+    case "double_elimination":
+      return { format: "double_elimination", bestOfWinners: 3, bestOfLosers: 3, grandFinals: "single", seeding: "random" };
+    case "round_robin":
+      return { format: "round_robin", isRoundTrip: false, bestOfSets: 3, tiebreakers: ["h2h", "game_diff"] };
+    case "swiss":
+      return { format: "swiss", rounds: 5, bestOfSets: 3, avoidRematches: true, tiebreaker: "buchholz" };
+    case "league":
+      return { format: "league", isRoundTrip: false, bestOfSets: 3 };
+    case "cup":
+      return { format: "cup", bestOfSets: 3, thirdPlaceMatch: false, seeding: "random" };
+    case "group_stage_knockout":
+      return { format: "group_stage_knockout", numGroups: 2, advancesPerGroup: 2, groupBestOfSets: 3, koBestOfSets: 3 };
+    default:
+      return { format: "single_elimination", bestOfSets: 3, thirdPlaceMatch: false, seeding: "random" };
+  }
+};
+
 // Categorias de torneios (relacionamento N:N)
 export const tournamentCategories = pgTable("tournament_categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tournamentId: varchar("tournament_id").notNull(),
   categoryId: varchar("category_id").notNull(),
   format: text("format").notNull().default("single_elimination"), // formato específico desta categoria
+  settings: text("settings"), // JSON serializado das configurações do formato
   maxParticipants: integer("max_participants"), // Limite opcional por categoria
   currentParticipants: integer("current_participants").default(0), // Contador de participantes por categoria
   createdAt: timestamp("created_at").defaultNow(),

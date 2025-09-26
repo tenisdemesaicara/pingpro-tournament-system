@@ -1,7 +1,7 @@
 import { type Athlete, type InsertAthlete, type Tournament, type InsertTournament, type TournamentParticipant, type InsertTournamentParticipant, type TournamentParticipantWithAthlete, type Match, type InsertMatch, type Community, type InsertCommunity, type Category, type InsertCategory, type TournamentWithParticipants, type Payment, type InsertPayment, type Revenue, type InsertRevenue, type Expense, type InsertExpense, type RankingSeason, type InsertRankingSeason, type Consent, type InsertConsent, type ExternalLink, type InsertExternalLink, type Asset, type InsertAsset, type SystemSetting, type InsertSystemSetting, athletes, tournaments, tournamentParticipants, matches, communities, categories, tournamentCategories, payments, revenues, expenses, rankingSeasons, consents, externalLinks, assets, systemSettings } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, desc, asc, and, sql } from "drizzle-orm";
+import { eq, desc, asc, and, or, sql } from "drizzle-orm";
 
 // Interface simplificada
 export interface IStorage {
@@ -32,6 +32,7 @@ export interface IStorage {
   createMatch(match: InsertMatch): Promise<Match>;
   updateMatch(id: string, match: Partial<InsertMatch>): Promise<Match | undefined>;
   deleteMatch(id: string): Promise<boolean>;
+  deleteMatchesByCategory(tournamentId: string, categoryId: string): Promise<boolean>;
   
   // Remoção inteligente de atletas
   getMatchesByAthleteAndCategory(athleteId: string, tournamentId: string, categoryId: string): Promise<Match[]>;
@@ -53,7 +54,7 @@ export interface IStorage {
   deleteCategory(id: string): Promise<boolean>;
   getTournamentCategories(tournamentId: string): Promise<Category[]>;
   removeTournamentCategory(tournamentId: string, categoryId: string): Promise<boolean>;
-  updateTournamentCategory(categoryId: string, updates: { format: string }): Promise<Category | undefined>;
+  updateTournamentCategory(categoryId: string, updates: { format: string, settings?: string | null }): Promise<Category | undefined>;
 
   // Payments
   getPayment(id: string): Promise<Payment | undefined>;
@@ -758,6 +759,16 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
+  async deleteMatchesByCategory(tournamentId: string, categoryId: string): Promise<boolean> {
+    await db.delete(matches).where(
+      and(
+        eq(matches.tournamentId, tournamentId),
+        eq(matches.categoryId, categoryId)
+      )
+    );
+    return true;
+  }
+
   // REMOÇÃO INTELIGENTE DE ATLETAS
   async getMatchesByAthleteAndCategory(athleteId: string, tournamentId: string, categoryId: string): Promise<Match[]> {
     const result = await db
@@ -1164,11 +1175,16 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async updateTournamentCategory(categoryId: string, updates: { format: string }): Promise<Category | undefined> {
+  async updateTournamentCategory(categoryId: string, updates: { format: string, settings?: string | null }): Promise<Category | undefined> {
     try {
       // Atualizar o formato da categoria no torneio (tabela tournamentCategories)
+      const updateData: any = { format: updates.format };
+      if (updates.settings !== undefined) {
+        updateData.settings = updates.settings;
+      }
+      
       const [updatedTournamentCategory] = await db.update(tournamentCategories)
-        .set({ format: updates.format })
+        .set(updateData)
         .where(eq(tournamentCategories.categoryId, categoryId))
         .returning();
 

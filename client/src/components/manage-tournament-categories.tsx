@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { X } from "lucide-react";
-import { type Category } from "@shared/schema";
+import { type Category, type FormatSettings, getDefaultFormatSettings } from "@shared/schema";
 
 interface ManageTournamentCategoriesProps {
   tournamentId: string;
@@ -35,7 +35,8 @@ export default function ManageTournamentCategories({
 
   const [selectedCategories, setSelectedCategories] = useState<{[key: string]: string[]}>({});
   const [categoryFormats, setCategoryFormats] = useState<{[key: string]: string}>({});
-  const [categoryLeagueSettings, setCategoryLeagueSettings] = useState<{[key: string]: {isRoundTrip: boolean}}>({});
+  // Estado unificado para configurações de todos os formatos
+  const [formatSettingsByCategory, setFormatSettingsByCategory] = useState<{[categoryName: string]: FormatSettings}>({});
   const [customCategories, setCustomCategories] = useState<any[]>([]);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editCategoryFormats, setEditCategoryFormats] = useState<{[key: string]: string}>({});
@@ -122,27 +123,59 @@ export default function ManageTournamentCategories({
     }));
   };
 
-  const handleLeagueSettingChange = (categoryName: string, isRoundTrip: boolean) => {
-    setCategoryLeagueSettings(prev => ({
-      ...prev,
-      [categoryName]: { isRoundTrip }
-    }));
+  // Função unificada para alterar configurações de qualquer formato
+  const handleFormatSettingChange = (categoryName: string, format: string, setting: string, value: any) => {
+    setFormatSettingsByCategory(prev => {
+      const currentSettings = prev[categoryName] || getDefaultFormatSettings(format);
+      return {
+        ...prev,
+        [categoryName]: {
+          ...currentSettings,
+          [setting]: value
+        }
+      };
+    });
+  };
+
+  // Função para obter configurações atuais de uma categoria
+  const getCategorySettings = (categoryName: string, format: string): FormatSettings => {
+    return formatSettingsByCategory[categoryName] || getDefaultFormatSettings(format);
   };
 
   // Update existing category format mutation
   const updateCategoryFormatMutation = useMutation({
-    mutationFn: async ({ categoryId, format, leagueSettings }: { categoryId: string, format: string, leagueSettings?: { isRoundTrip: boolean } }) => {
-      const payload: any = { format };
-      if (leagueSettings) {
-        payload.leagueSettings = leagueSettings;
-      }
+    mutationFn: async ({ categoryId, format, settings }: { 
+      categoryId: string, 
+      format: string, 
+      settings: FormatSettings
+    }) => {
+      const payload = { format, settings };
       return apiRequest('PATCH', `/api/tournaments/${tournamentId}/categories/${categoryId}`, payload);
     },
-    onSuccess: () => {
+    onSuccess: (data: any, variables) => {
+      // Invalidar TODAS as queries relacionadas às partidas para atualização completa
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'matches'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'categories-stats'] });
+      
+      // Invalidar queries específicas da aba de Partidas usando variables
+      const categoryId = variables.categoryId;
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'category-matches', categoryId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'categories', categoryId, 'rounds'] });
+      
+      // Forçar refresh completo das partidas (para casos de cache stubborn)
+      queryClient.removeQueries({ queryKey: ['/api/tournaments', tournamentId, 'matches'] });
+      queryClient.removeQueries({ queryKey: ['/api/tournaments', tournamentId, 'category-matches'] });
+      
+      // Mostrar mensagem específica se houve reset do chaveamento
+      const message = data?.bracketWasReset 
+        ? "⚠️ Chaveamento foi resetado devido à mudança de formato. Você pode gerar um novo chaveamento na aba Chaveamento."
+        : "Formato da categoria atualizado com sucesso!";
+      
       toast({
-        title: "Sucesso!",
-        description: "Formato da categoria atualizado com sucesso!",
+        title: data?.bracketWasReset ? "Formato atualizado - Chaveamento resetado!" : "Sucesso!",
+        description: message,
+        duration: data?.bracketWasReset ? 6000 : 3000, // Mais tempo para ler sobre reset
       });
       setEditingCategory(null);
       setEditCategoryFormats({});
@@ -174,12 +207,14 @@ export default function ManageTournamentCategories({
       // Preparar payload com configurações de Liga se necessário
       const payload: any = { categoryId, format: newFormat };
       
-      if (newFormat === 'league') {
-        const leagueSettings = categoryLeagueSettings[categoryName];
-        payload.leagueSettings = leagueSettings || { isRoundTrip: false };
-      }
+      // Obter configurações para o formato selecionado
+      const settings = getCategorySettings(categoryName, newFormat);
       
-      updateCategoryFormatMutation.mutate(payload);
+      updateCategoryFormatMutation.mutate({
+        categoryId,
+        format: newFormat,
+        settings
+      });
     }
   };
 
@@ -410,8 +445,8 @@ export default function ManageTournamentCategories({
                                   <div className="flex items-center space-x-2">
                                     <Checkbox
                                       id={`edit-${category.id}-single-round`}
-                                      checked={!(categoryLeagueSettings[category.name]?.isRoundTrip ?? false)}
-                                      onCheckedChange={() => handleLeagueSettingChange(category.name, false)}
+                                      checked={!((getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false)}
+                                      onCheckedChange={() => handleFormatSettingChange(category.name, 'league', 'isRoundTrip', false)}
                                     />
                                     <Label htmlFor={`edit-${category.id}-single-round`} className="text-sm">
                                       Apenas ida (1 rodada)
@@ -420,8 +455,8 @@ export default function ManageTournamentCategories({
                                   <div className="flex items-center space-x-2">
                                     <Checkbox
                                       id={`edit-${category.id}-round-trip`}
-                                      checked={categoryLeagueSettings[category.name]?.isRoundTrip ?? false}
-                                      onCheckedChange={() => handleLeagueSettingChange(category.name, true)}
+                                      checked={(getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false}
+                                      onCheckedChange={() => handleFormatSettingChange(category.name, 'league', 'isRoundTrip', true)}
                                     />
                                     <Label htmlFor={`edit-${category.id}-round-trip`} className="text-sm">
                                       Ida e volta (2 rodadas)
@@ -429,9 +464,74 @@ export default function ManageTournamentCategories({
                                   </div>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-2">
-                                  {(categoryLeagueSettings[category.name]?.isRoundTrip ?? false) 
+                                  {((getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false) 
                                     ? "Cada jogador enfrentará todos os outros duas vezes (casa e fora)"
                                     : "Cada jogador enfrentará todos os outros uma vez"}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Configurações específicas para Grupos + Eliminatórias quando editando */}
+                            {editCategoryFormats[category.id] === 'group_stage_knockout' && (
+                              <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                                <Label className="text-sm font-medium">Configuração dos Grupos:</Label>
+                                <div className="mt-2 space-y-3">
+                                  <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                      <Label className="text-xs">Número de Grupos</Label>
+                                      <Select 
+                                        value={((getCategorySettings(category.name, 'group_stage_knockout') as any).numGroups || 2).toString()}
+                                        onValueChange={(value) => handleFormatSettingChange(category.name, 'group_stage_knockout', 'numGroups', parseInt(value))}
+                                      >
+                                        <SelectTrigger className="h-8">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="2">2 grupos</SelectItem>
+                                          <SelectItem value="3">3 grupos</SelectItem>
+                                          <SelectItem value="4">4 grupos</SelectItem>
+                                          <SelectItem value="6">6 grupos</SelectItem>
+                                          <SelectItem value="8">8 grupos</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Avançam por Grupo</Label>
+                                      <Select 
+                                        value={((getCategorySettings(category.name, 'group_stage_knockout') as any).advancesPerGroup || 2).toString()}
+                                        onValueChange={(value) => handleFormatSettingChange(category.name, 'group_stage_knockout', 'advancesPerGroup', parseInt(value))}
+                                      >
+                                        <SelectTrigger className="h-8">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="1">1º lugar</SelectItem>
+                                          <SelectItem value="2">Top 2</SelectItem>
+                                          <SelectItem value="3">Top 3</SelectItem>
+                                          <SelectItem value="4">Top 4</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Melhor de</Label>
+                                      <Select 
+                                        value={((getCategorySettings(category.name, 'group_stage_knockout') as any).groupBestOfSets || 3).toString()}
+                                        onValueChange={(value) => handleFormatSettingChange(category.name, 'group_stage_knockout', 'groupBestOfSets', parseInt(value))}
+                                      >
+                                        <SelectTrigger className="h-8">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="3">3 sets</SelectItem>
+                                          <SelectItem value="5">5 sets</SelectItem>
+                                          <SelectItem value="7">7 sets</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Fase de grupos seguida por eliminatórias com os classificados
                                 </p>
                               </div>
                             )}
@@ -522,7 +622,7 @@ export default function ManageTournamentCategories({
                       <Label className="text-sm">Selecionar Naipe:</Label>
                       <div className="flex gap-3 mt-1">
                         {/* Para categorias do banco, usar apenas naipes disponíveis */}
-                        {(category.availableGenders || ['masculino', 'feminino', 'misto']).map((gender) => (
+                        {(category.availableGenders || ['masculino', 'feminino', 'misto']).map((gender: string) => (
                           <div key={gender} className="flex items-center space-x-2">
                             <Checkbox
                               id={`${category.id}-${gender}`}
@@ -577,8 +677,8 @@ export default function ManageTournamentCategories({
                               <div className="flex items-center space-x-2">
                                 <Checkbox
                                   id={`${category.id}-single-round`}
-                                  checked={!(categoryLeagueSettings[category.name]?.isRoundTrip ?? false)}
-                                  onCheckedChange={() => handleLeagueSettingChange(category.name, false)}
+                                  checked={!((getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false)}
+                                  onCheckedChange={() => handleFormatSettingChange(category.name, 'league', 'isRoundTrip', false)}
                                 />
                                 <Label htmlFor={`${category.id}-single-round`} className="text-sm">
                                   Apenas ida (1 rodada)
@@ -587,8 +687,8 @@ export default function ManageTournamentCategories({
                               <div className="flex items-center space-x-2">
                                 <Checkbox
                                   id={`${category.id}-round-trip`}
-                                  checked={categoryLeagueSettings[category.name]?.isRoundTrip ?? false}
-                                  onCheckedChange={() => handleLeagueSettingChange(category.name, true)}
+                                  checked={(getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false}
+                                  onCheckedChange={() => handleFormatSettingChange(category.name, 'league', 'isRoundTrip', true)}
                                 />
                                 <Label htmlFor={`${category.id}-round-trip`} className="text-sm">
                                   Ida e volta (2 rodadas)
@@ -596,7 +696,7 @@ export default function ManageTournamentCategories({
                               </div>
                             </div>
                             <p className="text-xs text-muted-foreground mt-2">
-                              {(categoryLeagueSettings[category.name]?.isRoundTrip ?? false) 
+                              {((getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false) 
                                 ? "Cada jogador enfrentará todos os outros duas vezes (casa e fora)"
                                 : "Cada jogador enfrentará todos os outros uma vez"}
                             </p>
@@ -685,8 +785,8 @@ export default function ManageTournamentCategories({
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id={`${category.id}-single-round`}
-                              checked={!(categoryLeagueSettings[category.name]?.isRoundTrip ?? false)}
-                              onCheckedChange={() => handleLeagueSettingChange(category.name, false)}
+                              checked={!((getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false)}
+                              onCheckedChange={() => handleFormatSettingChange(category.name, 'league', 'isRoundTrip', false)}
                             />
                             <Label htmlFor={`${category.id}-single-round`} className="text-sm">
                               Apenas ida (1 rodada)
@@ -695,8 +795,8 @@ export default function ManageTournamentCategories({
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id={`${category.id}-round-trip`}
-                              checked={categoryLeagueSettings[category.name]?.isRoundTrip ?? false}
-                              onCheckedChange={() => handleLeagueSettingChange(category.name, true)}
+                              checked={(getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false}
+                              onCheckedChange={() => handleFormatSettingChange(category.name, 'league', 'isRoundTrip', true)}
                             />
                             <Label htmlFor={`${category.id}-round-trip`} className="text-sm">
                               Ida e volta (2 rodadas)
@@ -704,7 +804,7 @@ export default function ManageTournamentCategories({
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          {(categoryLeagueSettings[category.name]?.isRoundTrip ?? false) 
+                          {((getCategorySettings(category.name, 'league') as any).isRoundTrip ?? false) 
                             ? "Cada jogador enfrentará todos os outros duas vezes (casa e fora)"
                             : "Cada jogador enfrentará todos os outros uma vez"}
                         </p>

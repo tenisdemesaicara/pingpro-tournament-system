@@ -1,11 +1,12 @@
 import { useState } from "react";
+import * as React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Edit, Save, X } from "lucide-react";
+import { Edit, Save, X, Trophy } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,6 +47,8 @@ interface GroupStandingData {
 
 interface BracketData {
   groupStandings?: GroupStandingData[];
+  round_of_32?: BracketMatch[];
+  round_of_16?: BracketMatch[];
   quarterfinal?: BracketMatch[];
   semifinal?: BracketMatch[];
   final?: BracketMatch[];
@@ -106,7 +109,8 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
   const [tempTableNumber, setTempTableNumber] = useState<number>(1);
   const { toast } = useToast();
   
-  const { data: bracketData, isLoading } = useQuery<BracketData>({
+  // Buscar dados do bracket (todas as fases)
+  const { data: rawBracketData, isLoading } = useQuery<any>({
     queryKey: [`/api/tournaments/${tournamentId}/categories/${categoryId}/bracket`],
   });
 
@@ -114,6 +118,29 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
   const { data: athletes } = useQuery({
     queryKey: ['/api/public/athletes'],
   });
+
+  // Filtrar apenas as fases eliminatórias para o WorldCupBracket
+  // Remove dados de grupo e mantém apenas eliminatórias
+  const bracketData = React.useMemo(() => {
+    if (!rawBracketData) return null;
+    
+    const eliminationPhases = ['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'];
+    const filteredBracket: BracketData = {};
+    
+    // Copiar apenas fases eliminatórias
+    eliminationPhases.forEach(phase => {
+      if (rawBracketData[phase]) {
+        filteredBracket[phase as keyof BracketData] = rawBracketData[phase];
+      }
+    });
+
+    // Manter groupStandings para mostrar classificação
+    if (rawBracketData.groupStandings) {
+      filteredBracket.groupStandings = rawBracketData.groupStandings;
+    }
+    
+    return filteredBracket;
+  }, [rawBracketData]);
 
   // Mutação para atualizar partida
   const updateMatchMutation = useMutation({
@@ -162,16 +189,35 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
     }
   });
 
+  // Buscar dados da partida para obter bestOfSets
+  const { data: matchDetails } = useQuery<{bestOfSets: number}>({
+    queryKey: [`/api/matches/${editingScoreMatch?.id}`],
+    enabled: !!editingScoreMatch?.id,
+  });
+
   // Funções para gerenciar o modal de placar
   const initializeScoreEditing = (match: BracketMatch) => {
     setEditingScoreMatch(match);
-    // Inicializar com sets existentes ou 3 sets vazios por padrão
+    // Inicializar com sets existentes primeiro, depois ajustar quando matchDetails carregar
     const existingSets = match.sets as Array<{player1Score: number, player2Score: number}> || [];
-    const defaultSets = existingSets.length > 0 ? existingSets : 
-      Array(3).fill(null).map(() => ({player1Score: 0, player2Score: 0}));
-    setTempSets(defaultSets);
+    if (existingSets.length > 0) {
+      setTempSets(existingSets);
+    } else {
+      // Usar 5 sets por padrão para melhor de 5, ajustará quando matchDetails carregar
+      setTempSets(Array(5).fill(null).map(() => ({player1Score: 0, player2Score: 0})));
+    }
     setTempTableNumber(match.tableNumber || 1);
   };
+
+  // Ajustar sets quando matchDetails carregar
+  React.useEffect(() => {
+    if (editingScoreMatch && matchDetails?.bestOfSets) {
+      const existingSets = editingScoreMatch.sets as Array<{player1Score: number, player2Score: number}> || [];
+      if (existingSets.length === 0 && tempSets.length !== matchDetails.bestOfSets) {
+        setTempSets(Array(matchDetails.bestOfSets).fill(null).map(() => ({player1Score: 0, player2Score: 0})));
+      }
+    }
+  }, [matchDetails?.bestOfSets, editingScoreMatch]);
 
   const cancelScoreEditing = () => {
     setEditingScoreMatch(null);
@@ -354,14 +400,125 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
   // Agora usamos APENAS dados do backend
   // Debug removido - matches funcionando!
 
+  // 🏆 LÓGICA DO PÓDIUM - Detectar fim do torneio e calcular posições
+  const calculatePodiumPositions = () => {
+    console.log("🏆 calculatePodiumPositions DEBUG:");
+    console.log("  - bracketData:", bracketData);
+    console.log("  - bracketData?.final:", bracketData?.final);
+    console.log("  - bracketData?.final?.length:", bracketData?.final?.length);
+    
+    if (!bracketData || !bracketData.final || bracketData.final.length === 0) {
+      console.log("❌ No bracketData or final matches found");
+      return [];
+    }
+
+    const finalMatch = bracketData.final[0];
+    console.log("  - finalMatch:", finalMatch);
+    console.log("  - finalMatch.status:", finalMatch?.status);
+    
+    if (!finalMatch || finalMatch.status !== 'completed') {
+      console.log("❌ Final match not completed");
+      return [];
+    }
+    
+    // Tentar determinar o vencedor mesmo se não explicitamente definido
+    let winner = finalMatch.winner;
+    if (!winner && finalMatch.player1 && finalMatch.player2) {
+      // Se não há vencedor explícito, tentar deduzir pelo placar
+      const sets = finalMatch.sets || [];
+      
+      if (sets.length > 0) {
+        // Contar sets ganhos por cada jogador
+        let player1Sets = 0;
+        let player2Sets = 0;
+        
+        sets.forEach(set => {
+          if (set.player1Score > set.player2Score) player1Sets++;
+          else if (set.player2Score > set.player1Score) player2Sets++;
+        });
+        
+        winner = player1Sets > player2Sets ? finalMatch.player1 : finalMatch.player2;
+      }
+    }
+    
+    if (!winner) {
+      return [];
+    }
+
+    const positions: Array<{
+      playerId: string;
+      playerName: string;
+      photoUrl?: string;
+      position: number;
+    }> = [];
+
+    // 1º lugar: vencedor da final
+    positions.push({
+      playerId: winner.playerId,
+      playerName: winner.playerName,
+      photoUrl: winner.photoUrl,
+      position: 1
+    });
+
+    // 2º lugar: perdedor da final
+    const finalist = finalMatch.player1?.playerId === winner.playerId 
+      ? finalMatch.player2 
+      : finalMatch.player1;
+    
+    if (finalist) {
+      positions.push({
+        playerId: finalist.playerId,
+        playerName: finalist.playerName,
+        photoUrl: finalist.photoUrl,
+        position: 2
+      });
+    }
+
+    // 3º lugar: SEMPRE os 2 perdedores das semifinais (tênis de mesa não tem disputa de 3º lugar)
+    if (bracketData.semifinal && bracketData.semifinal.length > 0) {
+      bracketData.semifinal.forEach(semifinalMatch => {
+        if (semifinalMatch.status === 'completed' && semifinalMatch.winner) {
+          const semifinalLoser = semifinalMatch.player1?.playerId === semifinalMatch.winner.playerId 
+            ? semifinalMatch.player2 
+            : semifinalMatch.player1;
+          
+          // Adicionar TODOS os perdedores das semifinais como 3º lugar
+          if (semifinalLoser) {
+            positions.push({
+              playerId: semifinalLoser.playerId,
+              playerName: semifinalLoser.playerName,
+              photoUrl: semifinalLoser.photoUrl,
+              position: 3
+            });
+          }
+        }
+      });
+    }
+
+    return positions;
+  };
+
+  const isCategoryFinished = () => {
+    if (!bracketData || !bracketData.final || bracketData.final.length === 0) {
+      return false;
+    }
+    
+    const finalMatch = bracketData.final[0];
+    return finalMatch && finalMatch.status === 'completed';
+  };
+
+  // Calcular posições do pódium
+  const podiumPositions = calculatePodiumPositions();
+  const categoryFinished = isCategoryFinished();
+
   const getPhaseTitle = (phase: string) => {
     switch (phase) {
-      case "round_of_32": return "32avos";
-      case "round_of_16": return "OITAVAS";
-      case "quarterfinal": return "QUARTAS";
+      case "round_of_32": return "32AVOS DE FINAL";
+      case "round_of_16": return "OITAVAS DE FINAL";
+      case "quarterfinal": return "QUARTAS DE FINAL";
       case "semifinal": return "SEMIFINAL";
       case "final": return "FINAL";
-      default: return phase;
+      default: return phase.toUpperCase();
     }
   };
 
@@ -400,7 +557,7 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
         </div>
         {athlete && athlete.isRealPlayer && (
           <div className="text-xs text-gray-500 truncate">
-            Grupo {athlete.group}
+            {athlete.position}º Grupo {athlete.group}
           </div>
         )}
         {athlete === null && (
@@ -663,6 +820,7 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
         <div className="mt-2 text-purple-300 text-xs sm:text-sm">
           {phases.map(getPhaseTitle).join(" → ")}
         </div>
+        
       </div>
 
       {/* Bracket principal - VISÃO AMPLA MOBILE */}
@@ -901,6 +1059,80 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* 🏆 Pódium da Categoria - Versão Fixa e Discreta */}
+      {podiumPositions.length > 0 && (
+        <Card className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950 dark:to-orange-950 border-yellow-200 dark:border-yellow-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-center text-lg font-bold text-yellow-700 dark:text-yellow-300 flex items-center justify-center gap-2">
+              <Trophy className="w-5 h-5" />
+              Pódium da Categoria
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center gap-4 sm:gap-8">
+              {/* 2º Lugar */}
+              {podiumPositions.find(p => p.position === 2) && (
+                <div className="flex flex-col items-center">
+                  <Avatar className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-gray-400 mb-2">
+                    {podiumPositions.find(p => p.position === 2)?.photoUrl ? (
+                      <AvatarImage src={podiumPositions.find(p => p.position === 2)?.photoUrl} />
+                    ) : null}
+                    <AvatarFallback className="bg-gray-400 text-white font-bold">
+                      {podiumPositions.find(p => p.position === 2)?.playerName.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-center">
+                    <div className="text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-400">2º</div>
+                    <div className="text-sm sm:text-base font-semibold">{podiumPositions.find(p => p.position === 2)?.playerName}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* 1º Lugar */}
+              {podiumPositions.find(p => p.position === 1) && (
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-3 border-yellow-400 mb-2">
+                      {podiumPositions.find(p => p.position === 1)?.photoUrl ? (
+                        <AvatarImage src={podiumPositions.find(p => p.position === 1)?.photoUrl} />
+                      ) : null}
+                      <AvatarFallback className="bg-yellow-500 text-white font-bold text-lg sm:text-xl">
+                        {podiumPositions.find(p => p.position === 1)?.playerName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -top-2 -right-1 text-2xl">👑</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm sm:text-base font-bold text-yellow-600 dark:text-yellow-400">1º</div>
+                    <div className="text-base sm:text-lg font-bold">{podiumPositions.find(p => p.position === 1)?.playerName}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3º Lugares */}
+              <div className="flex flex-col gap-2">
+                {podiumPositions.filter(p => p.position === 3).map((third, index) => (
+                  <div key={third.playerId} className="flex items-center gap-2">
+                    <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-amber-400">
+                      {third.photoUrl ? (
+                        <AvatarImage src={third.photoUrl} />
+                      ) : null}
+                      <AvatarFallback className="bg-amber-500 text-white font-bold text-sm">
+                        {third.playerName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="text-xs font-bold text-amber-600 dark:text-amber-400">3º</div>
+                      <div className="text-sm font-semibold">{third.playerName}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

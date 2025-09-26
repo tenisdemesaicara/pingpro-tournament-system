@@ -44,7 +44,7 @@ export async function generateGroupStageMatches(tournamentId: string, categoryId
   return matches;
 }
 
-export async function generateRoundRobinMatches(tournamentId: string, categoryId: string, participants: any[], isDouble: boolean = false) {
+export async function generateRoundRobinMatches(tournamentId: string, categoryId: string, participants: any[], isDouble: boolean = false, bestOfSets: number = 3) {
   const matches = [];
   let matchNumber = 1;
   const numParticipants = participants.length;
@@ -87,7 +87,7 @@ export async function generateRoundRobinMatches(tournamentId: string, categoryId
           matchNumber: matchNumber++,
           status: 'pending',
           phase: 'league',
-          bestOfSets: 3
+          bestOfSets: bestOfSets
         });
       }
     }
@@ -131,7 +131,7 @@ export async function generateRoundRobinMatches(tournamentId: string, categoryId
   return matches;
 }
 
-export async function generateKnockoutMatches(tournamentId: string, categoryId: string, participants: any[], format: string) {
+export async function generateKnockoutMatches(tournamentId: string, categoryId: string, participants: any[], format: string, bestOfSets: number = 3) {
   const matches = [];
   
   // Embaralhar participantes para sortear confrontos
@@ -151,7 +151,7 @@ export async function generateKnockoutMatches(tournamentId: string, categoryId: 
       matchNumber: Math.floor(i / 2) + 1,
       status: 'pending',
       phase: 'knockout',
-      bestOfSets: 3
+      bestOfSets: bestOfSets
     });
   }
   

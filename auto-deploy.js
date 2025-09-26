@@ -10,7 +10,10 @@ import { watch } from 'fs';
 import path from 'path';
 
 let deployTimeout;
+let isDeploying = false;
+let lastDeployTime = 0;
 const DEPLOY_DELAY = 3000; // Aguarda 3 segundos após última mudança
+const MIN_DEPLOY_INTERVAL = 2 * 60 * 1000; // 2 minutos entre deploys
 
 function log(message) {
   const timestamp = new Date().toLocaleTimeString();
@@ -35,18 +38,38 @@ function executeCommand(command, args = []) {
 }
 
 async function deployToProduction() {
+  const now = Date.now();
+  
+  // Proteção contra deploys sobrepostos
+  if (isDeploying) {
+    log('⏳ Deploy já em andamento, ignorando...');
+    return;
+  }
+  
+  // Proteção contra deploys muito frequentes  
+  if (now - lastDeployTime < MIN_DEPLOY_INTERVAL) {
+    const remaining = Math.ceil((MIN_DEPLOY_INTERVAL - (now - lastDeployTime)) / 1000);
+    log(`⏸️ Aguardando ${remaining}s para próximo deploy...`);
+    return;
+  }
+  
+  isDeploying = true;
+  lastDeployTime = now;
+  
   try {
-    log('Iniciando deploy via API GitHub...');
-    log('💡 Contorna restrições do Git no Replit');
+    log('🎯 Iniciando deploy via Git Push (sem rate limiting)...');
+    log('💡 Usa integração GitHub do Replit');
     
-    // Usar API deploy ao invés de git local
-    await executeCommand('node', ['api-deploy.js']);
+    // Usar Git push ao invés de API que causa rate limiting
+    await executeCommand('node', ['deploy-github.js']);
     
     log('🎉 Deploy concluído! Render irá atualizar automaticamente em ~3 minutos');
     log('📱 Acesse: https://pingpro.onrender.com');
     
   } catch (error) {
     log(`❌ Erro no deploy: ${error.message}`);
+  } finally {
+    isDeploying = false;
   }
 }
 

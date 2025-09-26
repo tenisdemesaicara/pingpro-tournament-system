@@ -92,6 +92,10 @@ async function deployToGitHub() {
       return;
     }
 
+    log('⚙️ Configurando identidade Git...');
+    await executeCommand('git', ['config', 'user.name', 'PingPro Bot']);
+    await executeCommand('git', ['config', 'user.email', 'bot@pingpro.com']);
+
     log('📦 Adicionando arquivos...');
     await executeCommand('git', ['add', '.']);
 

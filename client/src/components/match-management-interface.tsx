@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Trophy } from "lucide-react";
 import { type TournamentWithParticipants, type Athlete, type Match } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
@@ -148,10 +149,11 @@ export default function MatchManagementInterface({
   // Funções para gerenciar placares
   const initializeScoreEditing = (match: Match) => {
     setEditingScoreMatch(match);
-    // Inicializar com sets existentes ou 3 sets vazios por padrão
+    // Inicializar com sets existentes ou usar a configuração da partida
     const existingSets = match.sets as Array<{player1Score: number, player2Score: number}> || [];
+    const bestOfSets = match.bestOfSets || 3;
     const defaultSets = existingSets.length > 0 ? existingSets : 
-      Array(match.bestOfSets || 3).fill(null).map(() => ({player1Score: 0, player2Score: 0}));
+      Array(bestOfSets).fill(null).map(() => ({player1Score: 0, player2Score: 0}));
     setTempSets(defaultSets);
   };
 
@@ -230,6 +232,170 @@ export default function MatchManagementInterface({
     setTempSets([]);
   };
 
+  // Algoritmo para otimizar ordem das partidas evitando repetir jogadores em sequência
+  const optimizeMatchOrder = (matches: Match[]) => {
+    if (!matches || matches.length <= 2) return matches;
+    
+    // Separar por grupos primeiro para não misturar
+    const matchesByGroup = new Map<string, Match[]>();
+    matches.forEach(match => {
+      const group = match.groupName || 'default';
+      if (!matchesByGroup.has(group)) {
+        matchesByGroup.set(group, []);
+      }
+      matchesByGroup.get(group)!.push(match);
+    });
+    
+    const optimizedMatches: Match[] = [];
+    
+    // Otimizar cada grupo separadamente
+    for (const [group, groupMatches] of Array.from(matchesByGroup.entries())) {
+      const optimized = optimizeGroupMatches(groupMatches);
+      optimizedMatches.push(...optimized);
+    }
+    
+    return optimizedMatches;
+  };
+
+  const optimizeGroupMatches = (matches: Match[]) => {
+    if (matches.length <= 2) return matches;
+    
+    const remaining = [...matches];
+    const optimized: Match[] = [];
+    const recentPlayers = new Set<string>();
+    
+    while (remaining.length > 0) {
+      let bestMatchIndex = -1;
+      let bestScore = -1;
+      
+      // Encontrar a melhor partida que minimize repetição de jogadores
+      for (let i = 0; i < remaining.length; i++) {
+        const match = remaining[i];
+        const players = [match.player1Id, match.player2Id].filter(Boolean);
+        
+        // Calcular pontuação (quanto maior, melhor)
+        let score = 0;
+        
+        // Bonus se nenhum jogador jogou recentemente
+        const hasRecentPlayer = players.some(playerId => playerId && recentPlayers.has(playerId));
+        if (!hasRecentPlayer) {
+          score += 100; // Bonus alto para evitar repetição
+        }
+        
+        // Bonus se a partida está pendente (priorizar jogos não iniciados)
+        if (match.status === 'pending') {
+          score += 10;
+        }
+        
+        // Penalizar partidas já finalizadas para que fiquem no final
+        if (match.status === 'completed') {
+          score -= 50;
+        }
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatchIndex = i;
+        }
+      }
+      
+      // Se não encontrou uma boa opção, pegar a primeira
+      if (bestMatchIndex === -1) {
+        bestMatchIndex = 0;
+      }
+      
+      const selectedMatch = remaining[bestMatchIndex];
+      remaining.splice(bestMatchIndex, 1);
+      optimized.push(selectedMatch);
+      
+      // Atualizar lista de jogadores recentes (manter apenas os últimos 2-3 jogos)
+      recentPlayers.clear();
+      if (selectedMatch.player1Id) recentPlayers.add(selectedMatch.player1Id);
+      if (selectedMatch.player2Id) recentPlayers.add(selectedMatch.player2Id);
+      
+      // Adicionar jogadores das últimas partidas também
+      if (optimized.length >= 2) {
+        const prevMatch = optimized[optimized.length - 2];
+        if (prevMatch.player1Id) recentPlayers.add(prevMatch.player1Id);
+        if (prevMatch.player2Id) recentPlayers.add(prevMatch.player2Id);
+      }
+    }
+    
+    return optimized;
+  };
+
+  // 🏆 LÓGICA DO PÓDIUM - Calcular posições quando categoria está completa
+  const calculatePodiumPositions = () => {
+    if (!selectedCategory || !matches || !athletes) return [];
+    
+    const category = tournament.categories?.find(c => c.name === selectedCategory);
+    if (!category) return [];
+    
+    // Filtrar partidas da categoria selecionada
+    const categoryMatches = matches.filter(match => match.categoryId === category.id);
+    
+    // Verificar se é um torneio de eliminação (tem fases como semifinal e final)
+    const finalMatches = categoryMatches.filter(match => match.phase === 'final');
+    const semifinalMatches = categoryMatches.filter(match => match.phase === 'semifinal');
+    
+    if (finalMatches.length === 0) return [];
+    
+    const finalMatch = finalMatches[0];
+    if (finalMatch.status !== 'completed' || !finalMatch.winnerId) return [];
+    
+    console.log("🏆 CALCULATING PODIUM for category:", selectedCategory);
+    console.log("  - Final match:", finalMatch);
+    console.log("  - Semifinal matches:", semifinalMatches);
+    
+    const positions = [];
+    
+    // 1º lugar: vencedor da final
+    const winner = athletes.find(a => a.id === finalMatch.winnerId);
+    if (winner) {
+      positions.push({
+        playerId: winner.id,
+        playerName: winner.name,
+        photoUrl: winner.photoUrl,
+        position: 1
+      });
+    }
+    
+    // 2º lugar: perdedor da final
+    const runnerUpId = finalMatch.player1Id === finalMatch.winnerId ? finalMatch.player2Id : finalMatch.player1Id;
+    const runnerUp = athletes.find(a => a.id === runnerUpId);
+    if (runnerUp) {
+      positions.push({
+        playerId: runnerUp.id,
+        playerName: runnerUp.name,
+        photoUrl: runnerUp.photoUrl,
+        position: 2
+      });
+    }
+    
+    // 3º lugar: perdedores das semifinais (AMBOS recebem 3º lugar - regra do tênis de mesa)
+    semifinalMatches.forEach(semifinalMatch => {
+      if (semifinalMatch.status === 'completed' && semifinalMatch.winnerId) {
+        const loserId = semifinalMatch.player1Id === semifinalMatch.winnerId 
+          ? semifinalMatch.player2Id 
+          : semifinalMatch.player1Id;
+        
+        const loser = athletes.find(a => a.id === loserId);
+        if (loser) {
+          positions.push({
+            playerId: loser.id,
+            playerName: loser.name,
+            photoUrl: loser.photoUrl,
+            position: 3
+          });
+        }
+      }
+    });
+    
+    console.log("🏆 PODIUM POSITIONS:", positions);
+    return positions;
+  };
+
+  const podiumPositions = calculatePodiumPositions();
+
   // Extract filtered matches logic into useMemo to avoid JSX complexity
   const filteredMatches = useMemo(() => {
     if (!matches || matches.length === 0) return [];
@@ -299,7 +465,8 @@ export default function MatchManagementInterface({
       console.log(`🔍 Filtros aplicados: ${appliedFilters.join(' → ')} | ${matches.length} → ${filtered.length} partidas`);
     }
 
-    return filtered;
+    // 5. ORDENAÇÃO INTELIGENTE - EVITAR REPETIR O MESMO JOGADOR EM SEQUÊNCIA
+    return optimizeMatchOrder(filtered);
   }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedGender, tournament.categories, athletes, isMixedCategory]);
 
   // Calcular classificação do grupo em tempo real a partir das partidas
@@ -759,152 +926,227 @@ export default function MatchManagementInterface({
           </div>
         )}
 
-        {/* Lista de partidas existentes */}
-        {matches && matches.length > 0 && shouldShowMatches && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Partidas do Torneio</h3>
-            <div className="grid gap-4">
-              {filteredMatches.map(match => {
-                // Cast sets para tipo correto antes de usar em JSX
-                const sets = (match.sets ?? []) as Array<{ player1Score: number; player2Score: number }>;
-                
-                return (
-                  <Card key={match.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        {/* NOVA ESTRUTURA: NOMES COM PLACAR AO LADO + STATUS ABAIXO DE VS */}
-                        <div className="text-center mb-3">
-                          <div className="flex items-center justify-center gap-4 mb-1">
-                            {/* JOGADOR 1 COM PLACAR */}
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">
-                                {getPlayerName(match.player1Id) || 'Jogador 1'}
-                              </span>
-                              <PlayerScore match={match} isPlayer1={true} />
-                            </div>
-
-                            {/* VS */}
-                            <div className="text-lg font-bold text-muted-foreground">
-                              VS
-                            </div>
-
-                            {/* JOGADOR 2 COM PLACAR */}
-                            <div className="flex items-center gap-2">
-                              <PlayerScore match={match} isPlayer1={false} />
-                              <span className="font-medium">
-                                {match.player2Id ? (getPlayerName(match.player2Id) || 'Jogador 2') : '🚫 BYE'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* STATUS CENTRALIZADO ABAIXO DE VS */}
-                          <div className="mt-2">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              match.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              match.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {match.status === 'completed' ? 'Finalizada' :
-                               match.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
-                            </span>
-                          </div>
-                        </div>
-
-                      {/* PONTOS DOS SETS */}
-                      {match.status === "completed" && sets.length > 0 && (
-                        <div className="flex flex-row flex-wrap justify-center gap-1 text-xs mb-3">
-                          {sets.flatMap((set, setIndex) => [
-                            <span 
-                              key={`${setIndex}-p1`} 
-                              className="bg-orange-400 text-white px-2 py-1 rounded font-bold min-w-6 text-center"
-                              data-testid={`set-${setIndex}-player1-score`}
-                            >
-                              {set.player1Score}
-                            </span>,
-                            <span 
-                              key={`${setIndex}-p2`} 
-                              className="bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold min-w-6 text-center border"
-                              data-testid={`set-${setIndex}-player2-score`}
-                            >
-                              {set.player2Score}
-                            </span>
-                          ])}
-                        </div>
-                      )}
-
-                      {/* MESA E PARTIDA NAS EXTREMIDADES */}
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        {/* MESA (ESQUERDA) */}
+        {/* Lista de partidas existentes - ORGANIZADAS POR GRUPO */}
+        {matches && matches.length > 0 && shouldShowMatches && (() => {
+          // Função para renderizar card individual de partida
+          const renderMatchCard = (match: Match) => {
+            const sets = (match.sets ?? []) as Array<{ player1Score: number; player2Score: number }>;
+            
+            return (
+              <Card key={match.id} className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    {/* NOVA ESTRUTURA: NOMES COM PLACAR AO LADO + STATUS ABAIXO DE VS */}
+                    <div className="text-center mb-3">
+                      <div className="flex items-center justify-center gap-4 mb-1">
+                        {/* JOGADOR 1 COM PLACAR */}
                         <div className="flex items-center gap-2">
-                          <span>Mesa {match.tableNumber || 1}</span>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-6 w-6 p-0 text-xs hover:bg-orange-100"
-                            onClick={async () => {
-                              const newTable = window.prompt(`Alterar mesa (atual: Mesa ${match.tableNumber || 1}):`, `${match.tableNumber || 1}`);
-                              if (newTable && !isNaN(Number(newTable))) {
-                                try {
-                                  await apiRequest('PATCH', `/api/matches/${match.id}`, { tableNumber: Number(newTable) });
-                                  
-                                  // Invalidar cache para atualizar a lista
-                                  queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id, 'matches'] });
-                                  
-                                  toast({
-                                    title: "Mesa alterada",
-                                    description: `Partida movida para Mesa ${newTable}`,
-                                  });
-                                } catch (error) {
-                                  toast({
-                                    title: "Erro",
-                                    description: `Não foi possível alterar a mesa: ${error instanceof Error ? error.message : String(error)}`,
-                                    variant: "destructive",
-                                  });
-                                }
-                              }
-                            }}
-                            data-testid={`button-edit-table-${match.id}`}
-                          >
-                            ✏️
-                          </Button>
+                          {/* Foto do Jogador 1 */}
+                          <Avatar className="w-8 h-8">
+                            {(() => {
+                              const player = athletes?.find(a => a.id === match.player1Id);
+                              return player?.photoUrl ? (
+                                <AvatarImage 
+                                  src={player.photoUrl} 
+                                  alt={player.name}
+                                  className="object-cover"
+                                />
+                              ) : null;
+                            })()}
+                            <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                              {getPlayerName(match.player1Id)?.charAt(0).toUpperCase() || '🏓'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">
+                            {getPlayerName(match.player1Id) || 'Jogador 1'}
+                          </span>
+                          <PlayerScore match={match} isPlayer1={true} />
                         </div>
 
-                        {/* PARTIDA (DIREITA) */}
-                        <span>Partida #{match.matchNumber}</span>
+                        {/* VS */}
+                        <div className="text-lg font-bold text-muted-foreground">
+                          VS
+                        </div>
+
+                        {/* JOGADOR 2 COM PLACAR */}
+                        <div className="flex items-center gap-2">
+                          <PlayerScore match={match} isPlayer1={false} />
+                          <span className="font-medium">
+                            {match.player2Id ? (getPlayerName(match.player2Id) || 'Jogador 2') : '🚫 BYE'}
+                          </span>
+                          {/* Foto do Jogador 2 */}
+                          {match.player2Id && (
+                            <Avatar className="w-8 h-8">
+                              {(() => {
+                                const player = athletes?.find(a => a.id === match.player2Id);
+                                return player?.photoUrl ? (
+                                  <AvatarImage 
+                                    src={player.photoUrl} 
+                                    alt={player.name}
+                                    className="object-cover"
+                                  />
+                                ) : null;
+                              })()}
+                              <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-green-500 to-green-600 text-white">
+                                {getPlayerName(match.player2Id)?.charAt(0).toUpperCase() || '⚽'}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
                       </div>
-                      {/* Botão para editar placar */}
+
+                      {/* STATUS CENTRALIZADO ABAIXO DE VS */}
                       <div className="mt-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => initializeScoreEditing(match)}
-                          data-testid={`button-edit-score-${match.id}`}
-                          className="w-full"
-                        >
-                          🏓 {match.sets && Array.isArray(match.sets) && match.sets.length > 0 ? 'Editar Placar' : 'Adicionar Placar'}
-                        </Button>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          match.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          match.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {match.status === 'completed' ? 'Finalizada' :
+                           match.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
+                        </span>
                       </div>
                     </div>
-                    {match.needsAttention && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-red-600 text-sm">⚠️ Precisa atenção</span>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={(e: React.MouseEvent) => handleClearAttentionClick(e, match.id)}
-                          data-testid={`button-clear-attention-${match.id}`}
-                        >
-                          Resolver
-                        </Button>
+
+                    {/* PONTOS DOS SETS */}
+                    {match.status === "completed" && sets.length > 0 && (
+                      <div className="flex flex-row flex-wrap justify-center gap-1 text-xs mb-3">
+                        {sets.flatMap((set, setIndex) => [
+                          <span 
+                            key={`${setIndex}-p1`} 
+                            className="bg-orange-400 text-white px-2 py-1 rounded font-bold min-w-6 text-center"
+                            data-testid={`set-${setIndex}-player1-score`}
+                          >
+                            {set.player1Score}
+                          </span>,
+                          <span 
+                            key={`${setIndex}-p2`} 
+                            className="bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold min-w-6 text-center border"
+                            data-testid={`set-${setIndex}-player2-score`}
+                          >
+                            {set.player2Score}
+                          </span>
+                        ])}
                       </div>
                     )}
+
+                    {/* MESA E PARTIDA NAS EXTREMIDADES */}
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      {/* MESA (ESQUERDA) */}
+                      <div className="flex items-center gap-2">
+                        <span>Mesa {match.tableNumber || 1}</span>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-6 w-6 p-0 text-xs hover:bg-orange-100"
+                          onClick={async () => {
+                            const newTable = window.prompt(`Alterar mesa (atual: Mesa ${match.tableNumber || 1}):`, `${match.tableNumber || 1}`);
+                            if (newTable && !isNaN(Number(newTable))) {
+                              try {
+                                await apiRequest('PATCH', `/api/matches/${match.id}`, { tableNumber: Number(newTable) });
+                                
+                                // Invalidar cache para atualizar a lista
+                                queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id, 'matches'] });
+                                
+                                toast({
+                                  title: "Mesa alterada",
+                                  description: `Partida movida para Mesa ${newTable}`,
+                                });
+                              } catch (error) {
+                                toast({
+                                  title: "Erro",
+                                  description: `Não foi possível alterar a mesa: ${error instanceof Error ? error.message : String(error)}`,
+                                  variant: "destructive",
+                                });
+                              }
+                            }
+                          }}
+                          data-testid={`button-edit-table-${match.id}`}
+                        >
+                          ✏️
+                        </Button>
+                      </div>
+
+                      {/* PARTIDA (DIREITA) */}
+                      <span>Partida #{match.matchNumber}</span>
+                    </div>
+                    {/* Botão para editar placar */}
+                    <div className="mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => initializeScoreEditing(match)}
+                        data-testid={`button-edit-score-${match.id}`}
+                        className="w-full"
+                      >
+                        🏓 {match.sets && Array.isArray(match.sets) && match.sets.length > 0 ? 'Editar Placar' : 'Adicionar Placar'}
+                      </Button>
+                    </div>
+                  </div>
+                  {match.needsAttention && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-600 text-sm">⚠️ Precisa atenção</span>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={(e: React.MouseEvent) => handleClearAttentionClick(e, match.id)}
+                        data-testid={`button-clear-attention-${match.id}`}
+                      >
+                        Resolver
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </Card>
-                );
-              })}
+            );
+          };
+
+          return (
+            <div className="space-y-4">
+              {selectedPhase === 'group' ? (
+                // VISUALIZAÇÃO POR GRUPOS - FASE DE GRUPOS
+                (() => {
+                  // Agrupar partidas por grupo
+                  const matchesByGroup = new Map<string, typeof filteredMatches>();
+                  filteredMatches.forEach(match => {
+                    const group = match.groupName || 'Sem Grupo';
+                    if (!matchesByGroup.has(group)) {
+                      matchesByGroup.set(group, []);
+                    }
+                    matchesByGroup.get(group)!.push(match);
+                  });
+
+                  // Ordenar grupos alfabeticamente
+                  const sortedGroups = Array.from(matchesByGroup.keys()).sort();
+
+                  return (
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold">Partidas por Grupo</h3>
+                      {sortedGroups.map(group => (
+                        <div key={group} className="space-y-3">
+                          <h4 className="text-md font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-2 rounded-lg shadow-sm">
+                            📊 Grupo {group}
+                          </h4>
+                          <div className="grid gap-3">
+                            {matchesByGroup.get(group)!.map(match => renderMatchCard(match))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()
+              ) : (
+                // VISUALIZAÇÃO ÚNICA - OUTRAS FASES
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Partidas do Torneio</h3>
+                  <div className="grid gap-4">
+                    {filteredMatches.map(match => renderMatchCard(match))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Status messages for different tournament states */}
         {tournament.status === 'registration_open' ? (
@@ -914,19 +1156,20 @@ export default function MatchManagementInterface({
             <p className="mb-4">As partidas aparecerão aqui após o torneio ser iniciado.</p>
             <p className="text-sm">Use o botão "Iniciar Torneio" para começar a competição.</p>
           </div>
-        ) : tournament.status === 'in_progress' ? (
+        ) : (!filteredMatches || filteredMatches.length === 0) && selectedCategory ? (
           <div className="text-center p-8 text-muted-foreground">
             <span className="material-icons text-4xl mb-4 block">sports_tennis</span>
             <h3 className="text-lg font-semibold mb-2">Nenhuma partida criada</h3>
-            <p className="mb-4">O chaveamento ainda não foi gerado para este torneio.</p>
+            <p className="mb-4">O chaveamento ainda não foi gerado para esta categoria.</p>
             <p className="text-sm">Use a aba "Chaveamento" para gerar as partidas.</p>
           </div>
-        ) : (
+        ) : (!matches || matches.length === 0) && !selectedCategory ? (
           <div className="text-center p-8 text-muted-foreground">
             <span className="material-icons text-4xl mb-4 block">info</span>
             <p>Nenhuma partida encontrada para este torneio.</p>
+            <p className="text-sm">Selecione uma categoria para visualizar as partidas.</p>
           </div>
-        )}
+        ) : null}
 
         {/* Modal de Edição de Placar */}
         {editingScoreMatch && (
@@ -1066,6 +1309,80 @@ export default function MatchManagementInterface({
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* 🏆 Pódium da Categoria - Versão Fixa e Discreta */}
+        {podiumPositions.length > 0 && (
+          <Card className="mt-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950 dark:to-orange-950 border-yellow-200 dark:border-yellow-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-center text-lg font-bold text-yellow-700 dark:text-yellow-300 flex items-center justify-center gap-2">
+                <Trophy className="w-5 h-5" />
+                Pódium da Categoria: {selectedCategory}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center gap-4 sm:gap-8">
+                {/* 2º Lugar */}
+                {podiumPositions.find(p => p.position === 2) && (
+                  <div className="flex flex-col items-center">
+                    <Avatar className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-gray-400 mb-2">
+                      {podiumPositions.find(p => p.position === 2)?.photoUrl ? (
+                        <AvatarImage src={podiumPositions.find(p => p.position === 2)?.photoUrl || undefined} />
+                      ) : null}
+                      <AvatarFallback className="bg-gray-400 text-white font-bold">
+                        {podiumPositions.find(p => p.position === 2)?.playerName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="text-center">
+                      <div className="text-xs sm:text-sm font-bold text-gray-600 dark:text-gray-400">2º</div>
+                      <div className="text-sm sm:text-base font-semibold">{podiumPositions.find(p => p.position === 2)?.playerName}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 1º Lugar */}
+                {podiumPositions.find(p => p.position === 1) && (
+                  <div className="flex flex-col items-center">
+                    <div className="relative">
+                      <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-3 border-yellow-400 mb-2">
+                        {podiumPositions.find(p => p.position === 1)?.photoUrl ? (
+                          <AvatarImage src={podiumPositions.find(p => p.position === 1)?.photoUrl || undefined} />
+                        ) : null}
+                        <AvatarFallback className="bg-yellow-500 text-white font-bold text-lg sm:text-xl">
+                          {podiumPositions.find(p => p.position === 1)?.playerName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -top-2 -right-1 text-2xl">👑</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm sm:text-base font-bold text-yellow-600 dark:text-yellow-400">1º</div>
+                      <div className="text-base sm:text-lg font-bold">{podiumPositions.find(p => p.position === 1)?.playerName}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3º Lugares */}
+                <div className="flex flex-col gap-2">
+                  {podiumPositions.filter(p => p.position === 3).map((third, index) => (
+                    <div key={third.playerId} className="flex items-center gap-2">
+                      <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-amber-400">
+                        {third.photoUrl ? (
+                          <AvatarImage src={third.photoUrl} />
+                        ) : null}
+                        <AvatarFallback className="bg-amber-500 text-white font-bold text-sm">
+                          {third.playerName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-xs font-bold text-amber-600 dark:text-amber-400">3º</div>
+                        <div className="text-sm font-semibold">{third.playerName}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </CardContent>
     </Card>

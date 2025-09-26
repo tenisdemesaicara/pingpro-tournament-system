@@ -4,6 +4,14 @@
 
 PingPong Pro is a comprehensive table tennis tournament management platform built with modern web technologies. It provides tools for organizing tournaments, managing athlete registrations, tracking rankings, and facilitating community engagement around table tennis competitions. The system supports multiple tournament formats including single elimination, double elimination, round robin, and Swiss-style tournaments.
 
+### Latest Updates (September 2025)
+
+**Tournament Registration Logic Enhancement:**
+- **Online Registration**: Blocked after registration deadline or when tournament status is not 'draft' or 'registration_open'
+- **Direct Athlete Enrollment**: Only permitted when tournament is in 'paused' status and category is still in initial phase (no bracket generated)
+- **Smart BYE Detection**: Corrected logic to only mark matches as BYE when explicitly designated, preventing incorrect auto-completion of legitimate matches
+- **Bracket Visualization**: Fixed World Cup-style elimination brackets to properly separate group stage from elimination phases
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

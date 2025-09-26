@@ -1471,12 +1471,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error("Torneio não encontrado");
         }
         
+        // Verificar se torneio aceita inscrições online
         if (tournament.status === 'completed') {
           throw new Error("Este torneio já foi finalizado");
         }
         
+        if (tournament.status === 'in_progress') {
+          throw new Error("Este torneio já está em andamento e não aceita mais inscrições online");
+        }
+        
         if (tournament.registrationDeadline && new Date() > new Date(tournament.registrationDeadline)) {
           throw new Error("Prazo de inscrição expirado");
+        }
+        
+        // Verificar se status permite inscrições online (draft ou registration_open)
+        if (!['draft', 'registration_open'].includes(tournament.status)) {
+          throw new Error("Inscrições online não estão abertas para este torneio");
         }
         
         // 3. Validate category exists and belongs to tournament
@@ -1815,6 +1825,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint PÚBLICO para partidas do torneio (para cálculo de pódium)
+  app.get("/api/public/tournaments/:id/matches", async (req, res) => {
+    try {
+      console.log("=== GET PUBLIC MATCHES DEBUG ===");
+      console.log("Tournament ID for public matches:", req.params.id);
+      
+      const matches = await storage.getTournamentMatches(req.params.id);
+      console.log("Public matches found:", matches.length);
+      res.json(matches);
+    } catch (error) {
+      console.log("=== GET PUBLIC MATCHES ERROR ===");
+      console.error("Error fetching public matches:", error);
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ error: "Failed to fetch matches", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // Endpoint ADMINISTRATIVO para dados completos do torneio (protegido)
   app.get("/api/tournaments/:id", requireAuth, async (req, res) => {
     try {
@@ -2136,15 +2163,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const groupConfig = req.body.groupConfig || {};
           const numGroups = groupConfig.numGroups || Math.min(4, Math.ceil(participants.length / 4));
           const advancesPerGroup = groupConfig.advancesPerGroup || 2;
+          const bestOfSets = groupConfig.bestOfSets || 3;
           
-          console.log(`Group stage config: ${numGroups} grupos, ${advancesPerGroup} avançam por grupo`);
+          console.log(`Group stage config: ${numGroups} grupos, ${advancesPerGroup} avançam por grupo, melhor de ${bestOfSets} sets`);
           
           matches = await generateGroupStageMatches(
             req.params.id, 
             req.params.categoryId, 
             participants, 
             numGroups,
-            advancesPerGroup
+            advancesPerGroup,
+            bestOfSets
           );
           break;
           
@@ -2156,14 +2185,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case 'league_round_trip': // Liga ida e volta
           console.log(`Creating round-robin matches for format: ${format}...`);
           const isDouble = format.includes('double') || format.includes('round_trip') || req.body.isDoubleRoundRobin;
-          matches = await generateRoundRobinMatches(req.params.id, req.params.categoryId, participants, isDouble);
+          const leagueBestOfSets = req.body.groupConfig?.bestOfSets || req.body.bestOfSets || 3;
+          matches = await generateRoundRobinMatches(req.params.id, req.params.categoryId, participants, isDouble, leagueBestOfSets);
           break;
           
         case 'single_elimination':
         case 'double_elimination':
         default:
           console.log("Creating knockout elimination matches...");
-          matches = await generateKnockoutMatches(req.params.id, req.params.categoryId, participants, format);
+          const knockoutBestOfSets = req.body.groupConfig?.bestOfSets || req.body.bestOfSets || 3;
+          matches = await generateKnockoutMatches(req.params.id, req.params.categoryId, participants, format, knockoutBestOfSets);
           break;
       }
 
@@ -2426,8 +2457,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Torneio não encontrado" });
       }
 
-      if (tournament.status === 'finished') {
-        return res.status(400).json({ error: "Não é possível inscrever atletas em torneio finalizado" });
+      // Verificar se torneio permite inscrição direta (apenas se pausado)
+      if (tournament.status !== 'paused') {
+        return res.status(400).json({ 
+          error: "Inscrição direta de atletas só é permitida quando o torneio estiver pausado" 
+        });
+      }
+
+      // Verificar se ainda está na fase inicial da categoria (não pode ter chaveamento iniciado)
+      if (categoryId) {
+        const categoryMatches = await storage.getMatchesByCategory(req.params.id, categoryId);
+        if (categoryMatches.length > 0) {
+          return res.status(400).json({ 
+            error: "Não é possível inscrever atletas após o chaveamento da categoria ter sido iniciado" 
+          });
+        }
       }
 
       const enrolledAthletes = [];
@@ -3138,9 +3182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tournaments/:tournamentId/categories/:categoryId", requireAuth, async (req, res) => {
     try {
       const { tournamentId, categoryId } = req.params;
-      const { format, leagueSettings } = req.body;
+      const { format, settings } = req.body;
 
-      console.log(`📝 Atualizando formato da categoria: ${categoryId} para: ${format}`, { leagueSettings });
+      console.log(`📝 Atualizando formato da categoria: ${categoryId} para: ${format}`, { settings });
 
       if (!format) {
         return res.status(400).json({ error: "Formato é obrigatório" });
@@ -3160,22 +3204,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Categoria não encontrada no torneio" });
       }
 
-      // Preparar formato completo para Liga
-      let finalFormat = format;
-      if (format === 'league' && leagueSettings) {
-        finalFormat = leagueSettings.isRoundTrip ? 'league_round_trip' : 'league_single';
-        console.log(`🏆 Liga configurada como: ${finalFormat}`);
+      // Verificar se há chaveamento existente para esta categoria
+      const existingMatches = await storage.getMatchesByCategory(tournamentId, categoryId);
+      let bracketWasReset = false;
+
+      if (existingMatches.length > 0) {
+        console.log(`🔄 Encontradas ${existingMatches.length} partidas existentes. Resetando chaveamento...`);
+        
+        // Deletar todas as partidas da categoria pois o formato mudou
+        await storage.deleteMatchesByCategory(tournamentId, categoryId);
+        bracketWasReset = true;
+        
+        console.log(`🗑️ Chaveamento resetado! ${existingMatches.length} partidas removidas.`);
       }
 
-      // Atualizar o formato da categoria
-      const updatedCategory = await storage.updateTournamentCategory(categoryId, { format: finalFormat });
+      // Serializar configurações para JSON se fornecidas
+      const serializedSettings = settings ? JSON.stringify(settings) : null;
 
-      console.log(`✅ Formato da categoria "${category.name}" atualizado para: ${finalFormat}`);
+      // Atualizar o formato e configurações da categoria
+      const updatedCategory = await storage.updateTournamentCategory(categoryId, { 
+        format,
+        settings: serializedSettings
+      });
+
+      console.log(`✅ Formato da categoria "${category.name}" atualizado para: ${format} com configurações:`, settings);
+
+      // Mensagem personalizada baseada se houve reset do chaveamento
+      const message = bracketWasReset 
+        ? `Formato da categoria atualizado! O chaveamento foi resetado devido à mudança de formato - você pode gerar um novo chaveamento.`
+        : "Formato da categoria atualizado com sucesso";
 
       res.json({
         success: true,
-        message: "Formato da categoria atualizado com sucesso",
-        category: updatedCategory
+        message,
+        category: updatedCategory,
+        bracketWasReset // Informar frontend se houve reset
       });
 
     } catch (error) {

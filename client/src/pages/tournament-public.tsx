@@ -4,6 +4,7 @@ import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, MapPin, Trophy, Users, Clock, AlertCircle, Filter, Star, Award, Target } from "lucide-react";
 
@@ -18,7 +19,113 @@ export default function TournamentPublic() {
     enabled: !!id
   });
 
+  // Buscar partidas do torneio para cálculo do pódium
+  const { data: matches } = useQuery({
+    queryKey: ['/api/public/tournaments', id, 'matches'],
+    enabled: !!id
+  });
+
   const tournamentData = tournament as any;
+  const matchesData = matches as any[];
+
+  // Verificar se categoria selecionada é mista (DEVE VIR ANTES DOS LOGS)
+  const isSelectedCategoryMixed = useMemo(() => {
+    if (selectedCategory === 'all' || !tournamentData?.categories) return false;
+    
+    const category = tournamentData.categories.find((c: any) => c.id === selectedCategory);
+    if (!category) return false;
+    
+    const categoryName = category.name.toLowerCase();
+    return categoryName.includes('misto') || categoryName.includes('mixed') || categoryName.includes('mixto');
+  }, [selectedCategory, tournamentData?.categories]);
+
+  // 🏆 LÓGICA DO PÓDIUM - Calcular posições quando categoria está completa
+  const calculatePodiumPositions = () => {
+    if (!selectedCategory || selectedCategory === 'all' || !matchesData || !tournamentData?.participants) return [];
+    
+    const category = tournamentData.categories?.find((c: any) => c.id === selectedCategory);
+    if (!category) return [];
+    
+    // Filtrar partidas da categoria selecionada
+    const categoryMatches = matchesData.filter((match: any) => match.categoryId === category.id);
+    
+    // Verificar se é um torneio de eliminação (tem fases como semifinal e final)
+    const finalMatches = categoryMatches.filter((match: any) => match.phase === 'final');
+    const semifinalMatches = categoryMatches.filter((match: any) => match.phase === 'semifinal');
+    
+    if (finalMatches.length === 0) return [];
+    
+    const finalMatch = finalMatches[0];
+    if (finalMatch.status !== 'completed' || !finalMatch.winnerId) return [];
+    
+    const positions = [];
+    
+    // 1º lugar: vencedor da final
+    const winner = tournamentData.participants.find((p: any) => (p.athlete?.id || p.id) === finalMatch.winnerId);
+    if (winner) {
+      const winnerData = winner.athlete || winner;
+      positions.push({
+        playerId: winnerData.id,
+        playerName: winnerData.name,
+        photoUrl: winnerData.photoUrl,
+        position: 1
+      });
+    }
+    
+    // 2º lugar: perdedor da final
+    const runnerUpId = finalMatch.player1Id === finalMatch.winnerId ? finalMatch.player2Id : finalMatch.player1Id;
+    const runnerUp = tournamentData.participants.find((p: any) => (p.athlete?.id || p.id) === runnerUpId);
+    if (runnerUp) {
+      const runnerUpData = runnerUp.athlete || runnerUp;
+      positions.push({
+        playerId: runnerUpData.id,
+        playerName: runnerUpData.name,
+        photoUrl: runnerUpData.photoUrl,
+        position: 2
+      });
+    }
+    
+    // 3º lugar: perdedores das semifinais (AMBOS recebem 3º lugar - regra do tênis de mesa)
+    semifinalMatches.forEach((semifinalMatch: any) => {
+      if (semifinalMatch.status === 'completed' && semifinalMatch.winnerId) {
+        const loserId = semifinalMatch.player1Id === semifinalMatch.winnerId 
+          ? semifinalMatch.player2Id 
+          : semifinalMatch.player1Id;
+        
+        const loser = tournamentData.participants.find((p: any) => (p.athlete?.id || p.id) === loserId);
+        if (loser) {
+          const loserData = loser.athlete || loser;
+          positions.push({
+            playerId: loserData.id,
+            playerName: loserData.name,
+            photoUrl: loserData.photoUrl,
+            position: 3
+          });
+        }
+      }
+    });
+    
+    return positions;
+  };
+
+  const podiumPositions = calculatePodiumPositions();
+
+  // DEBUG: Log dos dados carregados
+  console.log("🏆 DEBUG PÁGINA PÚBLICA - VERSÃO NOVA:");
+  console.log("  - Tournament data:", tournamentData);
+  console.log("  - Matches data:", matchesData);
+  console.log("  - Selected category:", selectedCategory);
+  console.log("  - Is category mixed:", isSelectedCategoryMixed);
+  console.log("  - Podium positions:", podiumPositions);
+  
+  // FORÇAR ATUALIZAÇÃO: Verificar se categoria é mista
+  if (selectedCategory !== 'all' && tournamentData?.categories) {
+    const categoryData = tournamentData.categories.find((c: any) => c.id === selectedCategory);
+    if (categoryData) {
+      console.log("🔍 CATEGORIA SELECIONADA:", categoryData.name);
+      console.log("🔍 CONTÉM 'MISTO':", categoryData.name.toLowerCase().includes('misto'));
+    }
+  }
 
   // Filtrar participantes
   const filteredParticipants = useMemo(() => {
@@ -282,6 +389,89 @@ export default function TournamentPublic() {
             </Card>
           )}
 
+          {/* 🏆 PÓDIUM DA CATEGORIA - FORÇADO PARA APARECER */}
+          {(() => {
+            console.log("🏆 VERIFICAÇÃO PÓDIUM FORÇADA:", {
+              podiumLength: podiumPositions.length,
+              selectedCategory,
+              matchesCount: matchesData?.length || 0,
+              hasMatches: !!matchesData,
+              hasTournament: !!tournamentData
+            });
+            return podiumPositions.length > 0;
+          })() && (
+            <Card className="bg-gradient-to-r from-yellow-50/10 to-orange-50/10 dark:from-yellow-950/10 dark:to-orange-950/10 border-yellow-200/30 dark:border-yellow-800/30 backdrop-blur-lg">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-center text-xl font-bold text-yellow-400 dark:text-yellow-300 flex items-center justify-center gap-2">
+                  <Trophy className="w-6 h-6" />
+                  🏆 Pódium da Categoria: {tournamentData.categories?.find((c: any) => c.id === selectedCategory)?.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center gap-4 sm:gap-8">
+                  {/* 2º Lugar */}
+                  {podiumPositions.find((p: any) => p.position === 2) && (
+                    <div className="flex flex-col items-center">
+                      <Avatar className="w-14 h-14 sm:w-18 sm:h-18 border-2 border-gray-400 mb-2">
+                        {podiumPositions.find((p: any) => p.position === 2)?.photoUrl ? (
+                          <AvatarImage src={podiumPositions.find((p: any) => p.position === 2)?.photoUrl || undefined} />
+                        ) : null}
+                        <AvatarFallback className="bg-gray-400 text-white font-bold">
+                          {podiumPositions.find((p: any) => p.position === 2)?.playerName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-center">
+                        <div className="text-sm sm:text-base font-bold text-gray-300 dark:text-gray-400">2º</div>
+                        <div className="text-sm sm:text-base font-semibold text-white">{podiumPositions.find((p: any) => p.position === 2)?.playerName}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 1º Lugar */}
+                  {podiumPositions.find((p: any) => p.position === 1) && (
+                    <div className="flex flex-col items-center">
+                      <div className="relative">
+                        <Avatar className="w-18 h-18 sm:w-24 sm:h-24 border-3 border-yellow-400 mb-2">
+                          {podiumPositions.find((p: any) => p.position === 1)?.photoUrl ? (
+                            <AvatarImage src={podiumPositions.find((p: any) => p.position === 1)?.photoUrl || undefined} />
+                          ) : null}
+                          <AvatarFallback className="bg-yellow-500 text-white font-bold text-lg sm:text-2xl">
+                            {podiumPositions.find((p: any) => p.position === 1)?.playerName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -top-2 -right-1 text-3xl">👑</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base sm:text-lg font-bold text-yellow-400 dark:text-yellow-400">1º</div>
+                        <div className="text-lg sm:text-xl font-bold text-white">{podiumPositions.find((p: any) => p.position === 1)?.playerName}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3º Lugares */}
+                  <div className="flex flex-col gap-3">
+                    {podiumPositions.filter((p: any) => p.position === 3).map((third: any, index: number) => (
+                      <div key={third.playerId} className="flex items-center gap-2">
+                        <Avatar className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-amber-400">
+                          {third.photoUrl ? (
+                            <AvatarImage src={third.photoUrl} />
+                          ) : null}
+                          <AvatarFallback className="bg-amber-500 text-white font-bold text-sm">
+                            {third.playerName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="text-xs font-bold text-amber-400 dark:text-amber-400">3º</div>
+                          <div className="text-sm font-semibold text-white">{third.playerName}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Filters Section */}
           <Card className="bg-white/5 backdrop-blur-lg border-white/10">
             <CardHeader>
@@ -291,6 +481,16 @@ export default function TournamentPublic() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* ⚠️ DEBUG: Mostrando se categoria é mista */}
+              {selectedCategory !== 'all' && (
+                <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
+                  <div className="text-sm text-yellow-400">
+                    <strong>🔍 DEBUG:</strong> Categoria: {tournamentData?.categories?.find((c: any) => c.id === selectedCategory)?.name || selectedCategory} | 
+                    É mista: <strong>{isSelectedCategoryMixed ? 'SIM' : 'NÃO'}</strong> | 
+                    Pódium: <strong>{podiumPositions.length > 0 ? `${podiumPositions.length} posições` : 'Nenhuma'}</strong>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-white/70 mb-2 block">Categoria</label>
@@ -308,19 +508,35 @@ export default function TournamentPublic() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <label className="text-sm text-white/70 mb-2 block">Gênero</label>
-                  <Select value={selectedGender} onValueChange={setSelectedGender}>
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                      <SelectValue placeholder="Todos os gêneros" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-gray-700">
-                      <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
-                      <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
-                      <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* 🚫 FILTRO DE GÊNERO OCULTO PARA CATEGORIAS MISTAS */}
+                {(() => {
+                  // Verificação dupla se categoria é mista
+                  const categoryData = tournamentData?.categories?.find((c: any) => c.id === selectedCategory);
+                  const isMixed = categoryData?.name?.toLowerCase().includes('misto') || 
+                                  categoryData?.name?.toLowerCase().includes('mixed') ||
+                                  categoryData?.name?.toLowerCase().includes('mixto');
+                  console.log("🔥 FORÇANDO VERIFICAÇÃO MISTA:", {
+                    selectedCategory,
+                    categoryName: categoryData?.name,
+                    isMixed,
+                    isSelectedCategoryMixed
+                  });
+                  return !isMixed;
+                })() && (
+                  <div>
+                    <label className="text-sm text-white/70 mb-2 block">Gênero</label>
+                    <Select value={selectedGender} onValueChange={setSelectedGender}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectValue placeholder="Todos os gêneros" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-700">
+                        <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
+                        <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
+                        <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
               <div className="mt-4 text-sm text-white/60">
                 Mostrando {filteredParticipants.length} de {tournamentData.participants?.length || 0} participantes

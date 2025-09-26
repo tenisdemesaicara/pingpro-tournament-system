@@ -634,12 +634,12 @@ export default function CategoryBracketManagement({ tournament }: CategoryBracke
           />
         ) : (
           <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold pointer-events-none flex-shrink-0">
-            {playerName ? playerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : (position === 'player1' ? 'J1' : 'J2')}
+            {playerName ? playerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : (position === 'player1' ? '🏓' : '⚽')}
           </div>
         )}
         <div className="min-w-0 flex-1 pointer-events-none overflow-hidden">
           <div className="text-xs lg:text-sm font-medium truncate">
-            {playerName || (position === 'player1' ? 'J1' : 'J2')}
+            {playerName || (position === 'player1' ? 'Aguardando...' : 'Aguardando...')}
           </div>
           {(playerCity || playerState) && (
             <div className="text-xs text-muted-foreground truncate hidden lg:block">

@@ -312,6 +312,18 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
     queryKey: [`/api/tournaments/${tournamentId}/categories/${categoryId}/bracket`],
   });
 
+  // Buscar dados dos atletas para obter nomes reais
+  const { data: athletes } = useQuery({
+    queryKey: ['/api/public/athletes'],
+  });
+
+  // Função para obter nome do jogador
+  const getPlayerName = (playerId?: string | null) => {
+    if (!playerId) return null;
+    const athlete = (athletes as any[])?.find((a: any) => a.id === playerId);
+    return athlete?.name || null;
+  };
+
   // Normalizar dados do bracket para evitar erros de console
   const normalizedBracketData = bracketData ? {
     ...bracketData,
@@ -469,7 +481,7 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
                                 <Badge variant={playerIndex < 2 ? "default" : "secondary"} className="w-6 h-6 p-0 flex items-center justify-center text-xs">
                                   {player.position}
                                 </Badge>
-                                <span className="font-medium truncate">Jogador {player.playerId.slice(0, 8)}</span>
+                                <span className="font-medium truncate">{getPlayerName(player.playerId) || `Jogador ${player.playerId.slice(0, 8)}`}</span>
                               </div>
                               <div className="text-right">
                                 <div className="font-medium">{player.points}pts</div>
