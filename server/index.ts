@@ -217,11 +217,22 @@ app.post('/api/warmup', async (req, res) => {
     throw err;
   });
 
-  if (app.get("env") === "development") {
-    // Import dinâmico do vite apenas em desenvolvimento
-    const { setupVite } = await import("./vite");
-    await setupVite(app, server);
+  // Apenas usar Vite em desenvolvimento, senão usar arquivos estáticos
+  const isDev = process.env.NODE_ENV === "development";
+  
+  if (isDev) {
+    try {
+      // Usar uma variável para evitar que esbuild resolva a dependência
+      const viteModulePath = [".", "vite"].join("/");
+      const viteModule = await import(viteModulePath);
+      await viteModule.setupVite(app, server);
+      console.log('🚀 Vite development server ativo');
+    } catch (error) {
+      console.warn('⚠️ Vite não disponível, fallback para arquivos estáticos:', error instanceof Error ? error.message : error);
+      serveStatic(app);
+    }
   } else {
+    console.log('📰 Servindo arquivos estáticos em produção');
     serveStatic(app);
   }
 
