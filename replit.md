@@ -138,21 +138,32 @@ npm run auto-deploy
 
 ### Manual Deployment Commands
 
-**Deploy Rápido (Recomendado):**
+**Deploy Inteligente (Recomendado):**
+```bash
+node smart-deploy.js
+```
+- **🤖 Detecção automática**: Descobre arquivos modificados via SHA comparison
+- **📦 Batching inteligente**: Agrupa arquivos por prioridade e tamanho
+- **⚡ Sem rate limiting**: Delays apropriados e exponential backoff
+- **🎯 Deploy completo**: Envia todas as mudanças (adds/updates/deletes)
+- **🔄 Idempotente**: Pode reexecutar com segurança
+- **Exemplo**: 10 arquivos deployados em 1 batch (3 novos, 1 atualizado, 6 deletados)
+
+**Deploy Rápido (Limitado):**
 ```bash
 node simple-deploy.js
 ```
-- Deploy apenas dos arquivos modificados críticos
-- Evita rate limiting com delay entre requisições
-- Mais rápido e eficiente para mudanças pequenas
+- Deploy apenas de 2 arquivos específicos hardcoded
+- ⚠️ **ATENÇÃO**: Pode perder outras modificações importantes
+- Apenas para emergências em arquivos específicos
 
-**Deploy Completo:**
+**Deploy API Completo:**
 ```bash
 node api-deploy.js
 ```
 - Deploy de todos os arquivos do projeto (201 arquivos)
-- Pode enfrentar rate limiting em deploys muito grandes
-- Recomendado para mudanças extensas
+- Pode enfrentar rate limiting com muitos arquivos
+- Cria 1 blob por arquivo (200+ API calls)
 
 **Deploy Automático:**
 ```bash
