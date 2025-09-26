@@ -135,3 +135,29 @@ npm run auto-deploy
 - Console shows deployment status and timestamps
 - Production URL: https://pingpro.onrender.com
 - Build logs available in Render dashboard
+
+### Manual Deployment Commands
+
+**Deploy Rápido (Recomendado):**
+```bash
+node simple-deploy.js
+```
+- Deploy apenas dos arquivos modificados críticos
+- Evita rate limiting com delay entre requisições
+- Mais rápido e eficiente para mudanças pequenas
+
+**Deploy Completo:**
+```bash
+node api-deploy.js
+```
+- Deploy de todos os arquivos do projeto (201 arquivos)
+- Pode enfrentar rate limiting em deploys muito grandes
+- Recomendado para mudanças extensas
+
+**Deploy Automático:**
+```bash
+node auto-deploy.js
+```
+- Monitora mudanças em tempo real
+- Deploy automático após 3 segundos de inatividade
+- Útil durante desenvolvimento ativo
