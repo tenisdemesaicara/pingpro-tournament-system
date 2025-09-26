@@ -47,8 +47,9 @@ function log(message) {
 }
 
 function computeGitBlobSHA(content) {
-  const header = `blob ${Buffer.byteLength(content, 'utf8')}\0`;
-  const fullContent = Buffer.concat([Buffer.from(header), Buffer.from(content, 'utf8')]);
+  const contentBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+  const header = `blob ${contentBuffer.length}\0`;
+  const fullContent = Buffer.concat([Buffer.from(header), contentBuffer]);
   return createHash('sha1').update(fullContent).digest('hex');
 }
 
@@ -124,14 +125,16 @@ function detectChanges(localFiles, remoteTree) {
   localFiles.forEach(filePath => {
     if (!existsSync(filePath)) return;
     
-    const content = readFileSync(filePath, 'utf8');
+    // Detectar se é arquivo binário pela extensão
+    const isBinary = /\.(png|jpg|jpeg|gif|ico|pdf|zip|tar|gz|mp4|mov|avi)$/i.test(filePath);
+    const content = readFileSync(filePath, isBinary ? null : 'utf8');
     const localSha = computeGitBlobSHA(content);
     const remoteSha = remoteTree[filePath];
     
     if (!remoteSha) {
-      changes.adds.push({ path: filePath, content });
+      changes.adds.push({ path: filePath, content, isBinary });
     } else if (localSha !== remoteSha) {
-      changes.updates.push({ path: filePath, content });
+      changes.updates.push({ path: filePath, content, isBinary });
     }
   });
 
@@ -176,7 +179,7 @@ function createBatches(changes, maxFilesPerBatch = 50, maxSizePerBatch = 2.5 * 1
   let currentSize = 0;
 
   changes.forEach(change => {
-    const size = change.content ? Buffer.byteLength(change.content, 'utf8') : 0;
+    const size = change.content ? (Buffer.isBuffer(change.content) ? change.content.length : Buffer.byteLength(change.content, 'utf8')) : 0;
     
     // GitHub tem limite de 100MB por arquivo, vamos usar um limite razoável de 10MB
     if (size > 10 * 1024 * 1024) {
@@ -212,12 +215,22 @@ async function deployBatch(octokit, owner, repo, batch, parentSha, batchIndex) {
   const tree = batch.map(change => {
     if (change.content) {
       // Add ou update
-      return {
+      const entry = {
         path: change.path,
         mode: '100644',
-        type: 'blob',
-        content: change.content
+        type: 'blob'
       };
+      
+      if (change.isBinary) {
+        // Para arquivos binários, usar content base64
+        entry.content = change.content.toString('base64');
+        entry.encoding = 'base64';
+      } else {
+        // Para arquivos texto, usar content normal
+        entry.content = change.content;
+      }
+      
+      return entry;
     } else {
       // Delete
       return {
