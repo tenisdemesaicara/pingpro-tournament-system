@@ -178,9 +178,9 @@ function createBatches(changes, maxFilesPerBatch = 50, maxSizePerBatch = 2.5 * 1
   changes.forEach(change => {
     const size = change.content ? Buffer.byteLength(change.content, 'utf8') : 0;
     
-    // Verificar se arquivo é muito grande (limit 1MB)
-    if (size > 1024 * 1024) {
-      log(`⚠️ Arquivo muito grande ignorado: ${change.path} (${(size / 1024 / 1024).toFixed(2)}MB)`);
+    // GitHub tem limite de 100MB por arquivo, vamos usar um limite razoável de 10MB
+    if (size > 10 * 1024 * 1024) {
+      log(`⚠️ Arquivo muito grande ignorado: ${change.path} (${(size / 1024 / 1024).toFixed(2)}MB) - Limite: 10MB`);
       return;
     }
 
