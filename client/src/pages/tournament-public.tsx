@@ -186,14 +186,14 @@ export default function TournamentPublic() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center text-white">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center text-slate-800 dark:text-white">
           <div className="relative">
-            <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-6"></div>
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-purple-400 rounded-full animate-ping mx-auto"></div>
+            <div className="w-16 h-16 border-4 border-slate-300/50 dark:border-white/30 border-t-slate-600 dark:border-t-white rounded-full animate-spin mx-auto mb-6"></div>
+            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-blue-500 dark:border-t-purple-400 rounded-full animate-ping mx-auto"></div>
           </div>
           <h2 className="text-2xl font-bold mb-2">Carregando Torneio</h2>
-          <p className="text-white/70">Aguarde enquanto carregamos as informações...</p>
+          <p className="text-slate-600 dark:text-white/70">Aguarde enquanto carregamos as informações...</p>
         </div>
       </div>
     );
@@ -232,7 +232,7 @@ export default function TournamentPublic() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-purple-900 dark:to-slate-900">
       {/* Hero Section Impactante */}
       <div className="relative overflow-hidden">
         {/* Background Pattern */}
@@ -389,94 +389,12 @@ export default function TournamentPublic() {
             </Card>
           )}
 
-          {/* 🏆 PÓDIUM DA CATEGORIA - FORÇADO PARA APARECER */}
-          {(() => {
-            console.log("🏆 VERIFICAÇÃO PÓDIUM FORÇADA:", {
-              podiumLength: podiumPositions.length,
-              selectedCategory,
-              matchesCount: matchesData?.length || 0,
-              hasMatches: !!matchesData,
-              hasTournament: !!tournamentData
-            });
-            return podiumPositions.length > 0;
-          })() && (
-            <Card className="bg-gradient-to-r from-yellow-50/10 to-orange-50/10 dark:from-yellow-950/10 dark:to-orange-950/10 border-yellow-200/30 dark:border-yellow-800/30 backdrop-blur-lg">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-center text-xl font-bold text-yellow-400 dark:text-yellow-300 flex items-center justify-center gap-2">
-                  <Trophy className="w-6 h-6" />
-                  🏆 Pódium da Categoria: {tournamentData.categories?.find((c: any) => c.id === selectedCategory)?.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center gap-4 sm:gap-8">
-                  {/* 2º Lugar */}
-                  {podiumPositions.find((p: any) => p.position === 2) && (
-                    <div className="flex flex-col items-center">
-                      <Avatar className="w-14 h-14 sm:w-18 sm:h-18 border-2 border-gray-400 mb-2">
-                        {podiumPositions.find((p: any) => p.position === 2)?.photoUrl ? (
-                          <AvatarImage src={podiumPositions.find((p: any) => p.position === 2)?.photoUrl || undefined} />
-                        ) : null}
-                        <AvatarFallback className="bg-gray-400 text-white font-bold">
-                          {podiumPositions.find((p: any) => p.position === 2)?.playerName.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="text-center">
-                        <div className="text-sm sm:text-base font-bold text-gray-300 dark:text-gray-400">2º</div>
-                        <div className="text-sm sm:text-base font-semibold text-white">{podiumPositions.find((p: any) => p.position === 2)?.playerName}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 1º Lugar */}
-                  {podiumPositions.find((p: any) => p.position === 1) && (
-                    <div className="flex flex-col items-center">
-                      <div className="relative">
-                        <Avatar className="w-18 h-18 sm:w-24 sm:h-24 border-3 border-yellow-400 mb-2">
-                          {podiumPositions.find((p: any) => p.position === 1)?.photoUrl ? (
-                            <AvatarImage src={podiumPositions.find((p: any) => p.position === 1)?.photoUrl || undefined} />
-                          ) : null}
-                          <AvatarFallback className="bg-yellow-500 text-white font-bold text-lg sm:text-2xl">
-                            {podiumPositions.find((p: any) => p.position === 1)?.playerName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -top-2 -right-1 text-3xl">👑</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-base sm:text-lg font-bold text-yellow-400 dark:text-yellow-400">1º</div>
-                        <div className="text-lg sm:text-xl font-bold text-white">{podiumPositions.find((p: any) => p.position === 1)?.playerName}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3º Lugares */}
-                  <div className="flex flex-col gap-3">
-                    {podiumPositions.filter((p: any) => p.position === 3).map((third: any, index: number) => (
-                      <div key={third.playerId} className="flex items-center gap-2">
-                        <Avatar className="w-12 h-12 sm:w-14 sm:h-14 border-2 border-amber-400">
-                          {third.photoUrl ? (
-                            <AvatarImage src={third.photoUrl} />
-                          ) : null}
-                          <AvatarFallback className="bg-amber-500 text-white font-bold text-sm">
-                            {third.playerName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="text-xs font-bold text-amber-400 dark:text-amber-400">3º</div>
-                          <div className="text-sm font-semibold text-white">{third.playerName}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Filters Section */}
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+          <Card className="bg-white/90 dark:bg-white/5 backdrop-blur-lg border-slate-200 dark:border-white/10 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-xl text-white flex items-center gap-3">
-                <Filter className="w-5 h-5 text-purple-400" />
+              <CardTitle className="text-xl text-slate-800 dark:text-white flex items-center gap-3">
+                <Filter className="w-5 h-5 text-blue-500 dark:text-purple-400" />
                 Filtrar Participantes
               </CardTitle>
             </CardHeader>
@@ -493,9 +411,9 @@ export default function TournamentPublic() {
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-white/70 mb-2 block">Categoria</label>
+                  <label className="text-sm text-slate-600 dark:text-white/70 mb-2 block">Categoria</label>
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                    <SelectTrigger className="bg-white dark:bg-white/10 border-slate-300 dark:border-white/20 text-slate-800 dark:text-white">
                       <SelectValue placeholder="Todas as categorias" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-900 border-gray-700">
@@ -524,9 +442,9 @@ export default function TournamentPublic() {
                   return !isMixed;
                 })() && (
                   <div>
-                    <label className="text-sm text-white/70 mb-2 block">Gênero</label>
+                    <label className="text-sm text-slate-600 dark:text-white/70 mb-2 block">Gênero</label>
                     <Select value={selectedGender} onValueChange={setSelectedGender}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <SelectTrigger className="bg-white dark:bg-white/10 border-slate-300 dark:border-white/20 text-slate-800 dark:text-white">
                         <SelectValue placeholder="Todos os gêneros" />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-900 border-gray-700">
@@ -538,19 +456,113 @@ export default function TournamentPublic() {
                   </div>
                 )}
               </div>
-              <div className="mt-4 text-sm text-white/60">
+              <div className="mt-4 text-sm text-slate-600 dark:text-white/60">
                 Mostrando {filteredParticipants.length} de {tournamentData.participants?.length || 0} participantes
               </div>
             </CardContent>
           </Card>
 
+          {/* 🏆 PÓDIUM DA CATEGORIA - APARECE APÓS SELECIONAR CATEGORIA */}
+          {podiumPositions.length > 0 && (
+            <Card className="bg-gradient-to-r from-amber-50/95 to-yellow-50/95 dark:from-amber-900/50 dark:to-yellow-900/50 border-amber-300 dark:border-amber-600 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-center text-2xl font-bold text-amber-800 dark:text-amber-200 flex items-center justify-center gap-3">
+                  <Trophy className="w-7 h-7 text-amber-600" />
+                  🏆 Pódium da Categoria: {tournamentData.categories?.find((c: any) => c.id === selectedCategory)?.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-6">
+                <div className="flex items-end justify-center gap-6 sm:gap-12">
+                  {/* 2º Lugar */}
+                  {podiumPositions.find((p: any) => p.position === 2) && (
+                    <div className="flex flex-col items-center">
+                      <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-3 border-gray-500 mb-3">
+                        {podiumPositions.find((p: any) => p.position === 2)?.photoUrl ? (
+                          <AvatarImage src={podiumPositions.find((p: any) => p.position === 2)?.photoUrl || undefined} />
+                        ) : null}
+                        <AvatarFallback className="bg-gray-500 text-white font-bold text-xl">
+                          {podiumPositions.find((p: any) => p.position === 2)?.playerName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-center bg-gray-100 dark:bg-gray-700 px-4 py-6 rounded-t-lg min-h-[80px] flex flex-col justify-end">
+                        <div className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1">2º</div>
+                        <div className="text-base font-semibold text-gray-800 dark:text-gray-200">{podiumPositions.find((p: any) => p.position === 2)?.playerName}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 1º Lugar */}
+                  {podiumPositions.find((p: any) => p.position === 1) && (
+                    <div className="flex flex-col items-center">
+                      <div className="relative">
+                        <Avatar className="w-20 h-20 sm:w-24 sm:h-24 border-4 border-yellow-400 mb-3">
+                          {podiumPositions.find((p: any) => p.position === 1)?.photoUrl ? (
+                            <AvatarImage src={podiumPositions.find((p: any) => p.position === 1)?.photoUrl || undefined} />
+                          ) : null}
+                          <AvatarFallback className="bg-yellow-500 text-white font-bold text-2xl">
+                            {podiumPositions.find((p: any) => p.position === 1)?.playerName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -top-3 -right-2 text-4xl">👑</div>
+                      </div>
+                      <div className="text-center bg-yellow-200 dark:bg-yellow-700 px-6 py-8 rounded-t-lg min-h-[100px] flex flex-col justify-end">
+                        <div className="text-xl font-bold text-yellow-800 dark:text-yellow-200 mb-1">1º</div>
+                        <div className="text-lg font-bold text-yellow-900 dark:text-yellow-100">{podiumPositions.find((p: any) => p.position === 1)?.playerName}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3º Lugar (só o primeiro, mais destacado) */}
+                  {podiumPositions.find((p: any) => p.position === 3) && (
+                    <div className="flex flex-col items-center">
+                      <Avatar className="w-14 h-14 sm:w-18 sm:h-18 border-3 border-amber-500 mb-3">
+                        {podiumPositions.find((p: any) => p.position === 3)?.photoUrl ? (
+                          <AvatarImage src={podiumPositions.find((p: any) => p.position === 3)?.photoUrl} />
+                        ) : null}
+                        <AvatarFallback className="bg-amber-500 text-white font-bold text-lg">
+                          {podiumPositions.find((p: any) => p.position === 3)?.playerName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-center bg-amber-100 dark:bg-amber-700 px-4 py-5 rounded-t-lg min-h-[60px] flex flex-col justify-end">
+                        <div className="text-base font-bold text-amber-700 dark:text-amber-300 mb-1">3º</div>
+                        <div className="text-sm font-semibold text-amber-800 dark:text-amber-200">{podiumPositions.find((p: any) => p.position === 3)?.playerName}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Segundo 3º lugar se existir */}
+                {podiumPositions.filter((p: any) => p.position === 3).length > 1 && (
+                  <div className="mt-6 pt-4 border-t border-amber-300 dark:border-amber-600">
+                    <div className="flex justify-center">
+                      <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-900/30 px-6 py-3 rounded-lg">
+                        <Avatar className="w-12 h-12 border-2 border-amber-500">
+                          {podiumPositions.filter((p: any) => p.position === 3)[1]?.photoUrl ? (
+                            <AvatarImage src={podiumPositions.filter((p: any) => p.position === 3)[1]?.photoUrl} />
+                          ) : null}
+                          <AvatarFallback className="bg-amber-500 text-white font-bold">
+                            {podiumPositions.filter((p: any) => p.position === 3)[1]?.playerName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="text-sm font-bold text-amber-700 dark:text-amber-300">3º lugar</div>
+                          <div className="text-base font-semibold text-amber-800 dark:text-amber-200">{podiumPositions.filter((p: any) => p.position === 3)[1]?.playerName}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Participants Section */}
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+          <Card className="bg-white/90 dark:bg-white/5 backdrop-blur-lg border-slate-200 dark:border-white/10 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-2xl text-white flex items-center gap-3">
-                <Users className="w-6 h-6 text-purple-400" />
+              <CardTitle className="text-2xl text-slate-800 dark:text-white flex items-center gap-3">
+                <Users className="w-6 h-6 text-blue-500 dark:text-purple-400" />
                 Participantes Inscritos
-                <Badge variant="secondary" className="bg-purple-500/20 text-purple-300 border-purple-400/30">
+                <Badge variant="secondary" className="bg-blue-500/20 dark:bg-purple-500/20 text-blue-700 dark:text-purple-300 border-blue-400/30 dark:border-purple-400/30">
                   {filteredParticipants.length}
                 </Badge>
               </CardTitle>
@@ -568,9 +580,9 @@ export default function TournamentPublic() {
                     
                     return (
                       <div key={category.id} className="space-y-4">
-                        <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                          <Award className="w-5 h-5 text-purple-400" />
-                          <h3 className="text-xl font-semibold text-white">{category.name}</h3>
+                        <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-white/10">
+                          <Award className="w-5 h-5 text-blue-500 dark:text-purple-400" />
+                          <h3 className="text-xl font-semibold text-slate-800 dark:text-white">{category.name}</h3>
                           <Badge variant="outline" className="border-purple-400/30 text-purple-300">
                             {participantsInCategory.length} atletas
                           </Badge>
@@ -748,28 +760,49 @@ export default function TournamentPublic() {
                       Próximas Partidas
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[
-                        { player1: "Rafael Nunes", player2: "Gabriel Costa", time: "14:30", table: "Mesa 1" },
-                        { player1: "Fernanda Lima", player2: "Beatriz Silva", time: "14:45", table: "Mesa 2" },
-                        { player1: "Lucas Santos", player2: "Mateus Alves", time: "15:00", table: "Mesa 1" },
-                        { player1: "Patricia Souza", player2: "Camila Rocha", time: "15:15", table: "Mesa 2" }
-                      ].map((match, index) => (
-                        <div key={index} className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-400/30 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30 text-xs">
-                              {match.time}
-                            </Badge>
-                            <Badge variant="outline" className="border-purple-400/30 text-purple-300 text-xs">
-                              {match.table}
-                            </Badge>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-semibold text-white text-sm">{match.player1}</div>
-                            <div className="text-white/50 text-xs my-1">vs</div>
-                            <div className="font-semibold text-white text-sm">{match.player2}</div>
-                          </div>
-                        </div>
-                      ))}
+                      {(() => {
+                        // Filtrar apenas partidas reais que ainda não começaram
+                        const upcomingMatches = matchesData?.filter((match: any) => 
+                          match.status === 'pending' && 
+                          match.scheduledTime &&
+                          new Date(match.scheduledTime) > new Date()
+                        ) || [];
+                        
+                        if (upcomingMatches.length === 0) {
+                          return (
+                            <div className="col-span-full text-center py-8">
+                              <Clock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                              <p className="text-white/70 text-lg">Nenhuma partida agendada no momento.</p>
+                              <p className="text-white/50 text-sm mt-2">As próximas partidas aparecerão aqui quando forem programadas.</p>
+                            </div>
+                          );
+                        }
+                        
+                        return upcomingMatches.slice(0, 4).map((match: any, index: number) => {
+                          const player1 = tournamentData.participants?.find((p: any) => (p.athlete?.id || p.id) === match.player1Id);
+                          const player2 = tournamentData.participants?.find((p: any) => (p.athlete?.id || p.id) === match.player2Id);
+                          const player1Name = player1?.athlete?.name || player1?.name || 'Jogador 1';
+                          const player2Name = player2?.athlete?.name || player2?.name || 'Jogador 2';
+                          
+                          return (
+                            <div key={match.id} className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-400/30 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30 text-xs">
+                                  {new Date(match.scheduledTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </Badge>
+                                <Badge variant="outline" className="border-purple-400/30 text-purple-300 text-xs">
+                                  {match.tableNumber ? `Mesa ${match.tableNumber}` : 'Mesa TBD'}
+                                </Badge>
+                              </div>
+                              <div className="text-center">
+                                <div className="font-semibold text-white text-sm">{player1Name}</div>
+                                <div className="text-white/50 text-xs my-1">vs</div>
+                                <div className="font-semibold text-white text-sm">{player2Name}</div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 </div>
