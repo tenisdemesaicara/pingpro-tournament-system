@@ -15,3 +15,28 @@ export const pool = new Pool({
 });
 
 export const db = drizzle(pool, { schema });
+
+// Função para aguardar BD estar pronto com retry exponencial
+export async function waitForDb(): Promise<void> {
+  const maxRetries = 10;
+  const baseDelay = 1000; // 1 segundo
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔍 Tentativa ${attempt}/${maxRetries}: Verificando conexão com BD...`);
+      await pool.query('SELECT 1');
+      console.log('✅ BD conectado com sucesso!');
+      return;
+    } catch (error) {
+      const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+      console.warn(`⚠️ BD não disponível (tentativa ${attempt}/${maxRetries}):`, error instanceof Error ? error.message : error);
+      
+      if (attempt === maxRetries) {
+        throw new Error(`Falha ao conectar ao BD após ${maxRetries} tentativas: ${error instanceof Error ? error.message : error}`);
+      }
+      
+      console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}

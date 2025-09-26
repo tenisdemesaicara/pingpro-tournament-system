@@ -8,7 +8,7 @@ import { createDefaultPasswords } from "./auth";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import onHeaders from "on-headers";
-import { pool } from "./db";
+import { pool, waitForDb } from "./db";
 import { startSelfPing } from "./self-ping";
 
 // Show dynamic login info on startup
@@ -66,15 +66,19 @@ const sessionConfig: any = {
   }
 };
 
-// Use PostgreSQL session store in production
+// Use PostgreSQL session store in production (com fallback)
 if (isProduction) {
-  const PgStore = ConnectPgSimple(session);
-  sessionConfig.store = new PgStore({
-    pool: pool, // Use database pool
-    tableName: 'session', // Session table name
-    createTableIfMissing: true // Auto-create session table
-  });
-  console.log('🔒 Using PostgreSQL session store for production');
+  try {
+    const PgStore = ConnectPgSimple(session);
+    sessionConfig.store = new PgStore({
+      pool: pool, // Use database pool
+      tableName: 'session', // Session table name
+      createTableIfMissing: true // Auto-create session table
+    });
+    console.log('🔒 PostgreSQL session store configurado (aguardando BD...)');
+  } catch (error) {
+    console.warn('⚠️ Falha ao configurar PostgreSQL session store, usando MemoryStore temporariamente:', error);
+  }
 } else {
   console.log('🔒 Using MemoryStore for development');
 }
@@ -179,8 +183,23 @@ app.post('/api/warmup', async (req, res) => {
 });
 
 (async () => {
+  // Aguardar BD estar pronto antes de qualquer operação
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      console.log('🔄 Aguardando BD estar pronto...');
+      await waitForDb();
+    } catch (error) {
+      console.error('❌ ERRO CRÍTICO: BD não disponível após todas as tentativas:', error);
+      process.exit(1);
+    }
+  }
+  
   // Mostrar credenciais administrativas
-  await createDefaultPasswords();
+  try {
+    await createDefaultPasswords();
+  } catch (error) {
+    console.error('⚠️ Erro ao criar senhas padrão (continuando...):', error);
+  }
 
   // Serve uploaded files (favicon, etc.) in both development and production
   const uploadsPath = path.join(process.cwd(), 'client', 'public', 'uploads');
