@@ -1885,7 +1885,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedData = tournamentRegistrationSchema.parse(req.body);
         console.log("✅ Input validation passed");
         
-        const { tournamentId, category: categoryId, technicalCategory: technicalCategoryId, athleteId, consentData, ...athleteData } = validatedData;
+        // Convert empty strings to undefined for optional category fields
+        const { tournamentId, category: rawCategory, technicalCategory: rawTechnicalCategory, athleteId, consentData, ...athleteData } = validatedData;
+        const categoryId = rawCategory && rawCategory !== '' ? rawCategory : undefined;
+        const technicalCategoryId = rawTechnicalCategory && rawTechnicalCategory !== '' ? rawTechnicalCategory : undefined;
         
         // 2. Validate tournament exists and is accepting registrations
         console.log(`🏆 Validating tournament ${tournamentId}...`);
