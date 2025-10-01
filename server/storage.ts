@@ -1,4 +1,4 @@
-import { type Athlete, type InsertAthlete, type Tournament, type InsertTournament, type TournamentParticipant, type InsertTournamentParticipant, type TournamentParticipantWithAthlete, type Match, type InsertMatch, type Community, type InsertCommunity, type Category, type InsertCategory, type TournamentWithParticipants, type Payment, type InsertPayment, type Revenue, type InsertRevenue, type Expense, type InsertExpense, type RankingSeason, type InsertRankingSeason, type Consent, type InsertConsent, type ExternalLink, type InsertExternalLink, type Asset, type InsertAsset, type SystemSetting, type InsertSystemSetting, athletes, tournaments, tournamentParticipants, matches, communities, categories, tournamentCategories, payments, revenues, expenses, rankingSeasons, consents, externalLinks, assets, systemSettings } from "@shared/schema";
+import { type Athlete, type InsertAthlete, type Tournament, type InsertTournament, type TournamentParticipant, type InsertTournamentParticipant, type TournamentParticipantWithAthlete, type Match, type InsertMatch, type Community, type InsertCommunity, type Category, type InsertCategory, type TournamentWithParticipants, type Payment, type InsertPayment, type Revenue, type InsertRevenue, type Expense, type InsertExpense, type RankingSeason, type InsertRankingSeason, type Consent, type InsertConsent, type ExternalLink, type InsertExternalLink, type Asset, type InsertAsset, type SystemSetting, type InsertSystemSetting, type Team, type InsertTeam, type TeamMember, type InsertTeamMember, type TournamentTeam, type InsertTournamentTeam, type TeamTie, type InsertTeamTie, athletes, tournaments, tournamentParticipants, matches, communities, categories, tournamentCategories, payments, revenues, expenses, rankingSeasons, consents, externalLinks, assets, systemSettings, teams, teamMembers, tournamentTeams, teamTies } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, desc, asc, and, or, sql } from "drizzle-orm";
@@ -116,6 +116,40 @@ export interface IStorage {
   getAllSystemSettings(): Promise<any[]>;
   createOrUpdateSystemSetting(key: string, value?: string, fileUrl?: string, description?: string, category?: string): Promise<any>;
   deleteSystemSetting(key: string): Promise<boolean>;
+
+  // Teams
+  getTeam(id: string): Promise<Team | undefined>;
+  getAllTeams(): Promise<Team[]>;
+  createTeam(team: InsertTeam): Promise<Team>;
+  updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team | undefined>;
+  deleteTeam(id: string): Promise<boolean>;
+
+  // Team Members
+  getTeamMember(id: string): Promise<TeamMember | undefined>;
+  getTeamMembers(teamId: string): Promise<TeamMember[]>;
+  createTeamMember(member: InsertTeamMember): Promise<TeamMember>;
+  updateTeamMember(id: string, member: Partial<InsertTeamMember>): Promise<TeamMember | undefined>;
+  deleteTeamMember(id: string): Promise<boolean>;
+  getTeamMembersWithAthletes(teamId: string): Promise<(TeamMember & { athlete: Athlete })[]>;
+
+  // Tournament Teams
+  getTournamentTeam(id: string): Promise<TournamentTeam | undefined>;
+  getTournamentTeams(tournamentId: string, categoryId?: string): Promise<TournamentTeam[]>;
+  createTournamentTeam(tournamentTeam: InsertTournamentTeam): Promise<TournamentTeam>;
+  updateTournamentTeam(id: string, tournamentTeam: Partial<InsertTournamentTeam>): Promise<TournamentTeam | undefined>;
+  deleteTournamentTeam(id: string): Promise<boolean>;
+  getTeamsByTournamentCategory(tournamentId: string, categoryId: string): Promise<(TournamentTeam & { team: Team })[]>;
+
+  // Team Ties
+  getTeamTie(id: string): Promise<TeamTie | undefined>;
+  getTeamTies(tournamentId: string, categoryId?: string): Promise<TeamTie[]>;
+  createTeamTie(tie: InsertTeamTie): Promise<TeamTie>;
+  updateTeamTie(id: string, tie: Partial<InsertTeamTie>): Promise<TeamTie | undefined>;
+  deleteTeamTie(id: string): Promise<boolean>;
+  getTiesByCategoryPhase(tournamentId: string, categoryId: string, phase: string): Promise<TeamTie[]>;
+  updateTieScoreFromChildMatches(tieId: string): Promise<TeamTie | undefined>;
+  computeTeamGroupStandings(tournamentId: string, categoryId: string): Promise<{group: string, standings: any[]}[]>;
+  createTieWithChildren(tie: InsertTeamTie, matches: InsertMatch[]): Promise<{ tie: TeamTie, matches: Match[] }>;
 }
 
 // Implementação simplificada
@@ -215,11 +249,28 @@ export class DatabaseStorage implements IStorage {
           await db.insert(categories).values(newCategory);
           
           // Associar categoria ao torneio
+          const categoryFormat = categoryData.format || tournamentData.format || 'single_elimination';
+          
+          // Preparar configurações específicas para formatos de equipe
+          let categorySettings: any = null;
+          if (categoryFormat === 'team_round_robin' || categoryFormat === 'team_group_knockout') {
+            categorySettings = {
+              format: categoryFormat,
+              maxBoards: tournamentData.teamMembersPerTeam || 7,
+              pairingMode: tournamentData.teamPairingMode || 'ordered',
+              pointsPerWin: tournamentData.pointsPerWin || 1,
+              bestOfSets: tournamentData.bestOfSetsTeam || 3,
+              numGroups: categoryFormat === 'team_round_robin' ? 1 : 2,
+              advancesPerGroup: categoryFormat === 'team_group_knockout' ? 2 : undefined
+            };
+          }
+          
           const tournamentCategory = {
             id: randomUUID(),
             tournamentId: newTournament.id,
             categoryId: newCategory.id,
-            format: categoryData.format || tournamentData.format || 'single_elimination',
+            format: categoryFormat,
+            settings: categorySettings ? JSON.stringify(categorySettings) : null,
             maxParticipants: categoryData.participantLimit || null,
           };
           
@@ -479,8 +530,9 @@ export class DatabaseStorage implements IStorage {
       technicalCategoryId: tournamentParticipants.technicalCategoryId,
       // status: tournamentParticipants.status, // Campo não existe na tabela atual
       seed: tournamentParticipants.seed,
-      // Dados do atleta
-      athleteId: athletes.id,
+      // Dados do atleta - CORREÇÃO CRÍTICA: usar athleteId como id principal
+      id: athletes.id, // ✅ ID correto do atleta para o frontend
+      athleteId: athletes.id, // Mantido para compatibilidade
       name: athletes.name,
       email: athletes.email,
       phone: athletes.phone,
@@ -511,7 +563,7 @@ export class DatabaseStorage implements IStorage {
     .where(eq(tournamentParticipants.tournamentId, tournamentId));
     
     return results.map(result => ({
-      id: result.participantId,
+      id: result.id, // ✅ CORREÇÃO CRÍTICA: usar ID correto do atleta
       categoryId: result.categoryId,
       // status: result.status, // Campo não existe
       seed: result.seed,
@@ -1600,6 +1652,396 @@ export class DatabaseStorage implements IStorage {
   async deleteSystemSetting(key: string): Promise<boolean> {
     await db.delete(systemSettings).where(eq(systemSettings.key, key));
     return true;
+  }
+
+  // ===============================
+  // TEAM MANAGEMENT METHODS  
+  // ===============================
+
+  // Teams
+  async getTeam(id: string): Promise<Team | undefined> {
+    const results = await db.select().from(teams).where(eq(teams.id, id));
+    return results[0];
+  }
+
+  async getAllTeams(): Promise<Team[]> {
+    return await db.select().from(teams).orderBy(asc(teams.name));
+  }
+
+  async createTeam(team: InsertTeam): Promise<Team> {
+    try {
+      const newTeam = { ...team, id: randomUUID() };
+      await db.insert(teams).values(newTeam);
+      return newTeam as Team;
+    } catch (error) {
+      console.error("Error in createTeam:", error);
+      throw error;
+    }
+  }
+
+  async updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team | undefined> {
+    try {
+      await db.update(teams).set(team).where(eq(teams.id, id));
+      return await this.getTeam(id);
+    } catch (error) {
+      console.error("Error in updateTeam:", error);
+      throw error;
+    }
+  }
+
+  async deleteTeam(id: string): Promise<boolean> {
+    try {
+      // Primeiro, remover todos os membros da equipe
+      await db.delete(teamMembers).where(eq(teamMembers.teamId, id));
+      // Depois, remover a equipe
+      await db.delete(teams).where(eq(teams.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error in deleteTeam:", error);
+      return false;
+    }
+  }
+
+  // Team Members
+  async getTeamMember(id: string): Promise<TeamMember | undefined> {
+    const results = await db.select().from(teamMembers).where(eq(teamMembers.id, id));
+    return results[0];
+  }
+
+  async getTeamMembers(teamId: string): Promise<TeamMember[]> {
+    return await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId)).orderBy(asc(teamMembers.boardOrder));
+  }
+
+  async createTeamMember(member: InsertTeamMember): Promise<TeamMember> {
+    try {
+      const newMember = { ...member, id: randomUUID() };
+      await db.insert(teamMembers).values(newMember);
+      return newMember as TeamMember;
+    } catch (error) {
+      console.error("Error in createTeamMember:", error);
+      throw error;
+    }
+  }
+
+  async updateTeamMember(id: string, member: Partial<InsertTeamMember>): Promise<TeamMember | undefined> {
+    try {
+      await db.update(teamMembers).set(member).where(eq(teamMembers.id, id));
+      return await this.getTeamMember(id);
+    } catch (error) {
+      console.error("Error in updateTeamMember:", error);
+      throw error;
+    }
+  }
+
+  async deleteTeamMember(id: string): Promise<boolean> {
+    try {
+      await db.delete(teamMembers).where(eq(teamMembers.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error in deleteTeamMember:", error);
+      return false;
+    }
+  }
+
+  async getTeamMembersWithAthletes(teamId: string): Promise<(TeamMember & { athlete: Athlete })[]> {
+    try {
+      console.log("\ud83d\udd0d DEBUG STORAGE - getTeamMembersWithAthletes teamId:", teamId);
+      
+      // Primeiro, verificar quantos membros existem para a equipe
+      const rawMembers = await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
+      console.log("\ud83d\udd0d DEBUG STORAGE - Membros na tabela team_members:", rawMembers.length);
+      console.log("\ud83d\udd0d DEBUG STORAGE - Dados dos membros:", JSON.stringify(rawMembers, null, 2));
+      
+      const results = await db
+        .select({
+          id: teamMembers.id,
+          teamId: teamMembers.teamId,
+          athleteId: teamMembers.athleteId,
+          boardOrder: teamMembers.boardOrder,
+          isCaptain: teamMembers.isCaptain,
+          createdAt: teamMembers.createdAt,
+          athlete: athletes
+        })
+        .from(teamMembers)
+        .innerJoin(athletes, eq(teamMembers.athleteId, athletes.id))
+        .where(eq(teamMembers.teamId, teamId))
+        .orderBy(asc(teamMembers.boardOrder));
+      
+      console.log("\ud83d\udd0d DEBUG STORAGE - Resultado do JOIN:", results.length);
+      console.log("\ud83d\udd0d DEBUG STORAGE - Dados do JOIN:", JSON.stringify(results, null, 2));
+      
+      return results as (TeamMember & { athlete: Athlete })[];
+    } catch (error) {
+      console.error("\u274c Error in getTeamMembersWithAthletes:", error);
+      throw error;
+    }
+  }
+
+  // Tournament Teams
+  async getTournamentTeam(id: string): Promise<TournamentTeam | undefined> {
+    const results = await db.select().from(tournamentTeams).where(eq(tournamentTeams.id, id));
+    return results[0];
+  }
+
+  async getTournamentTeams(tournamentId: string, categoryId?: string): Promise<TournamentTeam[]> {
+    let query = db.select().from(tournamentTeams).where(eq(tournamentTeams.tournamentId, tournamentId));
+    
+    if (categoryId) {
+      query = query.where(and(eq(tournamentTeams.tournamentId, tournamentId), eq(tournamentTeams.categoryId, categoryId)));
+    }
+    
+    return await query.orderBy(asc(tournamentTeams.registeredAt));
+  }
+
+  async createTournamentTeam(tournamentTeam: InsertTournamentTeam): Promise<TournamentTeam> {
+    try {
+      const newTournamentTeam = { ...tournamentTeam, id: randomUUID() };
+      await db.insert(tournamentTeams).values(newTournamentTeam);
+      return newTournamentTeam as TournamentTeam;
+    } catch (error) {
+      console.error("Error in createTournamentTeam:", error);
+      throw error;
+    }
+  }
+
+  async updateTournamentTeam(id: string, tournamentTeam: Partial<InsertTournamentTeam>): Promise<TournamentTeam | undefined> {
+    try {
+      await db.update(tournamentTeams).set(tournamentTeam).where(eq(tournamentTeams.id, id));
+      return await this.getTournamentTeam(id);
+    } catch (error) {
+      console.error("Error in updateTournamentTeam:", error);
+      throw error;
+    }
+  }
+
+  async deleteTournamentTeam(id: string): Promise<boolean> {
+    try {
+      await db.delete(tournamentTeams).where(eq(tournamentTeams.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error in deleteTournamentTeam:", error);
+      return false;
+    }
+  }
+
+  async getTeamsByTournamentCategory(tournamentId: string, categoryId: string): Promise<(TournamentTeam & { team: Team })[]> {
+    try {
+      const results = await db
+        .select({
+          id: tournamentTeams.id,
+          tournamentId: tournamentTeams.tournamentId,
+          categoryId: tournamentTeams.categoryId,
+          teamId: tournamentTeams.teamId,
+          groupLabel: tournamentTeams.groupLabel,
+          seed: tournamentTeams.seed,
+          registeredAt: tournamentTeams.registeredAt,
+          team: teams
+        })
+        .from(tournamentTeams)
+        .innerJoin(teams, eq(tournamentTeams.teamId, teams.id))
+        .where(and(eq(tournamentTeams.tournamentId, tournamentId), eq(tournamentTeams.categoryId, categoryId)))
+        .orderBy(asc(tournamentTeams.registeredAt));
+      
+      return results as (TournamentTeam & { team: Team })[];
+    } catch (error) {
+      console.error("Error in getTeamsByTournamentCategory:", error);
+      throw error;
+    }
+  }
+
+  // Team Ties  
+  async getTeamTie(id: string): Promise<TeamTie | undefined> {
+    const results = await db.select().from(teamTies).where(eq(teamTies.id, id));
+    return results[0];
+  }
+
+  async getTeamTies(tournamentId: string, categoryId?: string): Promise<TeamTie[]> {
+    let query = db.select().from(teamTies).where(eq(teamTies.tournamentId, tournamentId));
+    
+    if (categoryId) {
+      query = query.where(and(eq(teamTies.tournamentId, tournamentId), eq(teamTies.categoryId, categoryId)));
+    }
+    
+    return await query.orderBy(asc(teamTies.createdAt));
+  }
+
+  async createTeamTie(tie: InsertTeamTie): Promise<TeamTie> {
+    try {
+      const newTie = { ...tie, id: randomUUID() };
+      await db.insert(teamTies).values(newTie);
+      return newTie as TeamTie;
+    } catch (error) {
+      console.error("Error in createTeamTie:", error);
+      throw error;
+    }
+  }
+
+  async updateTeamTie(id: string, tie: Partial<InsertTeamTie>): Promise<TeamTie | undefined> {
+    try {
+      await db.update(teamTies).set(tie).where(eq(teamTies.id, id));
+      return await this.getTeamTie(id);
+    } catch (error) {
+      console.error("Error in updateTeamTie:", error);
+      throw error;
+    }
+  }
+
+  async deleteTeamTie(id: string): Promise<boolean> {
+    try {
+      // Remove matches relacionadas primeiro
+      await db.delete(matches).where(eq(matches.tieId, id));
+      // Remove o confronto
+      await db.delete(teamTies).where(eq(teamTies.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error in deleteTeamTie:", error);
+      return false;
+    }
+  }
+
+  async getTiesByCategoryPhase(tournamentId: string, categoryId: string, phase: string): Promise<TeamTie[]> {
+    return await db
+      .select()
+      .from(teamTies)
+      .where(and(
+        eq(teamTies.tournamentId, tournamentId),
+        eq(teamTies.categoryId, categoryId),
+        eq(teamTies.phase, phase)
+      ))
+      .orderBy(asc(teamTies.round));
+  }
+
+  async updateTieScoreFromChildMatches(tieId: string): Promise<TeamTie | undefined> {
+    try {
+      // Buscar todas as partidas relacionadas ao confronto
+      const tieMatches = await db.select().from(matches).where(eq(matches.tieId, tieId));
+      
+      // Buscar dados do confronto
+      const tie = await this.getTeamTie(tieId);
+      if (!tie) return undefined;
+
+      let team1Points = 0;
+      let team2Points = 0;
+
+      // Calcular pontos baseado nas vitórias
+      for (const match of tieMatches) {
+        if (match.status === 'completed' && match.winnerId) {
+          // Verificar qual equipe o vencedor pertence
+          const team1Members = await db.select().from(teamMembers).where(eq(teamMembers.teamId, tie.team1Id));
+          const team2Members = await db.select().from(teamMembers).where(eq(teamMembers.teamId, tie.team2Id));
+          
+          const isTeam1Winner = team1Members.some(member => member.athleteId === match.winnerId);
+          const isTeam2Winner = team2Members.some(member => member.athleteId === match.winnerId);
+          
+          if (isTeam1Winner) {
+            team1Points += tie.pointsPerWin;
+          } else if (isTeam2Winner) {
+            team2Points += tie.pointsPerWin;
+          }
+        }
+      }
+
+      // Determinar vencedor
+      let winnerTeamId: string | null = null;
+      if (team1Points > team2Points) {
+        winnerTeamId = tie.team1Id;
+      } else if (team2Points > team1Points) {
+        winnerTeamId = tie.team2Id;
+      }
+
+      // Atualizar confronto
+      const updatedTie = await this.updateTeamTie(tieId, {
+        team1Points,
+        team2Points,
+        winnerTeamId,
+        status: winnerTeamId ? 'completed' : 'in_progress'
+      });
+
+      return updatedTie;
+    } catch (error) {
+      console.error("Error in updateTieScoreFromChildMatches:", error);
+      throw error;
+    }
+  }
+
+  async computeTeamGroupStandings(tournamentId: string, categoryId: string): Promise<{group: string, standings: any[]}[]> {
+    try {
+      // Buscar todos os confrontos da fase de grupos
+      const groupTies = await this.getTiesByCategoryPhase(tournamentId, categoryId, 'group');
+      
+      // Agrupar por grupo
+      const groups = [...new Set(groupTies.map(tie => tie.groupLabel).filter(Boolean))];
+      
+      const result = [];
+      
+      for (const group of groups) {
+        const groupTiesFiltered = groupTies.filter(tie => tie.groupLabel === group);
+        const teamStats: { [teamId: string]: any } = {};
+        
+        // Inicializar stats das equipes
+        for (const tie of groupTiesFiltered) {
+          if (!teamStats[tie.team1Id]) {
+            teamStats[tie.team1Id] = { teamId: tie.team1Id, played: 0, won: 0, lost: 0, pointsFor: 0, pointsAgainst: 0 };
+          }
+          if (!teamStats[tie.team2Id]) {
+            teamStats[tie.team2Id] = { teamId: tie.team2Id, played: 0, won: 0, lost: 0, pointsFor: 0, pointsAgainst: 0 };
+          }
+        }
+        
+        // Processar confrontos completos
+        for (const tie of groupTiesFiltered) {
+          if (tie.status === 'completed') {
+            teamStats[tie.team1Id].played += 1;
+            teamStats[tie.team2Id].played += 1;
+            teamStats[tie.team1Id].pointsFor += tie.team1Points;
+            teamStats[tie.team1Id].pointsAgainst += tie.team2Points;
+            teamStats[tie.team2Id].pointsFor += tie.team2Points;
+            teamStats[tie.team2Id].pointsAgainst += tie.team1Points;
+            
+            if (tie.winnerTeamId === tie.team1Id) {
+              teamStats[tie.team1Id].won += 1;
+              teamStats[tie.team2Id].lost += 1;
+            } else if (tie.winnerTeamId === tie.team2Id) {
+              teamStats[tie.team2Id].won += 1;
+              teamStats[tie.team1Id].lost += 1;
+            }
+          }
+        }
+        
+        // Ordenar por vitórias, depois por diferença de pontos
+        const standings = Object.values(teamStats).sort((a: any, b: any) => {
+          if (b.won !== a.won) return b.won - a.won;
+          return (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst);
+        });
+        
+        result.push({ group, standings });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error("Error in computeTeamGroupStandings:", error);
+      throw error;
+    }
+  }
+
+  async createTieWithChildren(tie: InsertTeamTie, matches: InsertMatch[]): Promise<{ tie: TeamTie, matches: Match[] }> {
+    try {
+      // Criar o confronto
+      const createdTie = await this.createTeamTie(tie);
+      
+      // Criar as partidas filhas com tieId
+      const matchesWithTieId = matches.map(match => ({
+        ...match,
+        tieId: createdTie.id
+      }));
+      
+      const createdMatches = await this.createMatchesBulk(matchesWithTieId);
+      
+      return { tie: createdTie, matches: createdMatches };
+    } catch (error) {
+      console.error("Error in createTieWithChildren:", error);
+      throw error;
+    }
   }
 }
 

@@ -18,10 +18,16 @@ import ScoringSystemExplanation from "@/components/scoring-system-explanation";
 import CategoryBracketManagement from "@/components/category-bracket-management";
 import DirectEnrollmentInterface from "@/components/direct-enrollment-interface";
 import ParticipantsWithFilters from "@/components/participants-with-filters";
+import TeamManagement from "@/components/team-management";
 
 export default function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  
+  // Verificar se há uma aba específica na URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get('tab') || 'overview';
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Fetch tournament data
   const { data: tournament, isLoading: tournamentLoading, isError: tournamentError } = useQuery<TournamentWithParticipants>({
@@ -282,9 +288,17 @@ export default function TournamentDetail() {
             <div>
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground break-words" data-testid="tournament-name">
-                    {tournament.name}
-                  </h1>
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground break-words" data-testid="tournament-name">
+                      {tournament.name}
+                    </h1>
+                    {/* Badge para torneios por equipe */}
+                    {(tournament.format === 'team_round_robin' || tournament.format === 'team_group_knockout') && (
+                      <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 font-semibold px-3 py-1 text-sm">
+                        🏆 Por Equipes
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-sm md:text-base text-muted-foreground mt-1" data-testid="tournament-organizer">
                     Organizado por {tournament.organizer}
                   </p>
@@ -378,7 +392,7 @@ export default function TournamentDetail() {
         </div>
 
         {/* Tabs - Design melhorado para mobile */}
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="overflow-x-auto">
             <TabsList className="inline-flex h-12 w-max min-w-full items-center justify-start rounded-lg bg-muted p-1 text-muted-foreground mb-6">
               <TabsTrigger 
@@ -397,6 +411,18 @@ export default function TournamentDetail() {
                 <span className="material-icons text-base mr-1 md:mr-2">group</span>
                 <span className="text-xs md:text-sm">Participantes</span>
               </TabsTrigger>
+              
+              {/* Aba de Equipes - apenas para torneios por equipe */}
+              {tournament && (tournament.format === 'team_round_robin' || tournament.format === 'team_group_knockout') && (
+                <TabsTrigger 
+                  value="teams" 
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm min-w-[100px] md:min-w-[120px]"
+                  data-testid="tab-teams"
+                >
+                  <span className="material-icons text-base mr-1 md:mr-2">groups</span>
+                  <span className="text-xs md:text-sm">Equipes</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger 
                 value="registration" 
                 className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm min-w-[100px] md:min-w-[120px]"
@@ -484,6 +510,58 @@ export default function TournamentDetail() {
               athletes={athletes || []}
             />
           </TabsContent>
+
+          {/* Aba de Gestão de Equipes - apenas para torneios por equipe */}
+          {tournament && (tournament.format === 'team_round_robin' || tournament.format === 'team_group_knockout') && (
+            <TabsContent value="teams" className="mt-6">
+              {(() => {
+                const categories = tournament.categories || [];
+                
+                // Se não há categorias, mostrar mensagem
+                if (categories.length === 0) {
+                  return (
+                    <Card>
+                      <CardContent className="p-6 text-center">
+                        <p className="text-muted-foreground">
+                          Este torneio ainda não possui categorias configuradas. 
+                          Configure as categorias na aba "Detalhes" para poder gerenciar equipes.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                
+                // Se há apenas uma categoria, usar automaticamente
+                if (categories.length === 1) {
+                  return (
+                    <TeamManagement 
+                      tournamentId={tournament.id}
+                      categoryId={categories[0].id}
+                    />
+                  );
+                }
+                
+                // Se há múltiplas categorias, mostrar seletor (implementar futuramente)
+                return (
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <p className="text-muted-foreground">
+                        Este torneio possui múltiplas categorias. 
+                        O seletor de categoria para gestão de equipes será implementado em breve.
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                        {categories.map((category) => (
+                          <Badge key={category.id} variant="secondary">
+                            {category.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </TabsContent>
+          )}
 
           <TabsContent value="registration" className="mt-6">
             <PublicRegistrationLinks 

@@ -74,7 +74,9 @@ export const tournamentFormats = z.enum([
   "swiss",
   "league",
   "cup",
-  "group_stage_knockout"
+  "group_stage_knockout",
+  "team_round_robin",
+  "team_group_knockout"
 ]);
 
 // Configurações específicas por formato
@@ -122,6 +124,23 @@ export const formatSettings = z.discriminatedUnion("format", [
     advancesPerGroup: z.number().min(1).max(4).default(2),
     groupBestOfSets: z.number().min(1).max(9).default(3),
     koBestOfSets: z.number().min(1).max(9).default(3)
+  }),
+  z.object({
+    format: z.literal("team_round_robin"),
+    numGroups: z.number().min(1).max(8).default(1),
+    maxBoards: z.number().min(1).max(15).default(7),
+    pairingMode: z.enum(["ordered", "snake", "all_pairs"]).default("ordered"),
+    pointsPerWin: z.number().min(1).max(5).default(1),
+    bestOfSets: z.number().min(1).max(9).default(3)
+  }),
+  z.object({
+    format: z.literal("team_group_knockout"),
+    numGroups: z.number().min(2).max(8).default(2),
+    advancesPerGroup: z.number().min(1).max(4).default(2),
+    maxBoards: z.number().min(1).max(15).default(7),
+    pairingMode: z.enum(["ordered", "snake", "all_pairs"]).default("ordered"),
+    pointsPerWin: z.number().min(1).max(5).default(1),
+    bestOfSets: z.number().min(1).max(9).default(3)
   })
 ]);
 
@@ -144,6 +163,10 @@ export const getDefaultFormatSettings = (format: string): FormatSettings => {
       return { format: "cup", bestOfSets: 3, thirdPlaceMatch: false, seeding: "random" };
     case "group_stage_knockout":
       return { format: "group_stage_knockout", numGroups: 2, advancesPerGroup: 2, groupBestOfSets: 3, koBestOfSets: 3 };
+    case "team_round_robin":
+      return { format: "team_round_robin", numGroups: 1, maxBoards: 7, pairingMode: "ordered", pointsPerWin: 1, bestOfSets: 3 };
+    case "team_group_knockout":
+      return { format: "team_group_knockout", numGroups: 2, advancesPerGroup: 2, maxBoards: 7, pairingMode: "ordered", pointsPerWin: 1, bestOfSets: 3 };
     default:
       return { format: "single_elimination", bestOfSets: 3, thirdPlaceMatch: false, seeding: "random" };
   }
@@ -200,6 +223,68 @@ export const matches = pgTable("matches", {
   player2Source: text("player2_source"), // "2º B", "Vencedor Partida #4", etc.
   nextMatchId: varchar("next_match_id"), // ID da próxima partida onde o vencedor vai
   nextMatchSlot: integer("next_match_slot"), // 1 ou 2 - qual slot o vencedor ocupará na próxima partida
+  
+  // CAMPOS PARA TORNEIOS POR EQUIPE
+  tieId: varchar("tie_id"), // ID do confronto entre equipes (opcional)
+});
+
+// Equipes
+export const teams = pgTable("teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  club: text("club"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Membros das equipes
+export const teamMembers = pgTable("team_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").notNull(),
+  athleteId: varchar("athlete_id").notNull(),
+  boardOrder: integer("board_order").notNull(), // Ordem no tabuleiro (1, 2, 3...)
+  isCaptain: boolean("is_captain").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueTeamAthlete: unique().on(table.teamId, table.athleteId),
+  uniqueTeamBoard: unique().on(table.teamId, table.boardOrder),
+}));
+
+// Inscrições de equipes em torneios
+export const tournamentTeams = pgTable("tournament_teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").notNull(),
+  categoryId: varchar("category_id").notNull(),
+  teamId: varchar("team_id").notNull(),
+  groupLabel: text("group_label"), // A, B, C, etc. para grupos
+  seed: integer("seed"),
+  registeredAt: timestamp("registered_at").defaultNow(),
+}, (table) => ({
+  uniqueTournamentCategoryTeam: unique().on(table.tournamentId, table.categoryId, table.teamId),
+}));
+
+// Confrontos entre equipes (ties)
+export const teamTies = pgTable("team_ties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").notNull(),
+  categoryId: varchar("category_id").notNull(),
+  phase: text("phase").notNull(), // group, knockout
+  round: integer("round"),
+  tieNumber: integer("tie_number"), // Número do confronto na fase
+  groupLabel: text("group_label"), // A, B, C, etc. para fase de grupos
+  team1Id: varchar("team1_id").notNull(),
+  team2Id: varchar("team2_id").notNull(),
+  status: text("status").default("pending"), // pending, in_progress, completed
+  team1Points: integer("team1_points").default(0),
+  team2Points: integer("team2_points").default(0),
+  maxBoards: integer("max_boards").notNull(), // Número máximo de tabuleiros
+  pointsPerWin: integer("points_per_win").default(1), // Pontos por vitória individual
+  bestOfSets: integer("best_of_sets").default(3), // Melhor de X sets para partidas individuais
+  winnerTeamId: varchar("winner_team_id"),
+  scheduledAt: timestamp("scheduled_at"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Categorias
@@ -261,6 +346,12 @@ export const insertTournamentSchema = createInsertSchema(tournaments).omit({
   registrationDeadline: z.string().optional().transform((val) => val ? new Date(val) : undefined),
   startDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
   endDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
+  
+  // Configurações específicas para torneios por equipe
+  teamPairingMode: z.enum(["ordered", "snake", "all_pairs"]).optional(),
+  teamMembersPerTeam: z.number().min(1).max(15).optional(),
+  pointsPerWin: z.number().min(1).max(5).optional(),
+  bestOfSetsTeam: z.number().min(1).max(9).optional(),
   // Categorias a serem criadas junto com o torneio
   categories: z.array(z.object({
     name: z.string(),
@@ -293,6 +384,27 @@ export const insertMatchSchema = createInsertSchema(matches).omit({
 export const insertCommunitySchema = createInsertSchema(communities).omit({
   id: true,
   memberCount: true,
+  createdAt: true,
+});
+
+// Esquemas para equipes
+export const insertTeamSchema = createInsertSchema(teams).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTournamentTeamSchema = createInsertSchema(tournamentTeams).omit({
+  id: true,
+  registeredAt: true,
+});
+
+export const insertTeamTieSchema = createInsertSchema(teamTies).omit({
+  id: true,
   createdAt: true,
 });
 
@@ -421,6 +533,19 @@ export type Community = typeof communities.$inferSelect;
 
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
+
+// Tipos para equipes
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type Team = typeof teams.$inferSelect;
+
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+export type TeamMember = typeof teamMembers.$inferSelect;
+
+export type InsertTournamentTeam = z.infer<typeof insertTournamentTeamSchema>;
+export type TournamentTeam = typeof tournamentTeams.$inferSelect;
+
+export type InsertTeamTie = z.infer<typeof insertTeamTieSchema>;
+export type TeamTie = typeof teamTies.$inferSelect;
 
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;

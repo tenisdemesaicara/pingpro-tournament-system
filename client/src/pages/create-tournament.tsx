@@ -69,6 +69,8 @@ export default function CreateTournament() {
   const categories = Array.from(uniqueCategories.values());
 
 
+  const [tournamentMode, setTournamentMode] = useState<"individual" | "team">("individual");
+  
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -119,7 +121,13 @@ export default function CreateTournament() {
       quarterfinalistPoints: 10,
       
       customFormula: "",
-    }
+    },
+    
+    // Configurações específicas para torneios por equipe
+    teamPairingMode: "ordered", // 'ordered', 'snake', 'all_pairs'
+    teamMembersPerTeam: 3,
+    pointsPerWin: 1,
+    bestOfSetsTeam: 3
   });
 
   const createTournamentMutation = useMutation({
@@ -128,12 +136,22 @@ export default function CreateTournament() {
       return response.json();
     },
     onSuccess: (tournament: any) => {
+      const isTeamTournament = tournament.format === 'team_round_robin' || tournament.format === 'team_group_knockout';
+      
       toast({
         title: "Sucesso!",
-        description: "Torneio criado com sucesso!",
+        description: isTeamTournament 
+          ? "Torneio por equipe criado! Agora você pode gerenciar suas equipes." 
+          : "Torneio criado com sucesso!",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
-      setLocation(`/tournaments/${tournament.id}`);
+      
+      // Redirecionar para a aba adequada
+      if (isTeamTournament) {
+        setLocation(`/tournaments/${tournament.id}?tab=teams`);
+      } else {
+        setLocation(`/tournaments/${tournament.id}`);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -348,7 +366,7 @@ export default function CreateTournament() {
     });
   };
 
-  const formatOptions = [
+  const individualFormats = [
     { value: "single_elimination", label: "Eliminação Simples", description: "Eliminação imediata após uma derrota" },
     { value: "double_elimination", label: "Eliminação Dupla", description: "Segunda chance para todos os participantes" },
     { value: "round_robin", label: "Todos contra Todos", description: "Cada participante enfrenta todos os outros" },
@@ -357,6 +375,13 @@ export default function CreateTournament() {
     { value: "group_stage_knockout", label: "Grupos + Eliminatórias", description: "Fase de grupos seguida de mata-mata" },
     { value: "custom", label: "Personalizado", description: "Formato personalizado definido pelo organizador" },
   ];
+
+  const teamFormats = [
+    { value: "team_round_robin", label: "Todos contra Todos", description: "Cada equipe enfrenta todas as outras equipes" },
+    { value: "team_group_knockout", label: "Grupos + Eliminatórias", description: "Fase de grupos seguida de mata-mata entre equipes" },
+  ];
+
+  const formatOptions = tournamentMode === "team" ? teamFormats : individualFormats;
 
   const rankingFormulaOptions = [
     { value: "linear", label: "Linear", description: "Multiplicador linear baseado na diferença de ranking" },
@@ -549,9 +574,72 @@ export default function CreateTournament() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Formato do Torneio</CardTitle>
+                  <CardTitle>Tipo de Competição</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
+                  {/* Toggle entre Individual e Equipe */}
+                  <div className="space-y-3">
+                    <Label>Modalidade</Label>
+                    <div className="flex items-center space-x-4 p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="individual-mode"
+                          name="tournament-mode"
+                          checked={tournamentMode === "individual"}
+                          onChange={() => {
+                            setTournamentMode("individual");
+                            setFormData({...formData, format: "single_elimination"});
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="individual-mode" className="text-sm font-medium cursor-pointer">
+                          🏃 Individual
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="team-mode"
+                          name="tournament-mode"
+                          checked={tournamentMode === "team"}
+                          onChange={() => {
+                            setTournamentMode("team");
+                            setFormData({...formData, format: "team_round_robin"});
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="team-mode" className="text-sm font-medium cursor-pointer">
+                          🏆 Por Equipes
+                        </Label>
+                      </div>
+                    </div>
+                    
+                    {/* Banner explicativo para modo de equipes */}
+                    {tournamentMode === "team" && (
+                      <div className="p-4 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-start space-x-3">
+                          <div className="text-blue-600 dark:text-blue-400 text-lg">🏆</div>
+                          <div>
+                            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                              Torneios por Equipe
+                            </h4>
+                            <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                              Equipes competem entre si com múltiplas partidas individuais por confronto.
+                            </p>
+                            <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                              <li>• Cada confronto gera várias partidas individuais</li>
+                              <li>• A equipe com mais vitórias individuais vence o confronto</li>
+                              <li>• Você poderá gerenciar equipes e atletas após criar o torneio</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Separator />
+                  
                   <div>
                     <Label htmlFor="format">Formato Principal</Label>
                     <Select value={formData.format} onValueChange={(value) => setFormData({...formData, format: value})}>
@@ -919,13 +1007,102 @@ export default function CreateTournament() {
                       </div>
                     </div>
 
+                    {/* Configurações específicas para torneios por equipe */}
+                    {(formData.format === 'team_round_robin' || formData.format === 'team_group_knockout') && (
+                      <>
+                        <Separator />
+                        
+                        <div>
+                          <h4 className="text-lg font-medium mb-4">🏆 Configurações de Equipes</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Modo de Emparelhamento</Label>
+                              <Select 
+                                value={formData.teamPairingMode} 
+                                onValueChange={(value) => setFormData({...formData, teamPairingMode: value})}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ordered">Ordenado (1x1, 2x2, 3x3)</SelectItem>
+                                  <SelectItem value="snake">Snake (1x3, 2x2, 3x1)</SelectItem>
+                                  <SelectItem value="all_pairs">Todos vs Todos</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Como os membros das equipes enfrentam entre si
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Membros por Equipe</Label>
+                              <Input
+                                type="number"
+                                min="2"
+                                max="10"
+                                value={formData.teamMembersPerTeam}
+                                onChange={(e) => setFormData({...formData, teamMembersPerTeam: parseInt(e.target.value) || 3})}
+                                placeholder="3"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Número de atletas por equipe
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Pontos por Vitória</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={formData.pointsPerWin}
+                                onChange={(e) => setFormData({...formData, pointsPerWin: parseInt(e.target.value) || 1})}
+                                placeholder="1"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Pontos que a equipe ganha por cada partida individual vencida
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label>Melhor de Sets (por partida individual)</Label>
+                              <Select 
+                                value={formData.bestOfSetsTeam.toString()} 
+                                onValueChange={(value) => setFormData({...formData, bestOfSetsTeam: parseInt(value)})}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="3">Melhor de 3</SelectItem>
+                                  <SelectItem value="5">Melhor de 5</SelectItem>
+                                  <SelectItem value="7">Melhor de 7</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Sets por partida individual entre atletas
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg">
+                            <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Como funcionam os torneios por equipe:</h5>
+                            <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                              <li>• Cada confronto entre equipes gera várias partidas individuais</li>
+                              <li>• A equipe que vencer mais partidas individuais vence o confronto</li>
+                              <li>• Os atletas de cada equipe são ordenados por tabuleiro (1, 2, 3...)</li>
+                              <li>• O modo de emparelhamento define como os atletas se enfrentam</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
                     <Separator />
 
                     <div>
-                      <h4 className="text-lg font-medium mb-4">Configurações de Inscr
-
-
-</h4>
+                      <h4 className="text-lg font-medium mb-4">Configurações de Inscrição</h4>
                       <div className="space-y-4">
                         <div className="flex items-center space-x-2">
                           <Switch />

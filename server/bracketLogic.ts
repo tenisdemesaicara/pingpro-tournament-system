@@ -1,4 +1,4 @@
-import { type Match, type InsertMatch } from "@shared/schema";
+import { type Match, type InsertMatch, type TeamTie, type InsertTeamTie, type TournamentTeam } from "@shared/schema";
 import { type IStorage } from "./storage";
 
 export interface GroupStanding {
@@ -17,6 +17,38 @@ export interface BracketGeneration {
 }
 
 export interface FullBracketGeneration {
+  allMatches: Match[];
+  phases: string[];
+}
+
+// ===========================
+// Team-specific interfaces  
+// ===========================
+
+export interface TeamGroupStanding {
+  teamId: string;
+  position: number;
+  points: number;
+  tiesWon: number;
+  tiesLost: number;
+  tiesPlayed: number;
+  matchesWon: number;
+  matchesLost: number;
+}
+
+export interface TeamBracketGeneration {
+  phase: string;
+  ties: InsertTeamTie[];
+  childMatches: InsertMatch[];
+}
+
+export interface TeamTieWithMatches {
+  tie: TeamTie;
+  matches: Match[];
+}
+
+export interface FullTeamBracketGeneration {
+  allTies: TeamTie[];
   allMatches: Match[];
   phases: string[];
 }
@@ -630,5 +662,400 @@ export class BracketManager {
     }
     
     console.log("[LOG] Conexões entre partidas concluídas com sucesso!");
+  }
+
+  // ===========================
+  // TEAM TOURNAMENT METHODS  
+  // ===========================
+
+  /**
+   * Verifica se a fase de grupos de equipes está completa
+   */
+  async isTeamGroupPhaseComplete(tournamentId: string, categoryId: string): Promise<boolean> {
+    const groupTies = await this.storage.getTiesByCategoryPhase(
+      tournamentId, 
+      categoryId, 
+      "group"
+    );
+
+    if (groupTies.length === 0) {
+      return false;
+    }
+
+    return groupTies.every(tie => tie.status === "completed");
+  }
+
+  /**
+   * Cria um confronto entre equipes com todas as partidas filhas conectadas
+   */
+  async createTeamTieWithMatches(
+    tournamentId: string,
+    categoryId: string,
+    tie: InsertTeamTie,
+    team1Members: string[], // athleteIds ordenados por tabuleiro
+    team2Members: string[], // athleteIds ordenados por tabuleiro
+    pairingMode: 'ordered' | 'snake' | 'all_pairs' = 'ordered'
+  ): Promise<{ tie: TeamTie, matches: Match[] }> {
+    // Gerar matches individuais
+    const matches = this.generateTeamTieMatches(
+      tournamentId, 
+      categoryId, 
+      tie, 
+      team1Members, 
+      team2Members, 
+      pairingMode
+    );
+    
+    // Criar tie com matches filhas conectadas
+    return await this.storage.createTieWithChildren(tie, matches);
+  }
+
+  /**
+   * Gera partidas individuais para um confronto entre equipes
+   */
+  generateTeamTieMatches(
+    tournamentId: string,
+    categoryId: string,
+    tie: InsertTeamTie,
+    team1Members: string[], // athleteIds ordenados por tabuleiro
+    team2Members: string[], // athleteIds ordenados por tabuleiro
+    pairingMode: 'ordered' | 'snake' | 'all_pairs' = 'ordered'
+  ): InsertMatch[] {
+    const matches: InsertMatch[] = [];
+    
+    switch (pairingMode) {
+      case 'ordered':
+        // 1x1, 2x2, 3x3, etc
+        const maxPairs = Math.min(team1Members.length, team2Members.length);
+        for (let i = 0; i < maxPairs; i++) {
+          matches.push({
+            tournamentId,
+            categoryId,
+            phase: tie.phase,
+            round: tie.round,
+            matchNumber: i + 1,
+            player1Id: team1Members[i],
+            player2Id: team2Members[i],
+            status: 'scheduled',
+            bestOfSets: tie.bestOfSets || 3,
+            tieId: null // será preenchido quando o tie for criado
+          });
+        }
+        break;
+        
+      case 'snake':
+        // 1x3, 2x2, 3x1 (para 3 jogadores por equipe)
+        const maxSnakePairs = Math.min(team1Members.length, team2Members.length);
+        for (let i = 0; i < maxSnakePairs; i++) {
+          const team2Index = team2Members.length - 1 - i; // snake pattern
+          matches.push({
+            tournamentId,
+            categoryId,
+            phase: tie.phase,
+            round: tie.round,
+            matchNumber: i + 1,
+            player1Id: team1Members[i],
+            player2Id: team2Members[team2Index],
+            status: 'scheduled',
+            bestOfSets: tie.bestOfSets || 3,
+            tieId: null
+          });
+        }
+        break;
+        
+      case 'all_pairs':
+        // Todos contra todos (para team rounds pequenos)
+        let matchNum = 1;
+        for (const player1 of team1Members) {
+          for (const player2 of team2Members) {
+            matches.push({
+              tournamentId,
+              categoryId,
+              phase: tie.phase,
+              round: tie.round,
+              matchNumber: matchNum++,
+              player1Id: player1,
+              player2Id: player2,
+              status: 'scheduled',
+              bestOfSets: tie.bestOfSets || 3,
+              tieId: null
+            });
+          }
+        }
+        break;
+    }
+    
+    return matches;
+  }
+
+  /**
+   * Cria bracket completo para torneio por equipes
+   */
+  async createTeamBracketFromGroups(
+    tournamentId: string,
+    categoryId: string,
+    qualifiersPerGroup: number = 2,
+    pairingMode: 'ordered' | 'snake' | 'all_pairs' = 'ordered'
+  ): Promise<FullTeamBracketGeneration | null> {
+    console.log(`[LOG] Criando bracket de equipes para torneio ${tournamentId}, categoria ${categoryId}`);
+    
+    try {
+      // Verificar se a fase de grupos está completa
+      const isComplete = await this.isTeamGroupPhaseComplete(tournamentId, categoryId);
+      if (!isComplete) {
+        throw new Error("Fase de grupos de equipes ainda não está completa");
+      }
+
+      // Obter classificação dos grupos
+      const groupStandings = await this.storage.computeTeamGroupStandings(tournamentId, categoryId);
+      
+      if (groupStandings.length === 0) {
+        throw new Error('Nenhuma classificação de grupo encontrada para equipes');
+      }
+
+      // Extrair equipes classificadas
+      const qualifiedTeams: { teamId: string; group: string; position: number }[] = [];
+      
+      for (const groupData of groupStandings) {
+        const topTeams = groupData.standings.slice(0, qualifiersPerGroup);
+        for (let i = 0; i < topTeams.length; i++) {
+          qualifiedTeams.push({
+            teamId: topTeams[i].teamId,
+            group: groupData.group,
+            position: i + 1
+          });
+        }
+      }
+
+      console.log(`[LOG] ${qualifiedTeams.length} equipes classificadas`);
+
+      if (qualifiedTeams.length < 4) {
+        throw new Error('Não há equipes suficientes classificadas para criar eliminatórias (mínimo 4)');
+      }
+
+      // Determinar estrutura do bracket
+      const bracketStructure = this.calculateBracketStructure(qualifiedTeams.length);
+      console.log(`[LOG] Estrutura do bracket para equipes:`, bracketStructure);
+
+      // Gerar confrontos eliminatórios
+      const eliminationTies = await this.generateTeamEliminationTies(
+        tournamentId,
+        categoryId,
+        bracketStructure,
+        qualifiedTeams,
+        pairingMode
+      );
+
+      console.log(`[LOG] ✅ Bracket de equipes criado: ${bracketStructure.phases.length} fases, ${eliminationTies.allTies.length} confrontos, ${eliminationTies.allMatches.length} partidas`);
+      
+      return eliminationTies;
+    } catch (error) {
+      console.error(`[ERROR] Erro ao criar bracket de equipes:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gera confrontos eliminatórios para equipes
+   */
+  private async generateTeamEliminationTies(
+    tournamentId: string,
+    categoryId: string,
+    bracketStructure: {
+      phases: string[];
+      roundsPerPhase: { [phase: string]: number };
+      matchesPerPhase: { [phase: string]: number };
+    },
+    qualifiedTeams: { teamId: string; group: string; position: number }[],
+    pairingMode: 'ordered' | 'snake' | 'all_pairs'
+  ): Promise<FullTeamBracketGeneration> {
+    const allTies: TeamTie[] = [];
+    const allMatches: Match[] = [];
+
+    // Ordenar equipes para seeding inteligente
+    const seededTeams = this.seedTeamsForElimination(qualifiedTeams);
+    
+    for (const phase of bracketStructure.phases) {
+      const phaseTies: InsertTeamTie[] = [];
+      const phaseMatches: InsertMatch[] = [];
+      
+      const matchesInPhase = bracketStructure.matchesPerPhase[phase];
+      
+      for (let i = 0; i < matchesInPhase; i++) {
+        const tie: InsertTeamTie = {
+          tournamentId,
+          categoryId,
+          phase,
+          round: 1, // Para eliminatórias, cada fase tem apenas 1 round
+          tieNumber: i + 1,
+          team1Id: this.getTeamForPosition(seededTeams, phase, i * 2),
+          team2Id: this.getTeamForPosition(seededTeams, phase, i * 2 + 1),
+          status: 'scheduled',
+          pointsPerWin: 1,
+          bestOfSets: 3,
+          team1Points: 0,
+          team2Points: 0,
+          winnerTeamId: null,
+          groupLabel: null
+        };
+
+        // Criar o confronto
+        const createdTie = await this.storage.createTeamTie(tie);
+        allTies.push(createdTie);
+
+        // Buscar membros das equipes
+        const team1Members = await this.storage.getTeamMembers(tie.team1Id);
+        const team2Members = await this.storage.getTeamMembers(tie.team2Id);
+
+        // Gerar partidas individuais para este confronto
+        const tieMatches = this.generateTeamTieMatches(
+          tournamentId,
+          categoryId,
+          tie,
+          team1Members.map(m => m.athleteId),
+          team2Members.map(m => m.athleteId),
+          pairingMode
+        );
+
+        // Associar partidas ao confronto criado
+        for (const match of tieMatches) {
+          match.tieId = createdTie.id;
+          const createdMatch = await this.storage.createMatch(match);
+          allMatches.push(createdMatch);
+        }
+      }
+    }
+
+    return {
+      allTies,
+      allMatches,
+      phases: bracketStructure.phases
+    };
+  }
+
+  /**
+   * Aplica seeding inteligente para eliminatórias de equipes
+   */
+  private seedTeamsForElimination(qualifiedTeams: { teamId: string; group: string; position: number }[]): string[] {
+    // Agrupar por posição
+    const firstPlaces = qualifiedTeams.filter(t => t.position === 1);
+    const secondPlaces = qualifiedTeams.filter(t => t.position === 2);
+    
+    // Intercalar para evitar confrontos entre equipes do mesmo grupo
+    const seeded: string[] = [];
+    const maxTeams = Math.max(firstPlaces.length, secondPlaces.length);
+    
+    for (let i = 0; i < maxTeams; i++) {
+      if (i < firstPlaces.length) {
+        seeded.push(firstPlaces[i].teamId);
+      }
+      if (i < secondPlaces.length) {
+        seeded.push(secondPlaces[i].teamId);
+      }
+    }
+    
+    return seeded;
+  }
+
+  /**
+   * Obtém ID da equipe para uma posição específica na fase
+   */
+  private getTeamForPosition(seededTeams: string[], phase: string, position: number): string {
+    // Para a primeira fase, usar teams seeded
+    if (phase === 'quarterfinal' || phase === 'round_of_16' || phase === 'round_of_32') {
+      return seededTeams[position] || '';
+    }
+    
+    // Para fases posteriores, usar placeholders que serão preenchidos conforme os confrontos se completam
+    return `TBD_${phase}_${position}`;
+  }
+
+  /**
+   * Gera rounds robin para equipes dentro de grupos
+   */
+  async generateTeamGroupMatches(
+    tournamentId: string,
+    categoryId: string,
+    teams: TournamentTeam[],
+    pairingMode: 'ordered' | 'snake' | 'all_pairs' = 'ordered'
+  ): Promise<{ ties: TeamTie[], matches: Match[] }> {
+    console.log(`[LOG] Gerando confrontos de grupo para ${teams.length} equipes`);
+    
+    const allTies: TeamTie[] = [];
+    const allMatches: Match[] = [];
+    
+    // Agrupar equipes por grupo
+    const teamsByGroup: { [group: string]: TournamentTeam[] } = {};
+    for (const team of teams) {
+      const group = team.groupLabel || 'A';
+      if (!teamsByGroup[group]) {
+        teamsByGroup[group] = [];
+      }
+      teamsByGroup[group].push(team);
+    }
+    
+    // Gerar confrontos round-robin dentro de cada grupo
+    for (const [groupLabel, groupTeams] of Object.entries(teamsByGroup)) {
+      console.log(`[LOG] Processando grupo ${groupLabel} com ${groupTeams.length} equipes`);
+      
+      let tieNumber = 1;
+      
+      // Round-robin: cada equipe joga contra todas as outras do grupo
+      for (let i = 0; i < groupTeams.length; i++) {
+        for (let j = i + 1; j < groupTeams.length; j++) {
+          const team1 = groupTeams[i];
+          const team2 = groupTeams[j];
+          
+          // Criar confronto entre equipes
+          const tie: InsertTeamTie = {
+            tournamentId,
+            categoryId,
+            phase: 'group',
+            round: 1,
+            tieNumber,
+            team1Id: team1.teamId,
+            team2Id: team2.teamId,
+            status: 'scheduled',
+            pointsPerWin: 1,
+            bestOfSets: 3,
+            maxBoards: 7,  // 🔧 CORREÇÃO: Campo obrigatório no banco
+            team1Points: 0,
+            team2Points: 0,
+            winnerTeamId: null,
+            groupLabel
+          };
+          
+          const createdTie = await this.storage.createTeamTie(tie);
+          allTies.push(createdTie);
+          
+          // Buscar membros das equipes
+          const team1Members = await this.storage.getTeamMembers(team1.teamId);
+          const team2Members = await this.storage.getTeamMembers(team2.teamId);
+          
+          // Gerar partidas individuais
+          const tieMatches = this.generateTeamTieMatches(
+            tournamentId,
+            categoryId,
+            tie,
+            team1Members.map(m => m.athleteId),
+            team2Members.map(m => m.athleteId),
+            pairingMode
+          );
+          
+          // Criar partidas associadas ao confronto
+          for (const match of tieMatches) {
+            match.tieId = createdTie.id;
+            const createdMatch = await this.storage.createMatch(match);
+            allMatches.push(createdMatch);
+          }
+          
+          tieNumber++;
+        }
+      }
+    }
+    
+    console.log(`[LOG] ✅ Gerados ${allTies.length} confrontos e ${allMatches.length} partidas para grupos`);
+    
+    return { ties: allTies, matches: allMatches };
   }
 }

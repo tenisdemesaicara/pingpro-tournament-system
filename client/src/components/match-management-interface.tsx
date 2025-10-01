@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Trophy } from "lucide-react";
+import { Trophy, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 import { type TournamentWithParticipants, type Athlete, type Match } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
@@ -32,12 +32,58 @@ export default function MatchManagementInterface({
   const [selectedGender, setSelectedGender] = useState<string>("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [selectedPhase, setSelectedPhase] = useState<string>("");
+  const [selectedRound, setSelectedRound] = useState<number | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [showMatchForm, setShowMatchForm] = useState(false);
   const [editingScoreMatch, setEditingScoreMatch] = useState<Match | null>(null);
   const [tempSets, setTempSets] = useState<Array<{player1Score: number, player2Score: number}>>([]);
   const { toast } = useToast();
 
+  // Resetar rodada selecionada quando filtros mudarem
+  useEffect(() => {
+    // Verificar se deve mostrar seletor de rodadas
+    const showRoundSelector = selectedPhase === 'league' || selectedPhase === 'round_robin';
+    
+    if (!selectedCategory || !selectedPhase || !showRoundSelector) {
+      setSelectedRound(null);
+      return;
+    }
+
+    if (!matches) {
+      setSelectedRound(null);
+      return;
+    }
+
+    // Calcular rodadas disponíveis inline
+    const category = tournament.categories?.find(c => c.name === selectedCategory);
+    if (!category) {
+      setSelectedRound(null);
+      return;
+    }
+
+    let phaseMatches = matches.filter(match => 
+      match.categoryId === category.id && match.phase === selectedPhase
+    );
+    
+    if (selectedGroup) {
+      phaseMatches = phaseMatches.filter(match => match.groupName === selectedGroup);
+    }
+    
+    const rounds: number[] = Array.from(new Set(
+      phaseMatches.map(match => match.round).filter(r => r !== null && r !== undefined) as number[]
+    )).sort((a, b) => a - b);
+    
+    // Se não há rodadas disponíveis, limpar seleção
+    if (rounds.length === 0) {
+      setSelectedRound(null);
+      return;
+    }
+
+    // Se rodada atual não está mais disponível, selecionar a primeira
+    if (selectedRound === null || !rounds.includes(selectedRound)) {
+      setSelectedRound(rounds[0]);
+    }
+  }, [selectedCategory, selectedPhase, selectedGroup, matches, tournament.categories, selectedRound]);
 
   // Obter categorias únicas dos participantes através das categorias do torneio
   const getUniqueCategories = () => {
@@ -100,13 +146,13 @@ export default function MatchManagementInterface({
         return ['knockout'];
       case 'round_robin':
       case 'league':
-        return ['round_robin'];
+        return ['league'];  // Usar 'league' como padrão para pontos corridos
       case 'swiss':
         return ['swiss'];
       case 'cup':
         return ['group', 'knockout'];
       default:
-        return ['round_robin']; // Padrão para formatos não reconhecidos
+        return ['league']; // Padrão para formatos não reconhecidos
     }
   };
 
@@ -129,12 +175,77 @@ export default function MatchManagementInterface({
     return groups.sort();
   };
 
+  // Obter rodadas disponíveis para a categoria e fase selecionadas
+  const getAvailableRounds = () => {
+    if (!selectedCategory || !selectedPhase || !matches) return [];
+    
+    const category = tournament.categories?.find(c => c.name === selectedCategory);
+    if (!category) return [];
+    
+    // Filtrar partidas por categoria e fase
+    let phaseMatches = matches.filter(match => 
+      match.categoryId === category.id && match.phase === selectedPhase
+    );
+    
+    // Se houver grupo selecionado, filtrar também por grupo
+    if (selectedGroup) {
+      phaseMatches = phaseMatches.filter(match => match.groupName === selectedGroup);
+    }
+    
+    // Obter rodadas únicas e ordenar
+    const rounds: number[] = Array.from(new Set(
+      phaseMatches.map(match => match.round).filter(r => r !== null && r !== undefined) as number[]
+    ));
+    
+    return rounds.sort((a, b) => a - b);
+  };
+
+  // Verificar se deve mostrar seletor de rodadas (apenas para round-robin e league)
+  const shouldShowRoundSelector = () => {
+    if (!selectedPhase) return false;
+    return selectedPhase === 'league' || selectedPhase === 'round_robin';
+  };
+
+  // Funções de navegação de rodadas
+  const availableRounds = getAvailableRounds();
+  
+  const goToFirstRound = () => {
+    if (availableRounds.length > 0) {
+      setSelectedRound(availableRounds[0]);
+    }
+  };
+
+  const goToPreviousRound = () => {
+    if (selectedRound !== null && availableRounds.length > 0) {
+      const currentIndex = availableRounds.indexOf(selectedRound);
+      if (currentIndex > 0) {
+        setSelectedRound(availableRounds[currentIndex - 1]);
+      }
+    }
+  };
+
+  const goToNextRound = () => {
+    if (selectedRound !== null && availableRounds.length > 0) {
+      const currentIndex = availableRounds.indexOf(selectedRound);
+      if (currentIndex < availableRounds.length - 1) {
+        setSelectedRound(availableRounds[currentIndex + 1]);
+      }
+    }
+  };
+
+  const goToLastRound = () => {
+    if (availableRounds.length > 0) {
+      setSelectedRound(availableRounds[availableRounds.length - 1]);
+    }
+  };
+
   // Traduzir nome da fase para português
   const getPhaseDisplayName = (phase: string) => {
     switch (phase) {
       case 'group': return 'Fase de Grupos';
       case 'knockout': return 'Eliminatórias';
       case 'round_robin': return 'Pontos Corridos';
+      case 'league': return 'Pontos Corridos';  // Aceitar 'league' como pontos corridos
       case 'swiss': return 'Sistema Suíço';
       case 'round_of_32': return '32avos de Final';
       case 'round_of_16': return 'Oitavas de Final';
@@ -436,7 +547,12 @@ export default function MatchManagementInterface({
       );
     }
 
-    // 4. FILTRO POR GÊNERO (se não for categoria mista e gênero selecionado)
+    // 4. FILTRO POR RODADA (se selecionada e aplicável)
+    if (selectedRound !== null && shouldShowRoundSelector()) {
+      filtered = filtered.filter(match => match.round === selectedRound);
+    }
+
+    // 5. FILTRO POR GÊNERO (se não for categoria mista e gênero selecionado)
     if (selectedGender && !isMixedCategory() && athletes) {
       filtered = filtered.filter(match => {
         const player1Athlete = athletes.find(a => a.id === match.player1Id);
@@ -459,15 +575,134 @@ export default function MatchManagementInterface({
     if (selectedCategory) appliedFilters.push(`Categoria: ${selectedCategory}`);
     if (selectedPhase) appliedFilters.push(`Fase: ${getPhaseDisplayName(selectedPhase)}`);
     if (selectedGroup) appliedFilters.push(`Grupo: ${selectedGroup}`);
+    if (selectedRound !== null && shouldShowRoundSelector()) appliedFilters.push(`Rodada: ${selectedRound}`);
     if (selectedGender) appliedFilters.push(`Naipe: ${selectedGender}`);
     
     if (appliedFilters.length > 0 && filtered.length !== matches.length) {
       console.log(`🔍 Filtros aplicados: ${appliedFilters.join(' → ')} | ${matches.length} → ${filtered.length} partidas`);
     }
 
-    // 5. ORDENAÇÃO INTELIGENTE - EVITAR REPETIR O MESMO JOGADOR EM SEQUÊNCIA
+    // 6. ORDENAÇÃO INTELIGENTE - EVITAR REPETIR O MESMO JOGADOR EM SEQUÊNCIA
     return optimizeMatchOrder(filtered);
-  }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedGender, tournament.categories, athletes, isMixedCategory]);
+  }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedRound, selectedGender, tournament.categories, athletes, isMixedCategory, shouldShowRoundSelector]);
+
+  // Calcular classificação para pontos corridos (league/round_robin)
+  const computeLeagueStandings = useMemo(() => {
+    // Apenas calcular para fases de pontos corridos
+    if (!selectedPhase || (selectedPhase !== 'league' && selectedPhase !== 'round_robin')) {
+      return [];
+    }
+
+    if (!selectedCategory || !matches || !athletes) {
+      return [];
+    }
+
+    const category = tournament.categories?.find(c => c.name === selectedCategory);
+    if (!category) return [];
+
+    // Filtrar partidas completas da categoria e fase
+    let leagueMatches = matches.filter(match => 
+      match.categoryId === category.id && 
+      match.phase === selectedPhase && 
+      match.status === 'completed'
+    );
+
+    // Se houver grupo selecionado, filtrar por grupo também
+    if (selectedGroup) {
+      leagueMatches = leagueMatches.filter(match => match.groupName === selectedGroup);
+    }
+
+    // Coletar todos os jogadores
+    const playerStats = new Map();
+
+    // Inicializar stats dos jogadores
+    leagueMatches.forEach(match => {
+      [match.player1Id, match.player2Id].forEach(playerId => {
+        if (playerId && !playerStats.has(playerId)) {
+          const athlete = athletes.find(a => a.id === playerId);
+          if (athlete) {
+            playerStats.set(playerId, {
+              playerId,
+              name: athlete.name,
+              photoUrl: athlete.photoUrl,
+              matchesWon: 0,
+              matchesLost: 0,
+              setsWon: 0,
+              setsLost: 0,
+              pointsScored: 0,
+              pointsConceded: 0,
+              points: 0,
+            });
+          }
+        }
+      });
+    });
+
+    // Calcular estatísticas
+    leagueMatches.forEach(match => {
+      const sets = match.sets as Array<{player1Score: number, player2Score: number}> || [];
+      
+      let player1Sets = 0;
+      let player2Sets = 0;
+      let player1Points = 0;
+      let player2Points = 0;
+
+      sets.forEach(set => {
+        player1Points += set.player1Score || 0;
+        player2Points += set.player2Score || 0;
+        
+        if (set.player1Score > set.player2Score) {
+          player1Sets++;
+        } else if (set.player2Score > set.player1Score) {
+          player2Sets++;
+        }
+      });
+
+      const player1Stats = playerStats.get(match.player1Id);
+      const player2Stats = playerStats.get(match.player2Id);
+
+      if (player1Stats && player2Stats) {
+        player1Stats.setsWon += player1Sets;
+        player1Stats.setsLost += player2Sets;
+        player1Stats.pointsScored += player1Points;
+        player1Stats.pointsConceded += player2Points;
+
+        player2Stats.setsWon += player2Sets;
+        player2Stats.setsLost += player1Sets;
+        player2Stats.pointsScored += player2Points;
+        player2Stats.pointsConceded += player1Points;
+
+        if (player1Sets > player2Sets) {
+          player1Stats.matchesWon++;
+          player1Stats.points += 2;
+          player2Stats.matchesLost++;
+        } else if (player2Sets > player1Sets) {
+          player2Stats.matchesWon++;
+          player2Stats.points += 2;
+          player1Stats.matchesLost++;
+        }
+      }
+    });
+
+    // Converter para array e ordenar pelos critérios de desempate
+    const standings = Array.from(playerStats.values());
+    standings.sort((a, b) => {
+      // 1. Vitórias (descrescente)
+      if (b.matchesWon !== a.matchesWon) return b.matchesWon - a.matchesWon;
+      // 2. Saldo de sets (descrescente)
+      const aSetsBalance = a.setsWon - a.setsLost;
+      const bSetsBalance = b.setsWon - b.setsLost;
+      if (bSetsBalance !== aSetsBalance) return bSetsBalance - aSetsBalance;
+      // 3. Saldo de pontos (descrescente)
+      const aPointsBalance = a.pointsScored - a.pointsConceded;
+      const bPointsBalance = b.pointsScored - b.pointsConceded;
+      if (bPointsBalance !== aPointsBalance) return bPointsBalance - aPointsBalance;
+      // 4. Pontos totais (descrescente)
+      return b.points - a.points;
+    });
+
+    return standings;
+  }, [selectedPhase, selectedCategory, selectedGroup, matches, athletes, tournament.categories]);
 
   // Calcular classificação do grupo em tempo real a partir das partidas
   const computeGroupStandingsRealTime = useMemo(() => {
@@ -748,6 +983,84 @@ export default function MatchManagementInterface({
               )}
             </div>
           )}
+
+          {/* Terceira linha: Seletor de Rodadas (apenas para round-robin/league) */}
+          {selectedPhase && shouldShowRoundSelector() && availableRounds.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <label className="block text-sm font-semibold text-gray-800 mb-2">
+                Rodada
+              </label>
+              <div className="flex items-center gap-2">
+                {/* Botão: Primeira Rodada */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToFirstRound}
+                  disabled={selectedRound === null || selectedRound === availableRounds[0]}
+                  className="px-2"
+                  data-testid="button-first-round"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+
+                {/* Botão: Rodada Anterior */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousRound}
+                  disabled={selectedRound === null || selectedRound === availableRounds[0]}
+                  className="px-2"
+                  data-testid="button-previous-round"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                {/* Dropdown de Rodadas */}
+                <Select 
+                  value={selectedRound?.toString() || ""} 
+                  onValueChange={(value) => setSelectedRound(value ? parseInt(value) : null)}
+                >
+                  <SelectTrigger 
+                    data-testid="select-round" 
+                    className="flex-1 h-12 text-base border-2 border-gray-300 hover:border-orange-400 focus:border-orange-500 rounded-lg shadow-sm"
+                  >
+                    <SelectValue placeholder="Selecione a rodada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRounds.map(round => (
+                      <SelectItem key={round} value={round.toString()}>
+                        Rodada {round}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Botão: Próxima Rodada */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextRound}
+                  disabled={selectedRound === null || selectedRound === availableRounds[availableRounds.length - 1]}
+                  className="px-2"
+                  data-testid="button-next-round"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+
+                {/* Botão: Última Rodada */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToLastRound}
+                  disabled={selectedRound === null || selectedRound === availableRounds[availableRounds.length - 1]}
+                  className="px-2"
+                  data-testid="button-last-round"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Gerar Fases Eliminatórias - botão para criar mata-mata */}
@@ -840,6 +1153,114 @@ export default function MatchManagementInterface({
             </div>
           );
         })()}
+
+        {/* Classificação para Pontos Corridos (League/Round Robin) */}
+        {(selectedPhase === 'league' || selectedPhase === 'round_robin') && computeLeagueStandings.length > 0 && (
+          <div className="mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-2xl">🏆</span>
+                  Classificação - {getPhaseDisplayName(selectedPhase)}
+                  {selectedGroup && ` - Grupo ${selectedGroup}`}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full" data-testid="table-league-standings">
+                    <thead>
+                      <tr className="border-b bg-gray-50 dark:bg-gray-800">
+                        <th className="text-left p-2 font-bold">#</th>
+                        <th className="text-left p-2 font-bold">Atleta</th>
+                        <th className="text-center p-2 font-bold">V</th>
+                        <th className="text-center p-2 font-bold">D</th>
+                        <th className="text-center p-2 font-bold">Sets +</th>
+                        <th className="text-center p-2 font-bold">Sets -</th>
+                        <th className="text-center p-2 font-bold">Saldo Sets</th>
+                        <th className="text-center p-2 font-bold">Pts +</th>
+                        <th className="text-center p-2 font-bold">Pts -</th>
+                        <th className="text-center p-2 font-bold">Saldo Pts</th>
+                        <th className="text-center p-2 font-bold">Pontos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {computeLeagueStandings.map((standing, index) => (
+                        <tr 
+                          key={standing.playerId} 
+                          className={`border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${index === 0 ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}`}
+                          data-testid={`row-standing-${index}`}
+                        >
+                          <td className="p-2 font-bold">
+                            {index + 1}°
+                            {index === 0 && <span className="ml-1 text-yellow-600">🥇</span>}
+                            {index === 1 && <span className="ml-1 text-gray-400">🥈</span>}
+                            {index === 2 && <span className="ml-1 text-orange-600">🥉</span>}
+                          </td>
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-8 h-8">
+                                {standing.photoUrl ? (
+                                  <AvatarImage src={standing.photoUrl} alt={standing.name} />
+                                ) : null}
+                                <AvatarFallback className="text-xs">
+                                  {standing.name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium">{standing.name}</span>
+                            </div>
+                          </td>
+                          <td className="text-center p-2 text-green-600 font-bold" data-testid={`wins-${index}`}>
+                            {standing.matchesWon}
+                          </td>
+                          <td className="text-center p-2 text-red-600 font-bold" data-testid={`losses-${index}`}>
+                            {standing.matchesLost}
+                          </td>
+                          <td className="text-center p-2" data-testid={`sets-won-${index}`}>
+                            {standing.setsWon}
+                          </td>
+                          <td className="text-center p-2" data-testid={`sets-lost-${index}`}>
+                            {standing.setsLost}
+                          </td>
+                          <td className="text-center p-2 font-bold" data-testid={`sets-balance-${index}`}>
+                            <span className={standing.setsWon - standing.setsLost >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {standing.setsWon - standing.setsLost > 0 ? '+' : ''}{standing.setsWon - standing.setsLost}
+                            </span>
+                          </td>
+                          <td className="text-center p-2" data-testid={`points-scored-${index}`}>
+                            {standing.pointsScored}
+                          </td>
+                          <td className="text-center p-2" data-testid={`points-conceded-${index}`}>
+                            {standing.pointsConceded}
+                          </td>
+                          <td className="text-center p-2 font-bold" data-testid={`points-balance-${index}`}>
+                            <span className={standing.pointsScored - standing.pointsConceded >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {standing.pointsScored - standing.pointsConceded > 0 ? '+' : ''}{standing.pointsScored - standing.pointsConceded}
+                            </span>
+                          </td>
+                          <td className="text-center p-2" data-testid={`total-points-${index}`}>
+                            <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 px-2 py-1 rounded font-bold">
+                              {standing.points}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
+                    📊 Critérios de Desempate (em ordem):
+                  </p>
+                  <ol className="text-sm text-blue-700 dark:text-blue-400 space-y-1 ml-4 list-decimal">
+                    <li>Maior número de vitórias</li>
+                    <li>Melhor saldo de sets (sets pró - sets contra)</li>
+                    <li>Melhor saldo de pontos (pontos pró - pontos contra)</li>
+                  </ol>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Classificação do Grupo em Tempo Real */}
         {selectedPhase === 'group' && selectedGroup && computeGroupStandingsRealTime.length > 0 && (

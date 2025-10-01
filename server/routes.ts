@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAthleteSchema, insertTournamentSchema, insertTournamentParticipantSchema, insertMatchSchema, insertCategorySchema, insertPaymentSchema, insertRevenueSchema, insertExpenseSchema, insertConsentSchema, insertExternalLinkSchema, insertAssetSchema, tournamentRegistrationSchema } from "@shared/schema";
+import { insertAthleteSchema, insertTournamentSchema, insertTournamentParticipantSchema, insertMatchSchema, insertCategorySchema, insertPaymentSchema, insertRevenueSchema, insertExpenseSchema, insertConsentSchema, insertExternalLinkSchema, insertAssetSchema, tournamentRegistrationSchema, insertTeamSchema, insertTeamMemberSchema, insertTournamentTeamSchema, insertTeamTieSchema } from "@shared/schema";
 import { calculateAgeInTournamentYear, isEligibleForCategory, extractYearFromDate } from "@shared/utils";
 import { eq, and, ne, or } from "drizzle-orm";
 import { z } from "zod";
@@ -62,44 +62,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     originalLog(...args);
   };
 
-  // DEBUG: Endpoint para verificar se ambos domínios usam mesmo DB
-  app.get("/api/debug/env", (req, res) => {
-    const dbUrl = process.env.DATABASE_URL || 'no-db-url';
-    const dbHash = dbUrl.substring(0, 20) + '...' + dbUrl.substring(dbUrl.length - 10);
-    
-    res.json({
-      host: req.headers.host,
-      forwarded_host: req.headers['x-forwarded-host'],
-      forwarded_proto: req.headers['x-forwarded-proto'],
-      origin: req.headers.origin,
-      database_hash: dbHash,
-      node_env: process.env.NODE_ENV,
-      timestamp: new Date().toISOString()
-    });
-  });
 
-  // DEBUG: Endpoint para ver logs de login em memória
-  app.get("/api/debug/logs", (req, res) => {
-    res.json({
-      logs: debugLogs,
-      count: debugLogs.length,
-      timestamp: new Date().toISOString()
-    });
-  });
 
-  // DEBUG: POST endpoint para testar body parsing
-  app.post("/api/debug/body", (req, res) => {
-    res.json({
-      host: req.headers.host,
-      content_type: req.headers['content-type'],
-      body_received: req.body,
-      body_keys: Object.keys(req.body || {}),
-      raw_body: JSON.stringify(req.body),
-      has_username: !!req.body?.username,
-      has_password: !!req.body?.password,
-      timestamp: new Date().toISOString()
-    });
-  });
 
   // Inicializar gerenciador de bracket
   const bracketManager = new BracketManager(storage);
@@ -1211,6 +1175,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard statistics endpoint
+  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
+    try {
+      const statsResult = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(*) FROM athletes WHERE status = 'approved') as total_athletes,
+          (SELECT COUNT(*) FROM athletes WHERE status = 'approved' AND LOWER(gender) IN ('masculino', 'male')) as male_athletes,
+          (SELECT COUNT(*) FROM athletes WHERE status = 'approved' AND LOWER(gender) IN ('feminino', 'female')) as female_athletes,
+          (SELECT COUNT(*) FROM users) as total_users,
+          (SELECT COUNT(*) FROM tournaments WHERE status IN ('active', 'registration_open', 'in_progress')) as active_tournaments,
+          (SELECT COUNT(*) FROM teams) as total_teams,
+          (SELECT COALESCE(SUM(amount), 0) FROM revenues) as total_revenue,
+          (SELECT COALESCE(SUM(amount), 0) FROM expenses) as total_expenses,
+          (SELECT COALESCE(SUM(amount), 0) FROM revenues WHERE LOWER(category) = 'mensalidade') as monthly_revenue
+      `);
+
+      const stats = statsResult.rows[0];
+      
+      res.json({
+        totalAthletes: parseInt(stats.total_athletes as string) || 0,
+        maleAthletes: parseInt(stats.male_athletes as string) || 0,
+        femaleAthletes: parseInt(stats.female_athletes as string) || 0,
+        totalUsers: parseInt(stats.total_users as string) || 0,
+        activeTournaments: parseInt(stats.active_tournaments as string) || 0,
+        totalTeams: parseInt(stats.total_teams as string) || 0,
+        totalRevenue: parseFloat(stats.total_revenue as string) || 0,
+        totalExpenses: parseFloat(stats.total_expenses as string) || 0,
+        monthlyRevenue: parseFloat(stats.monthly_revenue as string) || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ message: "Erro ao buscar estatísticas", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // Buscar atleta por CPF ou email para inscrição
   app.get("/api/athletes/search", async (req, res) => {
     try {
@@ -1394,6 +1393,430 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting athlete:", error);
       res.status(500).json({ error: "Failed to delete athlete" });
+    }
+  });
+
+  // ===========================
+  // Teams routes (PROTEGIDAS)  
+  // ===========================
+  
+  // Listar todas as equipes
+  app.get("/api/teams", requireAuth, async (req, res) => {
+    try {
+      const teams = await storage.getAllTeams();
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      res.status(500).json({ error: "Failed to fetch teams" });
+    }
+  });
+
+  // Buscar equipe por ID
+  app.get("/api/teams/:id", requireAuth, async (req, res) => {
+    try {
+      const team = await storage.getTeam(req.params.id);
+      if (!team) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      res.json(team);
+    } catch (error) {
+      console.error("Error fetching team:", error);
+      res.status(500).json({ error: "Failed to fetch team" });
+    }
+  });
+
+  // Criar nova equipe
+  app.post("/api/teams", requireAuth, requirePermission("teams.create"), async (req, res) => {
+    try {
+      const validatedData = insertTeamSchema.parse(req.body);
+      const team = await storage.createTeam(validatedData);
+      res.status(201).json(team);
+    } catch (error) {
+      console.error("Error creating team:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid team data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create team" });
+      }
+    }
+  });
+
+  // Atualizar equipe
+  app.put("/api/teams/:id", requireAuth, requirePermission("teams.manage"), async (req, res) => {
+    try {
+      const validatedData = insertTeamSchema.partial().parse(req.body);
+      const team = await storage.updateTeam(req.params.id, validatedData);
+      if (!team) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      res.json(team);
+    } catch (error) {
+      console.error("Error updating team:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid team data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update team" });
+      }
+    }
+  });
+
+  // Deletar equipe
+  app.delete("/api/teams/:id", requireAuth, requirePermission("teams.delete"), async (req, res) => {
+    try {
+      const success = await storage.deleteTeam(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      res.status(500).json({ error: "Failed to delete team" });
+    }
+  });
+
+  // ===========================
+  // Team Members routes  
+  // ===========================
+  
+  // Listar membros de uma equipe
+  app.get("/api/teams/:teamId/members", requireAuth, async (req, res) => {
+    try {
+      const members = await storage.getTeamMembers(req.params.teamId);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      res.status(500).json({ error: "Failed to fetch team members" });
+    }
+  });
+
+  // Listar membros de uma equipe com dados dos atletas
+  app.get("/api/teams/:teamId/members/with-athletes", requireAuth, async (req, res) => {
+    try {
+      console.log("\u2699\ufe0f DEBUG MEMBERS - Team ID:", req.params.teamId);
+      const members = await storage.getTeamMembersWithAthletes(req.params.teamId);
+      console.log("\u2699\ufe0f DEBUG MEMBERS - Resultado:", members.length, "membros");
+      console.log("\u2699\ufe0f DEBUG MEMBERS - Dados:", JSON.stringify(members, null, 2));
+      res.json(members);
+    } catch (error) {
+      console.error("\u274c Error fetching team members with athletes:", error);
+      res.status(500).json({ error: "Failed to fetch team members with athletes" });
+    }
+  });
+
+  // Adicionar membro à equipe
+  app.post("/api/teams/:teamId/members", requireAuth, requirePermission("teams.manage"), async (req, res) => {
+    try {
+      console.log("\u26a1 DEBUG ADD MEMBER - Dados recebidos:", req.body);
+      console.log("\u26a1 DEBUG ADD MEMBER - Team ID:", req.params.teamId);
+      
+      const validatedData = insertTeamMemberSchema.parse({
+        ...req.body,
+        teamId: req.params.teamId
+      });
+      
+      console.log("\u26a1 DEBUG ADD MEMBER - Dados validados:", validatedData);
+      
+      // VALIDAÇÃO: Verificar se o atleta já está na equipe
+      const existingMembers = await storage.getTeamMembers(req.params.teamId);
+      console.log("\u26a1 DEBUG ADD MEMBER - Membros existentes:", existingMembers.length);
+      
+      const isAthleteAlreadyInTeam = existingMembers.some(member => member.athleteId === validatedData.athleteId);
+      console.log("\u26a1 DEBUG ADD MEMBER - Atleta já na equipe:", isAthleteAlreadyInTeam);
+      
+      if (isAthleteAlreadyInTeam) {
+        console.log("❌ ERRO: Atleta já está na equipe");
+        return res.status(400).json({ error: "Este atleta já está na equipe" });
+      }
+      
+      // VALIDAÇÃO: Verificar se a posição já existe
+      const isBoardOrderTaken = existingMembers.some(member => member.boardOrder === validatedData.boardOrder);
+      console.log("\u26a1 DEBUG ADD MEMBER - Posição já ocupada:", isBoardOrderTaken);
+      
+      if (isBoardOrderTaken) {
+        console.log("❌ ERRO: Posição já está ocupada");
+        return res.status(400).json({ error: "Esta posição já está ocupada" });
+      }
+      
+      console.log("\u2705 VALIDACOES OK - Criando membro");
+      const member = await storage.createTeamMember(validatedData);
+      console.log("\u2705 MEMBRO CRIADO:", member);
+      res.status(201).json(member);
+    } catch (error) {
+      console.error("❌ Error adding team member:", error);
+      if (error instanceof z.ZodError) {
+        console.log("❌ ERRO ZOD:", error.errors);
+        res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      } else if (error && typeof error === 'object' && 'code' in error) {
+        // Erros de constraint do PostgreSQL
+        console.log("❌ ERRO DB CODE:", error.code, "CONSTRAINT:", error.constraint);
+        if (error.code === '23505') {
+          if (error.constraint?.includes('athlete_id')) {
+            res.status(400).json({ error: "Este atleta já está na equipe" });
+          } else if (error.constraint?.includes('board_order')) {
+            res.status(400).json({ error: "Esta posição já está ocupada" });
+          } else {
+            res.status(400).json({ error: "Membro duplicado" });
+          }
+        } else {
+          res.status(500).json({ error: "Erro interno do servidor" });
+        }
+      } else {
+        console.log("❌ ERRO GENERICO:", error);
+        res.status(500).json({ error: "Falha ao adicionar membro" });
+      }
+    }
+  });
+
+  // Atualizar membro da equipe
+  app.put("/api/team-members/:id", requireAuth, requirePermission("teams.manage"), async (req, res) => {
+    try {
+      const validatedData = insertTeamMemberSchema.partial().parse(req.body);
+      const member = await storage.updateTeamMember(req.params.id, validatedData);
+      if (!member) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      res.json(member);
+    } catch (error) {
+      console.error("Error updating team member:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid team member data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update team member" });
+      }
+    }
+  });
+
+  // Remover membro da equipe
+  app.delete("/api/team-members/:id", requireAuth, requirePermission("teams.manage"), async (req, res) => {
+    try {
+      const success = await storage.deleteTeamMember(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Team member not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing team member:", error);
+      res.status(500).json({ error: "Failed to remove team member" });
+    }
+  });
+
+  // ===========================
+  // Tournament Teams routes  
+  // ===========================
+  
+  // Listar equipes de um torneio
+  app.get("/api/tournaments/:tournamentId/teams", requireAuth, async (req, res) => {
+    try {
+      const { categoryId } = req.query;
+      const teams = await storage.getTournamentTeams(req.params.tournamentId, categoryId as string);
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching tournament teams:", error);
+      res.status(500).json({ error: "Failed to fetch tournament teams" });
+    }
+  });
+
+  // Listar equipes de uma categoria com dados da equipe
+  app.get("/api/tournaments/:tournamentId/categories/:categoryId/teams", requireAuth, async (req, res) => {
+    try {
+      const teams = await storage.getTeamsByTournamentCategory(req.params.tournamentId, req.params.categoryId);
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching teams by category:", error);
+      res.status(500).json({ error: "Failed to fetch teams by category" });
+    }
+  });
+
+  // Inscrever equipe em torneio/categoria
+  app.post("/api/tournaments/:tournamentId/teams", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const validatedData = insertTournamentTeamSchema.parse({
+        ...req.body,
+        tournamentId: req.params.tournamentId
+      });
+      const tournamentTeam = await storage.createTournamentTeam(validatedData);
+      res.status(201).json(tournamentTeam);
+    } catch (error) {
+      console.error("Error registering team in tournament:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid tournament team data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to register team in tournament" });
+      }
+    }
+  });
+
+  // Atualizar inscrição de equipe
+  app.put("/api/tournament-teams/:id", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const validatedData = insertTournamentTeamSchema.partial().parse(req.body);
+      const tournamentTeam = await storage.updateTournamentTeam(req.params.id, validatedData);
+      if (!tournamentTeam) {
+        return res.status(404).json({ error: "Tournament team not found" });
+      }
+      res.json(tournamentTeam);
+    } catch (error) {
+      console.error("Error updating tournament team:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid tournament team data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update tournament team" });
+      }
+    }
+  });
+
+  // Remover equipe do torneio
+  app.delete("/api/tournament-teams/:id", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const success = await storage.deleteTournamentTeam(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Tournament team not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing team from tournament:", error);
+      res.status(500).json({ error: "Failed to remove team from tournament" });
+    }
+  });
+
+  // ===========================
+  // Team Ties routes  
+  // ===========================
+  
+  // Listar confrontos entre equipes
+  app.get("/api/tournaments/:tournamentId/ties", requireAuth, async (req, res) => {
+    try {
+      const { categoryId } = req.query;
+      const ties = await storage.getTeamTies(req.params.tournamentId, categoryId as string);
+      res.json(ties);
+    } catch (error) {
+      console.error("Error fetching team ties:", error);
+      res.status(500).json({ error: "Failed to fetch team ties" });
+    }
+  });
+
+  // Buscar confronto por ID
+  app.get("/api/ties/:id", requireAuth, async (req, res) => {
+    try {
+      const tie = await storage.getTeamTie(req.params.id);
+      if (!tie) {
+        return res.status(404).json({ error: "Team tie not found" });
+      }
+      res.json(tie);
+    } catch (error) {
+      console.error("Error fetching team tie:", error);
+      res.status(500).json({ error: "Failed to fetch team tie" });
+    }
+  });
+
+  // Criar confronto entre equipes
+  app.post("/api/tournaments/:tournamentId/ties", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const validatedData = insertTeamTieSchema.parse({
+        ...req.body,
+        tournamentId: req.params.tournamentId
+      });
+      const tie = await storage.createTeamTie(validatedData);
+      res.status(201).json(tie);
+    } catch (error) {
+      console.error("Error creating team tie:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid team tie data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create team tie" });
+      }
+    }
+  });
+
+  // Criar confronto com partidas filhas automaticamente
+  app.post("/api/tournaments/:tournamentId/ties/with-matches", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const { tie, matches } = req.body;
+      const validatedTie = insertTeamTieSchema.parse({
+        ...tie,
+        tournamentId: req.params.tournamentId
+      });
+      
+      const validatedMatches = matches.map((match: any) => insertMatchSchema.parse(match));
+      
+      const result = await storage.createTieWithChildren(validatedTie, validatedMatches);
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error creating team tie with matches:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid tie or match data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create team tie with matches" });
+      }
+    }
+  });
+
+  // Atualizar confronto
+  app.put("/api/ties/:id", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const validatedData = insertTeamTieSchema.partial().parse(req.body);
+      const tie = await storage.updateTeamTie(req.params.id, validatedData);
+      if (!tie) {
+        return res.status(404).json({ error: "Team tie not found" });
+      }
+      res.json(tie);
+    } catch (error) {
+      console.error("Error updating team tie:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid team tie data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update team tie" });
+      }
+    }
+  });
+
+  // Recalcular pontuação do confronto baseado nas partidas filhas
+  app.put("/api/ties/:id/recalculate-score", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const tie = await storage.updateTieScoreFromChildMatches(req.params.id);
+      if (!tie) {
+        return res.status(404).json({ error: "Team tie not found" });
+      }
+      res.json(tie);
+    } catch (error) {
+      console.error("Error recalculating tie score:", error);
+      res.status(500).json({ error: "Failed to recalculate tie score" });
+    }
+  });
+
+  // Deletar confronto
+  app.delete("/api/ties/:id", requireAuth, requirePermission("tournaments.manage"), async (req, res) => {
+    try {
+      const success = await storage.deleteTeamTie(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Team tie not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting team tie:", error);
+      res.status(500).json({ error: "Failed to delete team tie" });
+    }
+  });
+
+  // Listar confrontos por categoria e fase
+  app.get("/api/tournaments/:tournamentId/categories/:categoryId/ties/:phase", requireAuth, async (req, res) => {
+    try {
+      const ties = await storage.getTiesByCategoryPhase(req.params.tournamentId, req.params.categoryId, req.params.phase);
+      res.json(ties);
+    } catch (error) {
+      console.error("Error fetching ties by phase:", error);
+      res.status(500).json({ error: "Failed to fetch ties by phase" });
+    }
+  });
+
+  // Obter classificação de grupos para equipes
+  app.get("/api/tournaments/:tournamentId/categories/:categoryId/team-group-standings", requireAuth, async (req, res) => {
+    try {
+      const standings = await storage.computeTeamGroupStandings(req.params.tournamentId, req.params.categoryId);
+      res.json(standings);
+    } catch (error) {
+      console.error("Error computing team group standings:", error);
+      res.status(500).json({ error: "Failed to compute team group standings" });
     }
   });
 
@@ -2183,10 +2606,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case 'round_robin_double':
         case 'league_double': // Liga dupla (ida e volta)
         case 'league_round_trip': // Liga ida e volta
-          console.log(`Creating round-robin matches for format: ${format}...`);
-          const isDouble = format.includes('double') || format.includes('round_trip') || req.body.isDoubleRoundRobin;
-          const leagueBestOfSets = req.body.groupConfig?.bestOfSets || req.body.bestOfSets || 3;
-          matches = await generateRoundRobinMatches(req.params.id, req.params.categoryId, participants, isDouble, leagueBestOfSets);
+          // 🔍 VERIFICAR SE HÁ EQUIPES REGISTRADAS
+          const tournamentTeams = await storage.getTournamentTeams(req.params.id, req.params.categoryId);
+          const hasTeams = tournamentTeams && tournamentTeams.length > 0;
+          
+          if (hasTeams) {
+            console.log(`🏆 TEAM-BASED TOURNAMENT DETECTED! Creating team ties and matches for ${tournamentTeams.length} teams...`);
+            const teamBestOfSets = req.body.groupConfig?.bestOfSets || req.body.bestOfSets || 3;
+            const maxBoards = req.body.groupConfig?.maxBoards || 7;
+            const pairingMode = req.body.groupConfig?.pairingMode || 'ordered';
+            
+            // Usar BracketManager para criar confrontos de equipe
+            const bracketManager = new BracketManager(storage);
+            const teamTiesResult = await bracketManager.generateTeamGroupMatches(
+              req.params.id, 
+              req.params.categoryId, 
+              tournamentTeams,  // 🔧 CORRETO: passar as equipes como 3º parâmetro
+              pairingMode
+            );
+            
+            // Para este endpoint, retornar as partidas criadas (não os ties)
+            matches = teamTiesResult.matches || [];
+            console.log(`✅ Team bracket created: ${teamTiesResult.ties?.length || 0} ties, ${matches.length} individual matches`);
+          } else {
+            console.log(`Creating individual round-robin matches for format: ${format}...`);
+            const isDouble = format.includes('double') || format.includes('round_trip') || req.body.isDoubleRoundRobin;
+            const leagueBestOfSets = req.body.groupConfig?.bestOfSets || req.body.bestOfSets || 3;
+            matches = await generateRoundRobinMatches(req.params.id, req.params.categoryId, participants, isDouble, leagueBestOfSets);
+          }
+          break;
+          
+        case 'team_round_robin':
+          console.log("Creating team round-robin ties and matches...");
+          const teamBestOfSets = req.body.groupConfig?.bestOfSets || req.body.bestOfSets || 3;
+          const maxBoards = req.body.groupConfig?.maxBoards || 7;
+          const pairingMode = req.body.groupConfig?.pairingMode || 'ordered';
+          const pointsPerWin = req.body.groupConfig?.pointsPerWin || 1;
+          
+          // Usar BracketManager para criar confrontos de equipe
+          const bracketManager = new BracketManager(storage);
+          const teamTiesResult = await bracketManager.generateTeamGroupMatches(
+            req.params.id, 
+            req.params.categoryId, 
+            pairingMode
+          );
+          
+          // Para este endpoint, retornar as partidas criadas (não os ties)
+          matches = teamTiesResult.matches || [];
           break;
           
         case 'single_elimination':
@@ -2457,10 +2923,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Torneio não encontrado" });
       }
 
-      // Verificar se torneio permite inscrição direta (apenas se pausado)
-      if (tournament.status !== 'paused') {
+      // Verificar se torneio permite inscrição direta
+      const allowedStatuses = ['draft', 'registration_open', 'paused'];
+      if (!allowedStatuses.includes(tournament.status)) {
         return res.status(400).json({ 
-          error: "Inscrição direta de atletas só é permitida quando o torneio estiver pausado" 
+          error: "Inscrição direta de atletas só é permitida em torneios em rascunho, com inscrições abertas ou pausados" 
         });
       }
 
@@ -2968,23 +3435,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DEBUG ROUTE - Forçar reconciliação de brackets (sem auth para debug)
-  app.post("/api/debug/fix-bracket/:tournamentId/:categoryId", async (req, res) => {
-    try {
-      console.log(`[DEBUG] Forçando reconciliação manual para ${req.params.tournamentId}/${req.params.categoryId}`);
-      
-      // Forçar reconciliação de placeholders
-      await bracketManager.reconcilePlaceholders(req.params.tournamentId, req.params.categoryId, 2);
-      
-      // Auto-completar partidas BYE
-      await bracketManager.autoCompleteBYEMatches(req.params.tournamentId, req.params.categoryId);
-      
-      res.json({ success: true, message: "Bracket reconciliation forced" });
-    } catch (error) {
-      console.error("Error in bracket reconciliation:", error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: errorMessage });
-    }
-  });
   
   // BRACKET ROUTES - Sistema de chaveamento
   
