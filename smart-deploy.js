@@ -78,6 +78,8 @@ function getLocalFiles() {
     'server/**/*',
     'shared/**/*',
     'package.json',
+    'package-lock.json',
+    'render.yaml',
     'tsconfig.json',
     'tailwind.config.ts',
     'vite.config.ts',
