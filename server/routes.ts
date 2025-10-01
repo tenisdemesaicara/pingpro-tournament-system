@@ -1912,13 +1912,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error("Inscrições online não estão abertas para este torneio");
         }
         
-        // 3. Validate category exists and belongs to tournament
-        console.log(`📋 Validating category ${categoryId}...`);
-        const tournamentCategories = await storage.getTournamentCategories(tournamentId);
-        const selectedCategory = tournamentCategories.find(cat => cat.id === categoryId);
+        // 3. Validate categories - at least one must be provided
+        console.log(`📋 Validating categories...`);
         
-        if (!selectedCategory) {
-          throw new Error("Categoria selecionada não pertence a este torneio");
+        // Ensure at least one category is selected
+        if (!categoryId && !technicalCategoryId) {
+          throw new Error("É necessário selecionar ao menos uma categoria (por idade ou técnica)");
+        }
+        
+        const tournamentCategories = await storage.getTournamentCategories(tournamentId);
+        
+        // Validate age category if provided
+        let selectedAgeCategory = null;
+        if (categoryId) {
+          selectedAgeCategory = tournamentCategories.find(cat => cat.id === categoryId);
+          if (!selectedAgeCategory) {
+            throw new Error("Categoria por idade selecionada não pertence a este torneio");
+          }
+          console.log(`✅ Age category validated: ${selectedAgeCategory.name}`);
+        }
+        
+        // Validate technical category if provided
+        let selectedTechnicalCategory = null;
+        if (technicalCategoryId) {
+          selectedTechnicalCategory = tournamentCategories.find(cat => cat.id === technicalCategoryId);
+          if (!selectedTechnicalCategory) {
+            throw new Error("Categoria técnica selecionada não pertence a este torneio");
+          }
+          console.log(`✅ Technical category validated: ${selectedTechnicalCategory.name}`);
         }
         
         // 4. Athlete eligibility validation
@@ -1926,23 +1947,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tournamentYear = extractYearFromDate(tournament.startDate?.toISOString() || new Date().toISOString());
         const ageInTournament = calculateAgeInTournamentYear(athleteData.birthDate, tournamentYear);
         
-        // Validate age eligibility for the category
-        if (!selectedCategory.name.toLowerCase().includes('absoluto')) {
-          if (selectedCategory.minAge !== null && ageInTournament < selectedCategory.minAge) {
-            throw new Error(`Idade mínima para a categoria ${selectedCategory.name}: ${selectedCategory.minAge} anos`);
-          }
-          if (selectedCategory.maxAge !== null && ageInTournament > selectedCategory.maxAge) {
-            throw new Error(`Idade máxima para a categoria ${selectedCategory.name}: ${selectedCategory.maxAge} anos`);
-          }
-        }
+        // Validate eligibility for ALL selected categories (age and/or technical)
+        const categoriesToValidate = [selectedAgeCategory, selectedTechnicalCategory].filter(Boolean);
         
-        // Validate gender eligibility
-        if (selectedCategory.gender !== 'misto') {
-          const normalizedAthleteGender = athleteData.gender === 'masculino' ? 'masculino' : 'feminino';
-          const normalizedCategoryGender = selectedCategory.gender === 'masculino' ? 'masculino' : 'feminino';
+        for (const category of categoriesToValidate) {
+          if (!category) continue;
           
-          if (normalizedAthleteGender !== normalizedCategoryGender) {
-            throw new Error(`Esta categoria é exclusiva para o sexo ${selectedCategory.gender}`);
+          // Validate age eligibility (skip for "absoluto" categories)
+          if (!category.name.toLowerCase().includes('absoluto')) {
+            if (category.minAge !== null && ageInTournament < category.minAge) {
+              throw new Error(`Idade mínima para a categoria ${category.name}: ${category.minAge} anos`);
+            }
+            if (category.maxAge !== null && ageInTournament > category.maxAge) {
+              throw new Error(`Idade máxima para a categoria ${category.name}: ${category.maxAge} anos`);
+            }
+          }
+          
+          // Validate gender eligibility
+          if (category.gender !== 'misto') {
+            const normalizedAthleteGender = athleteData.gender === 'masculino' ? 'masculino' : 'feminino';
+            const normalizedCategoryGender = category.gender === 'masculino' ? 'masculino' : 'feminino';
+            
+            if (normalizedAthleteGender !== normalizedCategoryGender) {
+              throw new Error(`A categoria ${category.name} é exclusiva para o sexo ${category.gender}`);
+            }
           }
         }
         
