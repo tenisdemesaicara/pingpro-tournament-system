@@ -236,11 +236,25 @@ export default function PublicMatchView({
                 <SelectValue placeholder="Selecione fase" />
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-700">
-                {getAvailablePhases(selectedCategory).map((phase) => (
-                  <SelectItem key={phase} value={phase} className="text-white hover:bg-gray-800">
-                    {phase}
-                  </SelectItem>
-                ))}
+                {getAvailablePhases(selectedCategory).map((phase) => {
+                  const phaseLabels: Record<string, string> = {
+                    'group': 'Fase de Grupos',
+                    'knockout': 'Eliminatórias',
+                    'league': 'Pontos Corridos',
+                    'swiss': 'Sistema Suíço',
+                    'round_of_32': 'Oitavas de Final',
+                    'round_of_16': 'Oitavas de Final',
+                    'quarterfinal': 'Quartas de Final',
+                    'semifinal': 'Semifinal',
+                    'final': 'Final'
+                  };
+                  
+                  return (
+                    <SelectItem key={phase} value={phase} className="text-white hover:bg-gray-800">
+                      {phaseLabels[phase] || phase}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

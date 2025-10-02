@@ -33,42 +33,34 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
     return name.includes('misto') || name.includes('mista') || name.includes('mixed');
   };
   
-  // Obter fases disponíveis baseado no formato
+  // Obter fases disponíveis baseado no formato (retorna valores em inglês como no banco)
   const getAvailablePhases = (categoryId?: string) => {
     const format = tournament.format;
     
-    if (format === 'world_cup_groups') {
-      return ['Fase de Grupos', 'Oitavas de Final', 'Quartas de Final', 'Semifinal', 'Final'];
-    } else if (format === 'single_elimination') {
-      return ['Oitavas de Final', 'Quartas de Final', 'Semifinal', 'Final'];
-    } else if (format === 'double_elimination') {
-      return ['Chave Superior', 'Chave Inferior', 'Grande Final'];
-    } else if (format === 'round_robin') {
-      return ['Fase de Grupos'];
+    if (format === 'groups_elimination' || format === 'group_stage_knockout' || format === 'cup') {
+      return ['group', 'knockout'];
+    } else if (format === 'single_elimination' || format === 'double_elimination') {
+      return ['knockout'];
+    } else if (format === 'round_robin' || format === 'league') {
+      return ['league'];
     } else if (format === 'swiss') {
-      return ['Sistema Suíço'];
-    } else if (format === 'league') {
-      return ['Turno', 'Returno'];
-    } else if (format === 'playoff') {
-      return ['Fase de Grupos', 'Playoff'];
-    } else if (format === 'combined') {
-      return ['Fase de Grupos', 'Fase Final'];
+      return ['swiss'];
     }
     
-    // Para grupos com mata-mata
+    // Para grupos com mata-mata - detectar fases reais do torneio
     if (categoryId && matches) {
       const categoryMatches = matches.filter(m => m.categoryId === categoryId);
-      const hasGroups = categoryMatches.some(m => m.phase === 'Fase de Grupos');
+      const hasGroups = categoryMatches.some(m => m.phase === 'group');
       const hasKnockout = categoryMatches.some(m => 
-        m.phase && ['Oitavas', 'Quartas', 'Semifinal', 'Final'].some(p => m.phase.includes(p))
+        m.phase && ['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'].includes(m.phase)
       );
       
       if (hasGroups && hasKnockout) {
-        return ['Fase de Grupos', 'Oitavas de Final', 'Quartas de Final', 'Semifinal', 'Final'];
+        return ['group', 'knockout'];
       }
     }
     
-    return ['Final'];
+    return ['league']; // Padrão
   };
   
   // Obter grupos disponíveis para uma categoria e fase
