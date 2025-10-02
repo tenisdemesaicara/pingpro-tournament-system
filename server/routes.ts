@@ -2371,20 +2371,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("=== UPDATE TOURNAMENT DEBUG ===");
       console.log("Tournament ID:", req.params.id);
-      console.log("Update data:", JSON.stringify(req.body, null, 2));
+      console.log("Raw body:", JSON.stringify(req.body, null, 2));
       
       // Convert date strings to Date objects if present
       const updateData = { ...req.body };
       if (updateData.registrationDeadline && typeof updateData.registrationDeadline === 'string') {
+        console.log("Converting registrationDeadline:", updateData.registrationDeadline);
         updateData.registrationDeadline = new Date(updateData.registrationDeadline);
+        console.log("Converted to Date:", updateData.registrationDeadline.toISOString());
       }
       if (updateData.startDate && typeof updateData.startDate === 'string') {
+        console.log("Converting startDate:", updateData.startDate);
         updateData.startDate = new Date(updateData.startDate);
+        console.log("Converted to Date:", updateData.startDate.toISOString());
       }
       if (updateData.endDate && typeof updateData.endDate === 'string') {
+        console.log("Converting endDate:", updateData.endDate);
         updateData.endDate = new Date(updateData.endDate);
+        console.log("Converted to Date:", updateData.endDate.toISOString());
       }
       
+      console.log("Calling storage.updateTournament with converted data");
       const tournament = await storage.updateTournament(req.params.id, updateData);
       if (!tournament) {
         return res.status(404).json({ error: "Tournament not found" });
