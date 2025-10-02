@@ -279,17 +279,17 @@ export default function TournamentPublic() {
               <div className="text-center mb-12">
                 <div className="flex justify-center mb-6">
                   <div className="p-6 bg-purple-500/20 rounded-full">
-                    <Trophy className="w-16 h-16 text-purple-400" />
+                    <Trophy className="w-16 h-16 text-purple-600 dark:text-purple-400" />
                   </div>
                 </div>
-                <Badge className="bg-purple-500/90 text-white border-0 px-4 py-2 mb-4">
+                <Badge className="bg-purple-600 text-white border-0 px-4 py-2 mb-4">
                   <Trophy className="w-4 h-4 mr-1" />
                   Torneio Oficial
                 </Badge>
-                <h1 className="text-5xl lg:text-7xl font-bold text-white mb-4 leading-tight">
+                <h1 className="text-5xl lg:text-7xl font-bold text-slate-900 dark:text-white mb-4 leading-tight">
                   {tournamentData.name}
                 </h1>
-                <p className="text-2xl text-white flex items-center justify-center gap-2">
+                <p className="text-2xl text-slate-800 dark:text-white flex items-center justify-center gap-2">
                   <Star className="w-6 h-6" />
                   Organizado por {tournamentData.organizer || 'Não informado'}
                 </p>
@@ -324,7 +324,7 @@ export default function TournamentPublic() {
                   <CardContent className="p-8">
                     <Trophy className="w-16 h-16 text-green-600 dark:text-green-400 mx-auto mb-4 animate-pulse" />
                     <h2 className="text-3xl font-bold text-green-800 dark:text-white mb-3">Inscrições Abertas!</h2>
-                    <p className="text-slate-700 dark:text-white text-base mb-6 max-w-md mx-auto font-medium">
+                    <p className="text-slate-800 dark:text-white text-base mb-6 max-w-md mx-auto font-medium">
                       Faça sua inscrição agora e participe deste torneio incrível. 
                       Cadastre-se rapidamente e garante sua vaga!
                     </p>
@@ -391,25 +391,25 @@ export default function TournamentPublic() {
 
 
           {/* Filters Section */}
-          <Card className="bg-white/90 dark:bg-white/5 backdrop-blur-lg border-slate-200 dark:border-white/10 shadow-lg">
+          <Card className="bg-white dark:bg-slate-800 backdrop-blur-lg border-slate-300 dark:border-slate-600 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-xl text-slate-800 dark:text-white flex items-center gap-3">
-                <Filter className="w-5 h-5 text-blue-500 dark:text-purple-400" />
+              <CardTitle className="text-xl text-slate-900 dark:text-white flex items-center gap-3">
+                <Filter className="w-5 h-5 text-blue-600 dark:text-purple-400" />
                 Filtrar Participantes
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-slate-600 dark:text-white/70 mb-2 block">Categoria</label>
+                  <label className="text-sm text-slate-700 dark:text-slate-300 mb-2 block font-medium">Categoria</label>
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="bg-white dark:bg-white/10 border-slate-300 dark:border-white/20 text-slate-800 dark:text-white">
+                    <SelectTrigger className="bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-900 dark:text-white">
                       <SelectValue placeholder="Todas as categorias" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-gray-700">
-                      <SelectItem value="all" className="text-white hover:bg-gray-800">Todas as Categorias</SelectItem>
+                    <SelectContent className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                      <SelectItem value="all" className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700">Todas as Categorias</SelectItem>
                       {tournamentData.categories?.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id} className="text-white hover:bg-gray-800">
+                        <SelectItem key={category.id} value={category.id} className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700">
                           {category.name}
                         </SelectItem>
                       ))}
@@ -418,21 +418,21 @@ export default function TournamentPublic() {
                 </div>
                 {!isSelectedCategoryMixed && (
                   <div>
-                    <label className="text-sm text-slate-600 dark:text-white/70 mb-2 block">Gênero</label>
+                    <label className="text-sm text-slate-700 dark:text-slate-300 mb-2 block font-medium">Gênero</label>
                     <Select value={selectedGender} onValueChange={setSelectedGender}>
-                      <SelectTrigger className="bg-white dark:bg-white/10 border-slate-300 dark:border-white/20 text-slate-800 dark:text-white">
+                      <SelectTrigger className="bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500 text-slate-900 dark:text-white">
                         <SelectValue placeholder="Todos os gêneros" />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-900 border-gray-700">
-                        <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
-                        <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
-                        <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
+                      <SelectContent className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                        <SelectItem value="all" className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700">Todos os Gêneros</SelectItem>
+                        <SelectItem value="masculino" className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700">Masculino</SelectItem>
+                        <SelectItem value="feminino" className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700">Feminino</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 )}
               </div>
-              <div className="mt-4 text-sm text-slate-700 dark:text-slate-200 font-medium">
+              <div className="mt-4 text-sm text-slate-700 dark:text-slate-300 font-medium">
                 Mostrando {filteredParticipants.length} de {tournamentData.participants?.length || 0} participantes
               </div>
             </CardContent>
@@ -533,12 +533,12 @@ export default function TournamentPublic() {
           )}
 
           {/* Participants Section */}
-          <Card className="bg-white/90 dark:bg-white/5 backdrop-blur-lg border-slate-200 dark:border-white/10 shadow-lg">
+          <Card className="bg-white dark:bg-slate-800 backdrop-blur-lg border-slate-300 dark:border-slate-600 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-2xl text-slate-800 dark:text-white flex items-center gap-3">
-                <Users className="w-6 h-6 text-blue-500 dark:text-purple-400" />
+              <CardTitle className="text-2xl text-slate-900 dark:text-white flex items-center gap-3">
+                <Users className="w-6 h-6 text-blue-600 dark:text-purple-400" />
                 Participantes Inscritos
-                <Badge variant="secondary" className="bg-blue-500/20 dark:bg-purple-500/20 text-blue-700 dark:text-purple-300 border-blue-400/30 dark:border-purple-400/30">
+                <Badge variant="secondary" className="bg-blue-100 dark:bg-purple-500/20 text-blue-800 dark:text-purple-300 border-blue-300 dark:border-purple-400/30">
                   {filteredParticipants.length}
                 </Badge>
               </CardTitle>
@@ -556,10 +556,10 @@ export default function TournamentPublic() {
                     
                     return (
                       <div key={category.id} className="space-y-4">
-                        <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-white/10">
-                          <Award className="w-5 h-5 text-blue-500 dark:text-purple-400" />
-                          <h3 className="text-xl font-semibold text-slate-800 dark:text-white">{category.name}</h3>
-                          <Badge variant="outline" className="border-purple-400/30 text-purple-300">
+                        <div className="flex items-center gap-3 pb-3 border-b border-slate-300 dark:border-slate-600">
+                          <Award className="w-5 h-5 text-blue-600 dark:text-purple-400" />
+                          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">{category.name}</h3>
+                          <Badge variant="outline" className="border-blue-300 dark:border-purple-400/30 text-blue-800 dark:text-purple-300 bg-blue-50 dark:bg-transparent">
                             {participantsInCategory.length} atletas
                           </Badge>
                         </div>
@@ -567,7 +567,7 @@ export default function TournamentPublic() {
                           {participantsInCategory.map((participant: any, index: number) => (
                             <div 
                               key={participant.id} 
-                              className="group relative p-4 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-lg border border-white/10 hover:border-purple-400/50 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300"
+                              className="group relative p-4 bg-slate-50 dark:bg-slate-700/50 backdrop-blur-sm rounded-lg border border-slate-200 dark:border-slate-600 hover:border-blue-400 dark:hover:border-purple-400/50 hover:shadow-lg transition-all duration-300"
                               style={{ animationDelay: `${index * 100}ms` }}
                             >
                               <div className="flex items-center gap-4">
@@ -576,31 +576,31 @@ export default function TournamentPublic() {
                                     <img 
                                       src={participant.athlete?.photoUrl || participant.photoUrl} 
                                       alt={participant.athlete?.name || participant.name}
-                                      className="w-12 h-12 rounded-full object-cover shadow-lg border-2 border-white/20"
+                                      className="w-12 h-12 rounded-full object-cover shadow-lg border-2 border-slate-300 dark:border-slate-500"
                                     />
                                   ) : (
-                                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-purple-500 dark:to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
                                       {(participant.athlete?.name || participant.name)?.charAt(0)?.toUpperCase() || '?'}
                                     </div>
                                   )}
                                   {(participant.athlete?.status || participant.status) === 'approved' && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-slate-700 rounded-full"></div>
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-semibold text-white truncate">
+                                  <h4 className="font-semibold text-slate-900 dark:text-white truncate">
                                     {participant.athlete?.name || participant.name || 'Nome não disponível'}
                                   </h4>
-                                  <p className="text-sm text-white/60 truncate">
+                                  <p className="text-sm text-slate-600 dark:text-slate-300 truncate">
                                     {participant.athlete?.club || participant.club || 'Independente'}
                                   </p>
                                   <div className="flex items-center gap-2 mt-1">
                                     {(participant.athlete?.status || participant.status) === 'approved' ? (
-                                      <Badge className="text-xs bg-green-500/20 text-green-300 border-green-400/30">
+                                      <Badge className="text-xs bg-green-100 dark:bg-green-500/20 text-green-800 dark:text-green-300 border-green-300 dark:border-green-400/30">
                                         Confirmado
                                       </Badge>
                                     ) : (
-                                      <Badge className="text-xs bg-yellow-500/20 text-yellow-300 border-yellow-400/30">
+                                      <Badge className="text-xs bg-yellow-100 dark:bg-yellow-500/20 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-400/30">
                                         Pendente
                                       </Badge>
                                     )}
@@ -616,20 +616,20 @@ export default function TournamentPublic() {
                 </div>
               ) : (
                 <div className="text-center py-16">
-                  <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Users className="w-12 h-12 text-white/40" />
+                  <div className="w-24 h-24 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Users className="w-12 h-12 text-slate-400 dark:text-slate-500" />
                   </div>
-                  <h3 className="text-2xl font-semibold text-white mb-3">
+                  <h3 className="text-2xl font-semibold text-slate-900 dark:text-white mb-3">
                     {selectedCategory !== "all" || selectedGender !== "all" 
                       ? "Nenhum participante encontrado" 
                       : "Aguardando Inscrições"}
                   </h3>
-                  <p className="text-white/60 max-w-md mx-auto mb-6">
+                  <p className="text-slate-600 dark:text-slate-300 max-w-md mx-auto mb-6">
                     {selectedCategory !== "all" || selectedGender !== "all" 
                       ? "Tente ajustar os filtros para ver mais participantes." 
                       : "As inscrições serão exibidas aqui conforme os atletas se registrarem no torneio."}
                   </p>
-                  <div className="flex items-center justify-center gap-2 text-sm text-white/40">
+                  <div className="flex items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                     <Clock className="w-4 h-4" />
                     <span>Atualizações em tempo real</span>
                   </div>
