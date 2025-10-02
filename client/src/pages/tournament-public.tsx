@@ -450,62 +450,108 @@ export default function TournamentPublic() {
           </Card>
 
           {/* Informações sobre o formato da categoria */}
-          {selectedCategory !== 'all' && tournamentData?.format && (
-            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-blue-200 dark:border-blue-700 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-xl text-slate-900 dark:text-white flex items-center gap-3">
-                  <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  Formato da Competição
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                    <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    {tournamentData.format === 'single_elimination' && 'Sistema de Eliminação Simples'}
-                    {tournamentData.format === 'double_elimination' && 'Sistema de Eliminação Dupla'}
-                    {tournamentData.format === 'round_robin' && 'Sistema de Todos Contra Todos (Round Robin)'}
-                    {tournamentData.format === 'swiss' && 'Sistema Suíço'}
-                  </h3>
-                  <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
-                    {tournamentData.format === 'single_elimination' && 
-                      'Cada atleta compete em um chaveamento direto. Uma derrota significa a eliminação do torneio. O campeão é definido pela vitória na partida final, sem direito a revanche.'}
-                    {tournamentData.format === 'double_elimination' && 
-                      'Cada atleta tem direito a uma segunda chance. Após a primeira derrota, o atleta vai para a "chave da repescagem". O campeão é definido quando um atleta vence ambas as chaves ou quando o vencedor da chave principal derrota o da repescagem na final.'}
-                    {tournamentData.format === 'round_robin' && 
-                      'Todos os atletas enfrentam todos os outros atletas da categoria. O campeão é definido pelo maior número de vitórias, com critérios de desempate aplicados se necessário (saldo de sets, saldo de pontos, confronto direto).'}
-                    {tournamentData.format === 'swiss' && 
-                      'Os atletas são pareados a cada rodada com base em seu desempenho anterior. Atletas com desempenhos similares enfrentam-se. O campeão é definido pelo maior número de vitórias após todas as rodadas, sem eliminação direta.'}
-                  </p>
-                </div>
+          {selectedCategory !== 'all' && (() => {
+            const selectedCategoryData = tournamentData?.categories?.find((c: any) => c.id === selectedCategory);
+            if (!selectedCategoryData) return null;
+            
+            // Usar formato da categoria ou fallback para o torneio
+            const categoryFormat = selectedCategoryData.format || tournamentData?.format;
+            
+            // Contar participantes da categoria
+            const categoryParticipants = filteredParticipants.length;
+            
+            // Informações da categoria
+            const categoryName = selectedCategoryData.name;
+            const categoryGender = selectedCategoryData.gender;
+            const minAge = selectedCategoryData.minAge;
+            const maxAge = selectedCategoryData.maxAge;
+            
+            // Construir descrição da faixa etária
+            let ageDescription = '';
+            if (minAge && maxAge) {
+              ageDescription = `${minAge} a ${maxAge} anos`;
+            } else if (minAge) {
+              ageDescription = `${minAge}+ anos`;
+            } else if (maxAge) {
+              ageDescription = `até ${maxAge} anos`;
+            }
+            
+            return (
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-blue-200 dark:border-blue-700 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-xl text-slate-900 dark:text-white flex items-center gap-3">
+                    <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    Informações da Categoria: {categoryName}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Informações da Categoria */}
+                  <div className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Detalhes da Categoria
+                    </h3>
+                    <div className="space-y-2 text-slate-700 dark:text-slate-300 text-sm">
+                      <p><strong className="text-slate-900 dark:text-white">Participantes:</strong> {categoryParticipants} atletas inscritos</p>
+                      {categoryGender && <p><strong className="text-slate-900 dark:text-white">Gênero:</strong> {categoryGender === 'masculino' ? 'Masculino' : categoryGender === 'feminino' ? 'Feminino' : 'Misto'}</p>}
+                      {ageDescription && <p><strong className="text-slate-900 dark:text-white">Faixa Etária:</strong> {ageDescription}</p>}
+                    </div>
+                  </div>
 
-                <div className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    Decisão do Campeão
-                  </h3>
-                  <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
-                    {(tournamentData.format === 'single_elimination' || tournamentData.format === 'double_elimination') && 
-                      'O campeão é definido na partida final. No tênis de mesa, as partidas geralmente são disputadas em melhor de 5 ou 7 sets. Cada set vai até 11 pontos, com vantagem de 2 pontos para vencer. Os semifinalistas derrotados recebem medalha de bronze (3º lugar), seguindo a tradição olímpica.'}
-                    {tournamentData.format === 'round_robin' && 
-                      'O campeão é o atleta com mais vitórias ao final de todas as partidas. Em caso de empate, os critérios de desempate são aplicados na seguinte ordem: confronto direto entre os empatados, saldo de sets (diferença entre sets ganhos e perdidos), e saldo de pontos (diferença entre pontos marcados e sofridos).'}
-                    {tournamentData.format === 'swiss' && 
-                      'Após todas as rodadas, o atleta com maior pontuação é declarado campeão. Este sistema garante que todos disputem o mesmo número de partidas e que atletas de níveis similares se enfrentem, proporcionando competições equilibradas e emocionantes do início ao fim.'}
-                  </p>
-                </div>
+                  {/* Formato de Disputa */}
+                  {categoryFormat && (
+                    <div className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                      <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                        <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        {categoryFormat === 'single_elimination' && 'Sistema de Eliminação Simples'}
+                        {categoryFormat === 'double_elimination' && 'Sistema de Eliminação Dupla'}
+                        {categoryFormat === 'round_robin' && 'Sistema de Todos Contra Todos (Round Robin)'}
+                        {categoryFormat === 'swiss' && 'Sistema Suíço'}
+                      </h3>
+                      <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed mb-3">
+                        {categoryFormat === 'single_elimination' && 
+                          'Cada atleta compete em um chaveamento direto. Uma derrota significa a eliminação do torneio. O campeão é definido pela vitória na partida final, sem direito a revanche. É o formato mais ágil e dramático, onde cada partida é decisiva.'}
+                        {categoryFormat === 'double_elimination' && 
+                          'Cada atleta tem direito a uma segunda chance. Após a primeira derrota, o atleta vai para a "chave da repescagem". O campeão é definido quando um atleta vence ambas as chaves ou quando o vencedor da chave principal derrota o da repescagem na final. Esse formato garante mais oportunidades e partidas emocionantes.'}
+                        {categoryFormat === 'round_robin' && 
+                          'Todos os atletas enfrentam todos os outros atletas da categoria. O campeão é definido pelo maior número de vitórias, com critérios de desempate aplicados se necessário (saldo de sets, saldo de pontos, confronto direto). Este formato garante justiça máxima, pois todos têm as mesmas oportunidades.'}
+                        {categoryFormat === 'swiss' && 
+                          'Os atletas são pareados a cada rodada com base em seu desempenho anterior. Atletas com desempenhos similares enfrentam-se. O campeão é definido pelo maior número de vitórias após todas as rodadas, sem eliminação direta. Ideal para torneios com muitos participantes.'}
+                      </p>
+                    </div>
+                  )}
 
-                <div className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                    <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    Sobre o Tênis de Mesa
-                  </h3>
-                  <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
-                    O tênis de mesa é um esporte olímpico que exige reflexos rápidos, concentração máxima e estratégia refinada. Cada ponto é uma batalha de milissegundos, onde velocidade, efeito na bola e posicionamento fazem toda a diferença. Com origem no século XIX, o esporte evoluiu para se tornar uma das modalidades mais praticadas no mundo, especialmente popular na Ásia, Europa e América Latina. No Brasil, o tênis de mesa tem tradição forte e produz atletas de alto nível internacional.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  {/* Decisão do Campeão */}
+                  <div className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      Como o Campeão é Definido
+                    </h3>
+                    <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
+                      {(categoryFormat === 'single_elimination' || categoryFormat === 'double_elimination') && 
+                        `O campeão é definido na partida final entre os 2 melhores atletas. No tênis de mesa, as partidas geralmente são disputadas em melhor de 5 ou 7 sets (jogos). Cada set vai até 11 pontos, com vantagem de 2 pontos necessária para vencer (exemplo: 11-9, 12-10). Os semifinalistas derrotados recebem medalha de bronze (3º lugar), seguindo a tradição olímpica. ${categoryParticipants > 0 ? `Nesta categoria, ${categoryParticipants} atletas estão competindo pelo título.` : ''}`}
+                      {categoryFormat === 'round_robin' && 
+                        `O campeão é o atleta com mais vitórias ao final de todas as partidas. ${categoryParticipants > 2 ? `Com ${categoryParticipants} participantes, serão disputadas ${(categoryParticipants * (categoryParticipants - 1)) / 2} partidas no total.` : ''} Em caso de empate, os critérios de desempate são aplicados na seguinte ordem: (1) confronto direto entre os empatados, (2) saldo de sets (diferença entre sets ganhos e perdidos), e (3) saldo de pontos (diferença entre pontos marcados e sofridos).`}
+                      {categoryFormat === 'swiss' && 
+                        `Após todas as rodadas, o atleta com maior pontuação é declarado campeão. ${categoryParticipants > 0 ? `Com ${categoryParticipants} participantes, serão realizadas múltiplas rodadas onde todos disputam o mesmo número de partidas.` : ''} Este sistema garante que todos disputem o mesmo número de partidas e que atletas de níveis similares se enfrentem, proporcionando competições equilibradas e emocionantes do início ao fim.`}
+                      {!categoryFormat && 'O formato de disputa será definido pelo organizador do torneio. Aguarde mais informações sobre como o campeão será decidido nesta categoria.'}
+                    </p>
+                  </div>
+
+                  {/* Sobre o Tênis de Mesa */}
+                  <div className="bg-white/60 dark:bg-slate-800/60 p-4 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                      <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      Sobre o Tênis de Mesa
+                    </h3>
+                    <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
+                      O tênis de mesa é um esporte olímpico que exige reflexos rápidos, concentração máxima e estratégia refinada. Cada ponto é uma batalha de milissegundos, onde velocidade, efeito na bola e posicionamento fazem toda a diferença. Com origem no século XIX, o esporte evoluiu para se tornar uma das modalidades mais praticadas no mundo, especialmente popular na Ásia, Europa e América Latina. No Brasil, o tênis de mesa tem tradição forte e produz atletas de alto nível internacional. A raquete, a mesa e a bolinha criam um jogo de xadrez em alta velocidade, onde cada golpe pode mudar o rumo da partida.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* 🏆 PÓDIUM DA CATEGORIA - APARECE APÓS SELECIONAR CATEGORIA */}
           {podiumPositions.length > 0 && (
