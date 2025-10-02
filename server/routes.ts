@@ -2369,13 +2369,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/tournaments/:id", async (req, res) => {
     try {
-      const tournament = await storage.updateTournament(req.params.id, req.body);
+      console.log("=== UPDATE TOURNAMENT DEBUG ===");
+      console.log("Tournament ID:", req.params.id);
+      console.log("Update data:", JSON.stringify(req.body, null, 2));
+      
+      // Convert date strings to Date objects if present
+      const updateData = { ...req.body };
+      if (updateData.registrationDeadline && typeof updateData.registrationDeadline === 'string') {
+        updateData.registrationDeadline = new Date(updateData.registrationDeadline);
+      }
+      if (updateData.startDate && typeof updateData.startDate === 'string') {
+        updateData.startDate = new Date(updateData.startDate);
+      }
+      if (updateData.endDate && typeof updateData.endDate === 'string') {
+        updateData.endDate = new Date(updateData.endDate);
+      }
+      
+      const tournament = await storage.updateTournament(req.params.id, updateData);
       if (!tournament) {
         return res.status(404).json({ error: "Tournament not found" });
       }
+      console.log("Tournament updated successfully");
       res.json(tournament);
     } catch (error) {
+      console.log("=== UPDATE TOURNAMENT ERROR ===");
       console.error("Error updating tournament:", error);
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
       res.status(500).json({ error: "Failed to update tournament" });
     }
   });
