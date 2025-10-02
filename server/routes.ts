@@ -2114,13 +2114,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Validation errors:");
           error.errors.forEach((err, index) => {
             console.error(`  ${index + 1}. Field: ${err.path.join('.')} | Error: ${err.message} | Code: ${err.code}`);
+            if (err.path.join('.') === 'photoUrl') {
+              console.error(`     photoUrl value received: "${req.body.photoUrl}" (type: ${typeof req.body.photoUrl}, length: ${req.body.photoUrl?.length || 0})`);
+            }
           });
+          
+          // Create user-friendly error message focusing on the first error
+          const firstError = error.errors[0];
+          const fieldName = firstError.path.join('.');
+          let userMessage = firstError.message;
+          
+          // Map technical field names to user-friendly names
+          const fieldMap: Record<string, string> = {
+            'photoUrl': 'Foto do rosto',
+            'name': 'Nome',
+            'email': 'Email',
+            'birthDate': 'Data de nascimento',
+            'gender': 'Sexo',
+            'category': 'Categoria por idade',
+            'technicalCategory': 'Categoria técnica',
+            'zipCode': 'CEP',
+            'city': 'Cidade',
+            'state': 'Estado',
+            'neighborhood': 'Bairro'
+          };
+          
+          const friendlyFieldName = fieldMap[fieldName] || fieldName;
           
           return {
             status: 400,
             data: {
               error: "Dados inválidos",
-              message: "Por favor, verifique os dados fornecidos.",
+              message: `${friendlyFieldName}: ${userMessage}`,
               details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
             }
           };
