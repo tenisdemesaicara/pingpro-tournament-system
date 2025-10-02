@@ -168,47 +168,47 @@ export default function RegistrationConfirmationCard({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto" data-testid="registration-confirmation-overlay">
-      <Card className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl max-h-[90vh] bg-gradient-to-br from-white via-purple-50 to-pink-50 border-0 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 my-8 overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto" data-testid="registration-confirmation-overlay">
+      <Card className="w-full max-w-[95vw] sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl max-h-[95vh] sm:max-h-[90vh] bg-gradient-to-br from-white via-purple-50 to-pink-50 border-0 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 my-2 sm:my-8 overflow-hidden">
         <CardContent className="p-0 max-h-full overflow-y-auto">
           {/* Header com gradiente */}
-          <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-pink-600 p-6 lg:p-8 text-white text-center rounded-t-lg">
-            <div className="flex items-center justify-center mb-3">
-              <CheckCircle className="w-12 h-12 lg:w-16 lg:h-16 text-green-400 animate-pulse" />
+          <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-pink-600 p-4 sm:p-6 lg:p-8 text-white text-center rounded-t-lg">
+            <div className="flex items-center justify-center mb-2 sm:mb-3">
+              <CheckCircle className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 text-green-400 animate-pulse" />
             </div>
-            <h2 className="text-2xl lg:text-3xl font-bold mb-2">🎉 INSCRIÇÃO CONFIRMADA!</h2>
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 lg:p-4 border border-white/30">
-              <div className="text-sm lg:text-base opacity-90 mb-1">Número de Inscrição</div>
-              <div className="text-4xl lg:text-5xl font-bold tracking-wider" data-testid="registration-number">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 px-2">🎉 INSCRIÇÃO CONFIRMADA!</h2>
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 sm:p-3 lg:p-4 border border-white/30 mx-2 sm:mx-0">
+              <div className="text-xs sm:text-sm lg:text-base opacity-90 mb-1">Número de Inscrição</div>
+              <div className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-wider" data-testid="registration-number">
                 #{registrationNumber}
               </div>
             </div>
           </div>
 
           {/* Dados do atleta */}
-          <div className="p-6 lg:p-8 xl:p-10 space-y-4 lg:space-y-6">
-            <div className="flex items-start sm:items-center space-x-4 lg:space-x-6">
-              <Avatar className="w-20 h-20 lg:w-24 lg:h-24 xl:w-28 xl:h-28 border-4 border-purple-200 flex-shrink-0">
+          <div className="p-4 sm:p-6 lg:p-8 xl:p-10 space-y-3 sm:space-y-4 lg:space-y-6">
+            <div className="flex items-start sm:items-center space-x-3 sm:space-x-4 lg:space-x-6">
+              <Avatar className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 xl:w-28 xl:h-28 border-4 border-purple-200 flex-shrink-0">
                 <AvatarImage src={athletePhoto} alt={athleteName} />
-                <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white text-xl lg:text-2xl font-bold">
+                <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white text-lg sm:text-xl lg:text-2xl font-bold">
                   {getInitials(athleteName)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <h3 className="text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900 mb-2 break-words" data-testid="athlete-name">{athleteName}</h3>
-                <div className="flex items-center text-gray-600 mb-1 text-sm lg:text-base">
-                  <Calendar className="w-4 h-4 lg:w-5 lg:h-5 mr-2 flex-shrink-0" />
+                <h3 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 break-words" data-testid="athlete-name">{athleteName}</h3>
+                <div className="flex items-center text-gray-600 mb-1 text-xs sm:text-sm lg:text-base">
+                  <Calendar className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 mr-1 sm:mr-2 flex-shrink-0" />
                   <span data-testid="athlete-age">{athleteAge} anos</span>
                 </div>
                 {club && (
-                  <div className="flex items-center text-gray-600 mb-1 text-sm lg:text-base">
-                    <Users className="w-4 h-4 lg:w-5 lg:h-5 mr-2 flex-shrink-0" />
+                  <div className="flex items-center text-gray-600 mb-1 text-xs sm:text-sm lg:text-base">
+                    <Users className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 mr-1 sm:mr-2 flex-shrink-0" />
                     <span className="truncate" data-testid="athlete-club" title={club}>{club}</span>
                   </div>
                 )}
                 {city && (
-                  <div className="flex items-center text-gray-600 text-sm lg:text-base">
-                    <MapPin className="w-4 h-4 lg:w-5 lg:h-5 mr-2 flex-shrink-0" />
+                  <div className="flex items-center text-gray-600 text-xs sm:text-sm lg:text-base">
+                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 mr-1 sm:mr-2 flex-shrink-0" />
                     <span data-testid="athlete-city">{city}</span>
                   </div>
                 )}
