@@ -311,15 +311,43 @@ export default function TournamentPublic() {
                 <CardContent className="p-6 text-center">
                   <Calendar className="w-8 h-8 text-purple-600 dark:text-white mx-auto mb-3" />
                   <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">Data do Evento</h3>
-                  <p className="text-slate-700 dark:text-white text-base font-medium">
+                  <p className="text-slate-700 dark:text-white text-sm">
                     {tournamentData.startDate && tournamentData.endDate ? (
-                      <>
-                        {new Date(tournamentData.startDate).toLocaleDateString('pt-BR')}
-                        {' até '}
-                        {new Date(tournamentData.endDate).toLocaleDateString('pt-BR')}
-                      </>
+                      (() => {
+                        const start = new Date(tournamentData.startDate);
+                        const end = new Date(tournamentData.endDate);
+                        const sameDay = start.toDateString() === end.toDateString();
+                        const startDate = start.toLocaleDateString('pt-BR');
+                        const endDate = end.toLocaleDateString('pt-BR');
+                        const startTime = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        const endTime = end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        const hasStartTime = startTime !== '00:00';
+                        const hasEndTime = endTime !== '00:00';
+                        
+                        if (sameDay) {
+                          if (hasStartTime && hasEndTime) {
+                            return `Previsão: ${startDate} das ${startTime} às ${endTime}`;
+                          } else if (hasStartTime) {
+                            return `Previsão: ${startDate} às ${startTime}`;
+                          } else {
+                            return `Previsão: ${startDate}`;
+                          }
+                        } else {
+                          if (hasStartTime && hasEndTime) {
+                            return `Previsão: ${startDate} às ${startTime} até ${endDate} às ${endTime}`;
+                          } else {
+                            return `Previsão: ${startDate} até ${endDate}`;
+                          }
+                        }
+                      })()
                     ) : tournamentData.startDate ? (
-                      new Date(tournamentData.startDate).toLocaleDateString('pt-BR')
+                      (() => {
+                        const start = new Date(tournamentData.startDate);
+                        const startDate = start.toLocaleDateString('pt-BR');
+                        const startTime = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        const hasTime = startTime !== '00:00';
+                        return hasTime ? `Previsão: ${startDate} às ${startTime}` : `Previsão: ${startDate}`;
+                      })()
                     ) : (
                       'A definir'
                     )}
