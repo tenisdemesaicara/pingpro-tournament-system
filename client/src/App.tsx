@@ -35,6 +35,7 @@ import ConsentsAdmin from "@/pages/consents-admin";
 import AdminUsers from "@/pages/admin-users";
 import AdminSystem from "@/pages/admin-system";
 import Profile from "@/pages/profile";
+import SimplePublicTournament from "@/pages/simple-public-tournament";
 import { AuthProvider } from "@/context/auth-context";
 import ProtectedRoute from "@/components/protected-route";
 
@@ -69,6 +70,9 @@ function Router() {
         <Route path="/tournament/:id/view">
           {(params) => <PublicTournamentView />}
         </Route>
+        
+        {/* NOVA ROTA - Página pública simples */}
+        <Route path="/public-tournament/:id" component={SimplePublicTournament} />
         
         {/* Nova rota de inscrição integrada */}
         <Route path="/consent/tournament/:tournamentId" component={ConsentTournament} />
