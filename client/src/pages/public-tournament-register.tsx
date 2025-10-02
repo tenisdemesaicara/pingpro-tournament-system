@@ -319,7 +319,7 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
     if (!formData.photoUrl) {
       toast({
         title: "Foto obrigatória",
-        description: "Por favor, adicione sua foto para completar a inscrição.",
+        description: "Por favor, adicione sua foto do rosto para completar a inscrição.",
         variant: "destructive",
       });
       return;
@@ -853,15 +853,15 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                   {/* Campo de foto do atleta */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      <span>📷 Foto do Atleta *</span>
+                      <span>📷 Foto do Rosto *</span>
                       <span className="text-xs text-red-500">(obrigatória)</span>
                     </Label>
-                    <p className="text-sm text-gray-600">Sua foto aparecerá na página pública do torneio</p>
+                    <p className="text-sm text-gray-600">Sua foto do rosto aparecerá na página pública do torneio</p>
                     <ImageUpload
                       onImageSelect={(imageUrl) => setFormData({...formData, photoUrl: imageUrl})}
                       currentImage={formData.photoUrl}
                       aspectRatio="aspect-square"
-                      label="Foto do Atleta"
+                      label="Foto do Rosto"
                     />
                   </div>
                 </div>

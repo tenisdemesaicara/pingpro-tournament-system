@@ -324,7 +324,7 @@ export const insertAthleteSchema = z.object({
   // Campos opcionais
   cpf: z.string().optional(),
   rg: z.string().optional(),
-  photoUrl: z.string().min(1, "Foto é obrigatória"),
+  photoUrl: z.string().min(1, "Foto do rosto é obrigatória"),
   category: z.string().optional(),
   street: z.string().optional(),
   phone: z.string().optional(),
@@ -730,7 +730,7 @@ export const tournamentRegistrationSchema = z.object({
   // Optional athlete fields
   cpf: z.string().optional(),
   rg: z.string().optional(),
-  photoUrl: z.string().min(1, "Foto é obrigatória"),
+  photoUrl: z.string().min(1, "Foto do rosto é obrigatória"),
   street: z.string().optional(),
   phone: z.string().optional(),
   complement: z.string().optional(),

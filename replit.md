@@ -6,6 +6,12 @@ PingPong Pro is a comprehensive table tennis tournament management platform buil
 
 ### Latest Updates (October 2025)
 
+**Category Management Fixes (Oct 2):**
+- **V40 Age Validation**: Fixed gender matching from "misto" to "mista" allowing 40-year-old athletes to register
+- **Proper Category Ordering**: Age categories sorted by minimum age, technical categories follow Iniciante → Absoluto A/B/C/D
+- **Gender Suffix Normalization**: Categories with suffixes (e.g., "Absoluto A Feminino") now sort correctly with base categories
+- **Database Cleanup**: Removed 26 duplicate/test categories, renamed Veterano to V40/V45/V50 format
+
 **Public Registration Category Improvements:**
 - **Flexible Category Selection**: Users can now select either age category OR technical category (or both), instead of requiring both
 - **Dynamic Category Filtering**: Age categories (e.g., "Sub-13", "Sub-15") separated from technical categories (e.g., "Absoluto A", "Absoluto B")
