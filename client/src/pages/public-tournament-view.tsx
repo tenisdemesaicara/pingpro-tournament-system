@@ -395,17 +395,22 @@ export default function PublicTournamentView() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                {matchesData && athletes ? (
+                {matchesData ? (
                   <PublicMatchView 
                     tournament={tournamentData}
                     matches={matchesData}
                     getPlayerName={getPlayerName}
                     getPlayerFullInfo={getPlayerFullInfo}
                   />
-                ) : (
+                ) : tournamentStarted ? (
                   <div className="text-center p-8">
                     <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
                     <p className="text-white/60">Carregando partidas...</p>
+                  </div>
+                ) : (
+                  <div className="text-center p-8">
+                    <Trophy className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                    <p className="text-white/60">As partidas serão exibidas quando o torneio iniciar</p>
                   </div>
                 )}
               </CardContent>
