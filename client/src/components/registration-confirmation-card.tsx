@@ -169,7 +169,7 @@ export default function RegistrationConfirmationCard({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto" data-testid="registration-confirmation-overlay">
-      <Card className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl max-h-[90vh] bg-gradient-to-br from-white via-purple-50 to-pink-50 border-0 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 my-8 overflow-hidden">
+      <Card className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl max-h-[90vh] bg-gradient-to-br from-white via-purple-50 to-pink-50 border-0 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 my-8 overflow-hidden">
         <CardContent className="p-0 max-h-full overflow-y-auto">
           {/* Header com gradiente */}
           <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-pink-600 p-6 lg:p-8 text-white text-center rounded-t-lg">
@@ -186,29 +186,29 @@ export default function RegistrationConfirmationCard({
           </div>
 
           {/* Dados do atleta */}
-          <div className="p-6 lg:p-8 space-y-4 lg:space-y-6">
-            <div className="flex items-center space-x-4 lg:space-x-6">
-              <Avatar className="w-20 h-20 lg:w-24 lg:h-24 border-4 border-purple-200">
+          <div className="p-6 lg:p-8 xl:p-10 space-y-4 lg:space-y-6">
+            <div className="flex items-start sm:items-center space-x-4 lg:space-x-6">
+              <Avatar className="w-20 h-20 lg:w-24 lg:h-24 xl:w-28 xl:h-28 border-4 border-purple-200 flex-shrink-0">
                 <AvatarImage src={athletePhoto} alt={athleteName} />
                 <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-400 text-white text-xl lg:text-2xl font-bold">
                   {getInitials(athleteName)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-1" data-testid="athlete-name">{athleteName}</h3>
-                <div className="flex items-center text-gray-600 mb-1">
-                  <Calendar className="w-4 h-4 mr-2" />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900 mb-2 break-words" data-testid="athlete-name">{athleteName}</h3>
+                <div className="flex items-center text-gray-600 mb-1 text-sm lg:text-base">
+                  <Calendar className="w-4 h-4 lg:w-5 lg:h-5 mr-2 flex-shrink-0" />
                   <span data-testid="athlete-age">{athleteAge} anos</span>
                 </div>
                 {club && (
-                  <div className="flex items-center text-gray-600 mb-1">
-                    <Users className="w-4 h-4 mr-2" />
-                    <span data-testid="athlete-club">{club}</span>
+                  <div className="flex items-center text-gray-600 mb-1 text-sm lg:text-base">
+                    <Users className="w-4 h-4 lg:w-5 lg:h-5 mr-2 flex-shrink-0" />
+                    <span className="truncate" data-testid="athlete-club" title={club}>{club}</span>
                   </div>
                 )}
                 {city && (
-                  <div className="flex items-center text-gray-600">
-                    <MapPin className="w-4 h-4 mr-2" />
+                  <div className="flex items-center text-gray-600 text-sm lg:text-base">
+                    <MapPin className="w-4 h-4 lg:w-5 lg:h-5 mr-2 flex-shrink-0" />
                     <span data-testid="athlete-city">{city}</span>
                   </div>
                 )}
@@ -231,10 +231,10 @@ export default function RegistrationConfirmationCard({
             </div>
 
             {/* Informações do torneio */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="text-sm text-gray-600 mb-1">Torneio</div>
-              <div className="font-semibold text-gray-900" data-testid="tournament-name">{tournamentName}</div>
-              <div className="text-xs text-gray-500 mt-2">
+            <div className="bg-gray-50 rounded-lg p-4 lg:p-6 border border-gray-200">
+              <div className="text-sm lg:text-base text-gray-600 mb-1">Torneio</div>
+              <div className="font-semibold text-gray-900 text-base lg:text-lg break-words" data-testid="tournament-name">{tournamentName}</div>
+              <div className="text-xs lg:text-sm text-gray-500 mt-2">
                 Inscrição realizada em {new Date(registrationDate).toLocaleDateString('pt-BR', { 
                   day: '2-digit', 
                   month: '2-digit', 
