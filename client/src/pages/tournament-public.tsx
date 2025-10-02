@@ -289,7 +289,7 @@ export default function TournamentPublic() {
                 <h1 className="text-5xl lg:text-7xl font-bold text-white mb-4 leading-tight">
                   {tournamentData.name}
                 </h1>
-                <p className="text-2xl text-white/80 flex items-center justify-center gap-2">
+                <p className="text-2xl text-white flex items-center justify-center gap-2">
                   <Star className="w-6 h-6" />
                   Organizado por {tournamentData.organizer || 'Não informado'}
                 </p>
@@ -298,21 +298,21 @@ export default function TournamentPublic() {
 
             {/* Tournament Info Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <Card className="bg-white/10 backdrop-blur-lg border-white/20 text-white">
+              <Card className="bg-white/95 dark:bg-white/20 backdrop-blur-lg border-purple-200 dark:border-white/30 shadow-xl">
                 <CardContent className="p-6 text-center">
-                  <Calendar className="w-8 h-8 text-purple-400 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Data do Evento</h3>
-                  <p className="text-white/80">
+                  <Calendar className="w-8 h-8 text-purple-600 dark:text-white mx-auto mb-3" />
+                  <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">Data do Evento</h3>
+                  <p className="text-slate-700 dark:text-white text-base font-medium">
                     {tournamentData.startDate ? new Date(tournamentData.startDate).toLocaleDateString('pt-BR') : 'A definir'}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 backdrop-blur-lg border-white/20 text-white">
+              <Card className="bg-white/95 dark:bg-white/20 backdrop-blur-lg border-purple-200 dark:border-white/30 shadow-xl">
                 <CardContent className="p-6 text-center">
-                  <MapPin className="w-8 h-8 text-purple-400 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Local</h3>
-                  <p className="text-white/80">{tournamentData.location || 'A definir'}</p>
+                  <MapPin className="w-8 h-8 text-purple-600 dark:text-white mx-auto mb-3" />
+                  <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">Local</h3>
+                  <p className="text-slate-700 dark:text-white text-base font-medium">{tournamentData.location || 'A definir'}</p>
                 </CardContent>
               </Card>
             </div>
@@ -320,11 +320,11 @@ export default function TournamentPublic() {
             {/* Registration CTA */}
             {tournamentData.status === 'registration_open' && (
               <div className="text-center mb-8">
-                <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur-lg border-green-400/30">
+                <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-500/20 dark:to-emerald-500/20 backdrop-blur-lg border-green-300 dark:border-green-400/30 shadow-xl">
                   <CardContent className="p-8">
-                    <Trophy className="w-16 h-16 text-green-400 mx-auto mb-4 animate-pulse" />
-                    <h2 className="text-3xl font-bold text-white mb-3">Inscrições Abertas!</h2>
-                    <p className="text-white/80 mb-6 max-w-md mx-auto">
+                    <Trophy className="w-16 h-16 text-green-600 dark:text-green-400 mx-auto mb-4 animate-pulse" />
+                    <h2 className="text-3xl font-bold text-green-800 dark:text-white mb-3">Inscrições Abertas!</h2>
+                    <p className="text-slate-700 dark:text-white text-base mb-6 max-w-md mx-auto font-medium">
                       Faça sua inscrição agora e participe deste torneio incrível. 
                       Cadastre-se rapidamente e garante sua vaga!
                     </p>
@@ -351,38 +351,38 @@ export default function TournamentPublic() {
           
           {/* Statistics Dashboard */}
           {stats && (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 overflow-hidden">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-2xl text-white flex items-center gap-3">
-                  <Target className="w-6 h-6 text-purple-400" />
+            <Card className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-lg border-slate-200 dark:border-slate-700 overflow-hidden shadow-xl">
+              <CardHeader className="pb-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 dark:from-purple-900/30 dark:to-blue-900/30">
+                <CardTitle className="text-2xl text-slate-800 dark:text-white flex items-center gap-3 font-bold">
+                  <Target className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                   Estatísticas do Torneio
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="bg-slate-50 dark:bg-slate-900/50">
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                  <div className="text-center p-4 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg border border-blue-400/20">
-                    <div className="text-3xl font-bold text-blue-300 mb-1">{stats.total}</div>
-                    <div className="text-sm text-white font-medium">Total Inscritos</div>
+                  <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/40 dark:to-blue-800/40 rounded-lg border-2 border-blue-200 dark:border-blue-700 shadow-md">
+                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-300 mb-1">{stats.total}</div>
+                    <div className="text-sm text-slate-700 dark:text-slate-200 font-semibold">Total Inscritos</div>
                   </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg border border-green-400/20">
-                    <div className="text-3xl font-bold text-green-300 mb-1">{stats.confirmed}</div>
-                    <div className="text-sm text-white font-medium">Confirmados</div>
+                  <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/40 dark:to-green-800/40 rounded-lg border-2 border-green-200 dark:border-green-700 shadow-md">
+                    <div className="text-3xl font-bold text-green-600 dark:text-green-300 mb-1">{stats.confirmed}</div>
+                    <div className="text-sm text-slate-700 dark:text-slate-200 font-semibold">Confirmados</div>
                   </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg border border-purple-400/20">
-                    <div className="text-3xl font-bold text-purple-300 mb-1">{stats.categories}</div>
-                    <div className="text-sm text-white font-medium">Categorias</div>
+                  <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/40 dark:to-purple-800/40 rounded-lg border-2 border-purple-200 dark:border-purple-700 shadow-md">
+                    <div className="text-3xl font-bold text-purple-600 dark:text-purple-300 mb-1">{stats.categories}</div>
+                    <div className="text-sm text-slate-700 dark:text-slate-200 font-semibold">Categorias</div>
                   </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-lg border border-orange-400/20">
-                    <div className="text-3xl font-bold text-orange-300 mb-1">{stats.clubs}</div>
-                    <div className="text-sm text-white font-medium">Clubes</div>
+                  <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/40 dark:to-orange-800/40 rounded-lg border-2 border-orange-200 dark:border-orange-700 shadow-md">
+                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-300 mb-1">{stats.clubs}</div>
+                    <div className="text-sm text-slate-700 dark:text-slate-200 font-semibold">Clubes</div>
                   </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 rounded-lg border border-cyan-400/20">
-                    <div className="text-3xl font-bold text-cyan-300 mb-1">{stats.masculine}</div>
-                    <div className="text-sm text-white font-medium">Masculino</div>
+                  <div className="text-center p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/40 dark:to-cyan-800/40 rounded-lg border-2 border-cyan-200 dark:border-cyan-700 shadow-md">
+                    <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-300 mb-1">{stats.masculine}</div>
+                    <div className="text-sm text-slate-700 dark:text-slate-200 font-semibold">Masculino</div>
                   </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-pink-500/20 to-pink-600/20 rounded-lg border border-pink-400/20">
-                    <div className="text-3xl font-bold text-pink-300 mb-1">{stats.feminine}</div>
-                    <div className="text-sm text-white font-medium">Feminino</div>
+                  <div className="text-center p-4 bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/40 dark:to-pink-800/40 rounded-lg border-2 border-pink-200 dark:border-pink-700 shadow-md">
+                    <div className="text-3xl font-bold text-pink-600 dark:text-pink-300 mb-1">{stats.feminine}</div>
+                    <div className="text-sm text-slate-700 dark:text-slate-200 font-semibold">Feminino</div>
                   </div>
                 </div>
               </CardContent>
@@ -416,21 +416,7 @@ export default function TournamentPublic() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* 🚫 FILTRO DE GÊNERO OCULTO PARA CATEGORIAS MISTAS */}
-                {(() => {
-                  // Verificação dupla se categoria é mista
-                  const categoryData = tournamentData?.categories?.find((c: any) => c.id === selectedCategory);
-                  const isMixed = categoryData?.name?.toLowerCase().includes('misto') || 
-                                  categoryData?.name?.toLowerCase().includes('mixed') ||
-                                  categoryData?.name?.toLowerCase().includes('mixto');
-                  console.log("🔥 FORÇANDO VERIFICAÇÃO MISTA:", {
-                    selectedCategory,
-                    categoryName: categoryData?.name,
-                    isMixed,
-                    isSelectedCategoryMixed
-                  });
-                  return !isMixed;
-                })() && (
+                {!isSelectedCategoryMixed && (
                   <div>
                     <label className="text-sm text-slate-600 dark:text-white/70 mb-2 block">Gênero</label>
                     <Select value={selectedGender} onValueChange={setSelectedGender}>
@@ -446,7 +432,7 @@ export default function TournamentPublic() {
                   </div>
                 )}
               </div>
-              <div className="mt-4 text-sm text-slate-600 dark:text-white/60">
+              <div className="mt-4 text-sm text-slate-700 dark:text-slate-200 font-medium">
                 Mostrando {filteredParticipants.length} de {tournamentData.participants?.length || 0} participantes
               </div>
             </CardContent>

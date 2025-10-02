@@ -6,6 +6,15 @@ PingPong Pro is a comprehensive table tennis tournament management platform buil
 
 ### Latest Updates (October 2025)
 
+**Photo Upload Enhancement (Oct 2):**
+- **Camera Capture Support**: Athletes can now take photos directly with their device's camera using HTML5 `capture="user"` attribute
+- **Gallery Selection**: Alternative option to select existing photos from device gallery
+- **Existing Athletes**: Users with existing accounts now see photo upload option during tournament registration
+- **Memory Management**: Proper cleanup of object URLs to prevent memory leaks during multiple uploads
+- **Preview System**: Immediate photo preview for both new and existing athletes, showing current photo if available
+- **Mobile-First UX**: Separate "Tirar Foto" and "Escolher Arquivo" buttons for better mobile experience
+- **Validation**: Photo remains mandatory for all registrations (new and existing athletes)
+
 **Category Management Fixes (Oct 2):**
 - **V40 Age Validation**: Fixed gender matching from "misto" to "mista" allowing 40-year-old athletes to register
 - **Proper Category Ordering**: Age categories sorted by minimum age, technical categories follow Iniciante → Absoluto A/B/C/D
