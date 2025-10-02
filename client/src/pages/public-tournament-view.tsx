@@ -55,19 +55,15 @@ export default function PublicTournamentView() {
     const clubs = new Set(tournamentData.participants.map((p: any) => p.athlete?.club).filter(Boolean)).size;
     const categories = tournamentData.categories?.length || 0;
     
-    // Contagem por gênero
+    // Contagem por gênero - baseado no gênero REAL do atleta
     const masculine = tournamentData.participants.filter((p: any) => {
-      const category = tournamentData.categories?.find((c: any) => c.id === p.categoryId);
-      const categoryName = category?.name?.toLowerCase() || "";
-      return categoryName.includes("masculino") || categoryName.includes("masc") || 
-             categoryName.includes("homens") || categoryName.includes("male");
+      const athleteGender = p.athlete?.gender || p.gender;
+      return athleteGender === 'masculino';
     }).length;
     
     const feminine = tournamentData.participants.filter((p: any) => {
-      const category = tournamentData.categories?.find((c: any) => c.id === p.categoryId);
-      const categoryName = category?.name?.toLowerCase() || "";
-      return categoryName.includes("feminino") || categoryName.includes("fem") || 
-             categoryName.includes("mulheres") || categoryName.includes("female");
+      const athleteGender = p.athlete?.gender || p.gender;
+      return athleteGender === 'feminino';
     }).length;
     
     return { total, confirmed, clubs, categories, masculine, feminine };
@@ -192,7 +188,17 @@ export default function PublicTournamentView() {
                   <Calendar className="w-8 h-8 text-purple-400 mx-auto mb-3" />
                   <h3 className="font-semibold mb-2">Data do Evento</h3>
                   <p className="text-white/80">
-                    {tournamentData.startDate ? new Date(tournamentData.startDate).toLocaleDateString('pt-BR') : 'A definir'}
+                    {tournamentData.startDate && tournamentData.endDate ? (
+                      <>
+                        {new Date(tournamentData.startDate).toLocaleDateString('pt-BR')}
+                        {' até '}
+                        {new Date(tournamentData.endDate).toLocaleDateString('pt-BR')}
+                      </>
+                    ) : tournamentData.startDate ? (
+                      new Date(tournamentData.startDate).toLocaleDateString('pt-BR')
+                    ) : (
+                      'A definir'
+                    )}
                   </p>
                 </CardContent>
               </Card>
