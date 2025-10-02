@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, MapPin, Trophy, Users, Clock, AlertCircle, Filter, Star, Award, Target } from "lucide-react";
-import MatchManagementInterface from "@/components/match-management-interface";
+import PublicMatchView from "@/components/public-match-view";
 import { type Athlete } from "@shared/schema";
 
 export default function PublicTournamentView() {
@@ -86,13 +86,6 @@ export default function PublicTournamentView() {
     // Versão pública - não permite ações
     e.stopPropagation();
   };
-
-  // Debug para verificar dados
-  console.log("🏆 DEBUG PÁGINA PÚBLICA:");
-  console.log("  - Tournament data:", tournamentData ? "✅" : "❌");
-  console.log("  - Matches data:", matchesData ? `✅ ${matchesData.length} partidas` : "❌");
-  console.log("  - Athletes data:", athletes ? `✅ ${athletes.length} atletas` : "❌");
-  console.log("  - Tournament started:", tournamentStarted);
 
   // Filtrar participantes
   const filteredParticipants = useMemo(() => {
@@ -393,28 +386,31 @@ export default function PublicTournamentView() {
           )}
 
           {/* Matches Section */}
-          {tournamentStarted && tournamentData && matchesData && athletes ? (
+          {tournamentStarted && tournamentData && (
             <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-2xl text-white flex items-center gap-3">
+                  <Trophy className="w-6 h-6 text-yellow-400" />
+                  Partidas do Torneio
+                </CardTitle>
+              </CardHeader>
               <CardContent className="p-6">
-                <MatchManagementInterface 
-                  tournament={tournamentData}
-                  matches={matchesData}
-                  getPlayerName={getPlayerName}
-                  getPlayerFullInfo={getPlayerFullInfo}
-                  athletes={athletes}
-                  handleClearAttentionClick={handleClearAttentionClick}
-                />
+                {matchesData && athletes ? (
+                  <PublicMatchView 
+                    tournament={tournamentData}
+                    matches={matchesData}
+                    getPlayerName={getPlayerName}
+                    getPlayerFullInfo={getPlayerFullInfo}
+                  />
+                ) : (
+                  <div className="text-center p-8">
+                    <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-white/60">Carregando partidas...</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ) : tournamentStarted && tournamentData ? (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-              <CardContent className="p-8 text-center">
-                <div className="text-white/60">
-                  Carregando partidas...
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
+          )}
 
           {/* Filters Section */}
           <Card className="bg-white/5 backdrop-blur-lg border-white/10">
