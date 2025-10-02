@@ -35,13 +35,30 @@ export function DirectEnrollmentInterface({
   const [searchTerm, setSearchTerm] = useState("");
   const [enrolledFilterCategory, setEnrolledFilterCategory] = useState<string>(""); // Filtro para aba de inscritos
 
-  // Verificar se categoria selecionada é mista
+  // Verificar se categoria selecionada é mista OU já tem gênero específico
   const isSelectedCategoryMixed = () => {
     if (!selectedCategory) return false;
     const category = categories.find(c => c.id === selectedCategory);
     if (!category) return false;
-    const categoryGender = category.gender?.toLowerCase();
-    return categoryGender === 'misto' || categoryGender === 'mixed';
+    
+    const categoryGender = category.gender?.toLowerCase() || '';
+    const categoryName = category.name?.toLowerCase() || '';
+    
+    // Verificar se é mista (pelo campo gender ou nome)
+    if (categoryGender === 'misto' || categoryGender === 'mista' || categoryGender === 'mixed' || categoryGender === 'mixto') {
+      return true;
+    }
+    
+    if (categoryName.includes('misto') || categoryName.includes('mista') || categoryName.includes('mixed') || categoryName.includes('mixto')) {
+      return true;
+    }
+    
+    // Verificar se já tem gênero específico no nome
+    if (categoryName.includes('masculino') || categoryName.includes('masc') || categoryName.includes('feminino') || categoryName.includes('fem')) {
+      return true;
+    }
+    
+    return false;
   };
 
   // Obter gêneros disponíveis para a categoria selecionada
@@ -53,8 +70,11 @@ export function DirectEnrollmentInterface({
 
     const categoryGender = category.gender?.toLowerCase();
 
-    // Se categoria é mista, NÃO mostrar seletor de gênero (return vazio)
-    if (categoryGender === 'misto' || categoryGender === 'mixed') {
+    // Se categoria é mista OU já tem gênero no nome, NÃO mostrar seletor de gênero (return vazio)
+    const categoryName = category.name?.toLowerCase() || '';
+    if (categoryGender === 'misto' || categoryGender === 'mista' || categoryGender === 'mixed' || categoryGender === 'mixto' ||
+        categoryName.includes('misto') || categoryName.includes('mista') || categoryName.includes('mixed') || categoryName.includes('mixto') ||
+        categoryName.includes('masculino') || categoryName.includes('masc') || categoryName.includes('feminino') || categoryName.includes('fem')) {
       return [];
     }
 
