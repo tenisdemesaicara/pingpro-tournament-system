@@ -63,7 +63,10 @@ async function deployEssentialFiles() {
     // Apenas os arquivos críticos que foram modificados
     const criticalFiles = [
       'client/src/pages/tournament-public.tsx',
+      'client/src/pages/tournament-detail.tsx',
+      'client/src/pages/public-tournament-view.tsx',
       'client/src/components/direct-enrollment-interface.tsx',
+      'client/src/components/match-management-interface.tsx',
       'client/src/data/table-tennis-facts.ts',
       'server/routes.ts'
     ];
