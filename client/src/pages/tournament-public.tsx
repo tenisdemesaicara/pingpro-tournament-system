@@ -28,15 +28,26 @@ export default function TournamentPublic() {
   const tournamentData = tournament as any;
   const matchesData = matches as any[];
 
-  // Verificar se categoria selecionada é mista (DEVE VIR ANTES DOS LOGS)
-  const isSelectedCategoryMixed = useMemo(() => {
+  // Verificar se deve esconder o filtro de gênero
+  const shouldHideGenderFilter = useMemo(() => {
     if (selectedCategory === 'all' || !tournamentData?.categories) return false;
     
     const category = tournamentData.categories.find((c: any) => c.id === selectedCategory);
     if (!category) return false;
     
     const categoryName = category.name.toLowerCase();
-    return categoryName.includes('misto') || categoryName.includes('mista') || categoryName.includes('mixed') || categoryName.includes('mixto');
+    
+    // Esconder se categoria é mista
+    if (categoryName.includes('misto') || categoryName.includes('mista') || categoryName.includes('mixed') || categoryName.includes('mixto')) {
+      return true;
+    }
+    
+    // Esconder se categoria já tem gênero específico
+    if (categoryName.includes('masculino') || categoryName.includes('masc') || categoryName.includes('feminino') || categoryName.includes('fem')) {
+      return true;
+    }
+    
+    return false;
   }, [selectedCategory, tournamentData?.categories]);
 
   // 🏆 LÓGICA DO PÓDIUM - Calcular posições quando categoria está completa
@@ -115,15 +126,15 @@ export default function TournamentPublic() {
   console.log("  - Tournament data:", tournamentData);
   console.log("  - Matches data:", matchesData);
   console.log("  - Selected category:", selectedCategory);
-  console.log("  - Is category mixed:", isSelectedCategoryMixed);
+  console.log("  - Should hide gender filter:", shouldHideGenderFilter);
   console.log("  - Podium positions:", podiumPositions);
   
-  // FORÇAR ATUALIZAÇÃO: Verificar se categoria é mista
+  // FORÇAR ATUALIZAÇÃO: Verificar categoria
   if (selectedCategory !== 'all' && tournamentData?.categories) {
     const categoryData = tournamentData.categories.find((c: any) => c.id === selectedCategory);
     if (categoryData) {
       console.log("🔍 CATEGORIA SELECIONADA:", categoryData.name);
-      console.log("🔍 CONTÉM 'MISTO':", categoryData.name.toLowerCase().includes('misto'));
+      console.log("🔍 DEVE ESCONDER FILTRO:", shouldHideGenderFilter);
     }
   }
 
@@ -416,7 +427,7 @@ export default function TournamentPublic() {
                     </SelectContent>
                   </Select>
                 </div>
-                {!isSelectedCategoryMixed && (
+                {!shouldHideGenderFilter && (
                   <div>
                     <label className="text-sm text-slate-700 dark:text-slate-300 mb-2 block font-medium">Gênero</label>
                     <Select value={selectedGender} onValueChange={setSelectedGender}>
