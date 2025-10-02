@@ -365,7 +365,18 @@ export default function PublicTournamentView() {
                       return null;
                     }
 
-                    const categoryMatches = matchesData.filter((match: any) => match.categoryId === category.id);
+                    // Garantir que matchesData existe
+                    if (!matchesData || matchesData.length === 0) {
+                      return null;
+                    }
+
+                    const categoryMatches = matchesData.filter((match: any) => {
+                      // Debug
+                      console.log(`🔍 Comparando match.categoryId: ${match.categoryId} com category.id: ${category.id}`);
+                      return String(match.categoryId) === String(category.id);
+                    });
+                    
+                    console.log(`📊 Categoria "${category.name}" (${category.id}): ${categoryMatches.length} partidas encontradas`);
                     
                     if (categoryMatches.length === 0) return null;
 
