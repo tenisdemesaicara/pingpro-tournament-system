@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type TournamentWithParticipants, type Athlete, type Match } from "@shared/schema";
 import EditTournamentCover from "@/components/edit-tournament-cover";
+import EditTournamentDetails from "@/components/edit-tournament-details";
 import DeleteTournament from "@/components/delete-tournament";
 import QRCodeGenerator from "@/components/qr-code-generator";
 import MatchManagementInterface from "@/components/match-management-interface";
@@ -371,6 +372,13 @@ export default function TournamentDetail() {
                   </Button>
                 )}
                 
+                <EditTournamentDetails
+                  tournamentId={tournament.id}
+                  currentDeadline={tournament.registrationDeadline}
+                  currentStartDate={tournament.startDate}
+                  currentEndDate={tournament.endDate}
+                  currentLocation={tournament.location}
+                />
                 <EditTournamentCover 
                   tournamentId={tournament.id} 
                   currentCover={tournament.coverImage}
