@@ -55,6 +55,17 @@ export default function TournamentDetail() {
         description: "Torneio iniciado com sucesso!",
       });
     },
+    onError: (error: any) => {
+      console.error("Erro ao iniciar torneio:", error);
+      const errorMessage = error?.message || "Não foi possível iniciar o torneio.";
+      toast({
+        title: "Erro ao Iniciar Torneio",
+        description: errorMessage.includes("chaveamento") 
+          ? "Algumas categorias ainda não têm chaveamento. Gere os chaveamentos primeiro na aba 'Chaveamento'."
+          : errorMessage,
+        variant: "destructive",
+      });
+    }
   });
 
   const finishTournamentMutation = useMutation({
