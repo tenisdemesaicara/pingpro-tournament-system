@@ -78,7 +78,7 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       return [];
     }
     
-    // Filtrar apenas categorias por IDADE (não técnicas) E do gênero selecionado
+    // Filtrar apenas categorias por IDADE (não técnicas) E compatíveis com o gênero
     // Categorias técnicas começam com "Absoluto" seguido de letra (A, B, C, D) ou são "Iniciante"
     const ageCategories = tournamentData.categories.filter((cat: any) => {
       const name = cat.name?.toLowerCase().trim() || '';
@@ -86,10 +86,15 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       // Regex para detectar categorias técnicas: "absoluto" seguido de espaço e letra A/B/C/D
       const isTechnical = /^absoluto\s+[abcd]/i.test(name) || name.startsWith('iniciante');
       
-      // Filtrar por tipo (idade) E gênero
-      const isCorrectGender = cat.gender?.toLowerCase() === formData.gender?.toLowerCase();
+      // Regra de gênero:
+      // - Categoria "mista" → permite qualquer gênero
+      // - Categoria "masculino" → permite apenas masculino
+      // - Categoria "feminino" → permite apenas feminino
+      const categoryGender = cat.gender?.toLowerCase().trim() || '';
+      const athleteGender = formData.gender?.toLowerCase().trim() || '';
+      const isGenderCompatible = categoryGender === 'mista' || categoryGender === athleteGender;
       
-      return !isTechnical && isCorrectGender; // Retorna apenas as que NÃO são técnicas E do gênero correto
+      return !isTechnical && isGenderCompatible;
     });
     
     console.log("📅 Categorias por idade (gênero:", formData.gender, "):", ageCategories.map((c: any) => c.name));
@@ -101,7 +106,7 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       return [];
     }
     
-    // Filtrar apenas categorias TÉCNICAS E do gênero selecionado
+    // Filtrar apenas categorias TÉCNICAS E compatíveis com o gênero
     // Categorias técnicas começam com "Absoluto" seguido de letra (A, B, C, D) ou são "Iniciante"
     const technicalCategories = tournamentData.categories.filter((cat: any) => {
       const name = cat.name?.toLowerCase().trim() || '';
@@ -109,10 +114,15 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       // Regex para detectar categorias técnicas: "absoluto" seguido de espaço e letra A/B/C/D
       const isTechnical = /^absoluto\s+[abcd]/i.test(name) || name.startsWith('iniciante');
       
-      // Filtrar por tipo (técnica) E gênero
-      const isCorrectGender = cat.gender?.toLowerCase() === formData.gender?.toLowerCase();
+      // Regra de gênero:
+      // - Categoria "mista" → permite qualquer gênero
+      // - Categoria "masculino" → permite apenas masculino
+      // - Categoria "feminino" → permite apenas feminino
+      const categoryGender = cat.gender?.toLowerCase().trim() || '';
+      const athleteGender = formData.gender?.toLowerCase().trim() || '';
+      const isGenderCompatible = categoryGender === 'mista' || categoryGender === athleteGender;
       
-      return isTechnical && isCorrectGender; // Retorna apenas as que SÃO técnicas E do gênero correto
+      return isTechnical && isGenderCompatible;
     });
     
     console.log("🎯 Categorias técnicas (gênero:", formData.gender, "):", technicalCategories.map((c: any) => c.name));
@@ -554,8 +564,20 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                     </div>
                   </div>
 
-                  {/* Alertar que pelo menos uma categoria é obrigatória */}
-                  {!formData.category && !formData.technicalCategory && (
+                  {/* Alertar quando não há categorias disponíveis para o gênero */}
+                  {getAgeCategories().length === 0 && getTechnicalCategories().length === 0 && (
+                    <Alert className="bg-amber-50 border-amber-300">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-amber-900">
+                        <strong>Nenhuma categoria disponível</strong><br/>
+                        Infelizmente não há categorias disponíveis para atletas do gênero <strong>{formData.gender}</strong> neste torneio. 
+                        Por favor, entre em contato com os organizadores para mais informações.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Alertar que pelo menos uma categoria é obrigatória (somente se houver categorias) */}
+                  {(getAgeCategories().length > 0 || getTechnicalCategories().length > 0) && !formData.category && !formData.technicalCategory && (
                     <Alert className="bg-red-50 border-red-200">
                       <AlertCircle className="h-4 w-4 text-red-600" />
                       <AlertDescription className="text-red-800">
@@ -732,8 +754,20 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                     </div>
                   </div>
 
-                  {/* Alertar que pelo menos uma categoria é obrigatória */}
-                  {!formData.category && !formData.technicalCategory && (
+                  {/* Alertar quando não há categorias disponíveis para o gênero */}
+                  {getAgeCategories().length === 0 && getTechnicalCategories().length === 0 && (
+                    <Alert className="bg-amber-50 border-amber-300">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-amber-900">
+                        <strong>Nenhuma categoria disponível</strong><br/>
+                        Infelizmente não há categorias disponíveis para atletas do gênero <strong>{formData.gender}</strong> neste torneio. 
+                        Por favor, entre em contato com os organizadores para mais informações.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Alertar que pelo menos uma categoria é obrigatória (somente se houver categorias) */}
+                  {(getAgeCategories().length > 0 || getTechnicalCategories().length > 0) && !formData.category && !formData.technicalCategory && (
                     <Alert className="bg-red-50 border-red-200">
                       <AlertCircle className="h-4 w-4 text-red-600" />
                       <AlertDescription className="text-red-800">
