@@ -31,7 +31,6 @@ export default function PublicMatchView({
   useEffect(() => {
     if (!selectedCategory && tournament.categories && tournament.categories.length > 0) {
       const firstCategory = tournament.categories[0];
-      console.log('📋 Auto-selecionando categoria:', firstCategory.name, 'ID:', firstCategory.id);
       setSelectedCategory(firstCategory.id);
     }
   }, [tournament.categories, selectedCategory]);
@@ -50,12 +49,9 @@ export default function PublicMatchView({
 
   // Filtrar partidas
   const filteredMatches = useMemo(() => {
-    if (!matches || !selectedCategory) {
-      console.log('🔍 Sem filtro:', { hasMatches: !!matches, selectedCategory });
-      return [];
-    }
+    if (!matches || !selectedCategory) return [];
 
-    const filtered = matches.filter(match => {
+    return matches.filter(match => {
       if (match.categoryId !== selectedCategory) return false;
       if (selectedPhase && match.phase !== selectedPhase) return false;
       if (selectedGroup && match.groupName !== selectedGroup) return false;
@@ -63,17 +59,6 @@ export default function PublicMatchView({
       
       return true;
     });
-    
-    console.log('🎯 Filtros aplicados:', {
-      totalMatches: matches.length,
-      selectedCategory,
-      selectedPhase,
-      selectedGroup,
-      selectedRound,
-      filteredCount: filtered.length
-    });
-    
-    return filtered;
   }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedRound]);
 
   // Grupos disponíveis
