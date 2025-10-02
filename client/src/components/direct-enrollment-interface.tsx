@@ -33,6 +33,7 @@ export function DirectEnrollmentInterface({
   const [selectedGender, setSelectedGender] = useState<string>("");
   const [selectedAthletes, setSelectedAthletes] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [enrolledFilterCategory, setEnrolledFilterCategory] = useState<string>(""); // Filtro para aba de inscritos
 
   // Verificar se categoria selecionada é mista
   const isSelectedCategoryMixed = () => {
@@ -411,46 +412,86 @@ export function DirectEnrollmentInterface({
           </TabsContent>
 
           <TabsContent value="enrolled" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-              {existingParticipants.length === 0 ? (
-                <div className="col-span-full text-center text-muted-foreground py-8">
-                  Nenhum atleta inscrito ainda
-                </div>
-              ) : (
-                existingParticipants.map((participant, index) => (
-                  <Card key={participant.id || index} className="relative">
-                    <CardContent className="p-3">
-                      <div className="pr-8">
-                        <p className="font-medium text-sm">{participant.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {participant.club && `${participant.club} - `}
-                          {participant.city}, {participant.state}
-                        </p>
-                        {participant.category && (
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {participant.category}
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (confirm(`Tem certeza que deseja remover ${participant.name} do torneio?`)) {
-                            removeParticipantMutation.mutate(participant.athleteId || participant.id);
-                          }
-                        }}
-                        disabled={removeParticipantMutation.isPending}
-                        className="absolute top-2 right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        data-testid={`button-remove-participant-${participant.id || index}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+            {/* Filtro de categoria para atletas inscritos */}
+            <div className="mb-4">
+              <Label htmlFor="enrolled-category-filter">Filtrar por Categoria *</Label>
+              <Select 
+                value={enrolledFilterCategory} 
+                onValueChange={(value) => setEnrolledFilterCategory(value || "")}
+              >
+                <SelectTrigger data-testid="select-enrolled-category-filter">
+                  <SelectValue placeholder="Selecione uma categoria para visualizar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {!enrolledFilterCategory ? (
+              <div className="text-center py-12">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="text-6xl opacity-20">👥</div>
+                  <p className="text-muted-foreground text-lg font-medium">
+                    Selecione uma categoria para visualizar os atletas inscritos
+                  </p>
+                  <p className="text-muted-foreground text-sm max-w-md">
+                    Escolha uma categoria no filtro acima para ver os atletas inscritos nela.
+                  </p>
+                </div>
+              </div>
+            ) : (() => {
+              const filteredParticipants = existingParticipants.filter(
+                p => p.categoryId === enrolledFilterCategory
+              );
+              
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                  {filteredParticipants.length === 0 ? (
+                    <div className="col-span-full text-center text-muted-foreground py-8">
+                      Nenhum atleta inscrito nesta categoria
+                    </div>
+                  ) : (
+                    filteredParticipants.map((participant, index) => (
+                      <Card key={participant.id || index} className="relative">
+                        <CardContent className="p-3">
+                          <div className="pr-8">
+                            <p className="font-medium text-sm">{participant.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {participant.club && `${participant.club} - `}
+                              {participant.city}, {participant.state}
+                            </p>
+                            {participant.category && (
+                              <Badge variant="outline" className="text-xs mt-1">
+                                {participant.category}
+                              </Badge>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              if (confirm(`Tem certeza que deseja remover ${participant.name} do torneio?`)) {
+                                removeParticipantMutation.mutate(participant.athleteId || participant.id);
+                              }
+                            }}
+                            disabled={removeParticipantMutation.isPending}
+                            className="absolute top-2 right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            data-testid={`button-remove-participant-${participant.id || index}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              );
+            })()}
           </TabsContent>
         </Tabs>
       </CardContent>

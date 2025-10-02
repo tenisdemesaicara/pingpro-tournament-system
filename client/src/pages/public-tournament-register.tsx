@@ -78,18 +78,21 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       return [];
     }
     
-    // Filtrar apenas categorias por IDADE (não técnicas)
+    // Filtrar apenas categorias por IDADE (não técnicas) E do gênero selecionado
+    // Categorias técnicas começam com "Absoluto" seguido de letra (A, B, C, D) ou são "Iniciante"
     const ageCategories = tournamentData.categories.filter((cat: any) => {
-      const name = cat.name?.toLowerCase() || '';
-      const isAge = !name.includes('absoluto a') && 
-                    !name.includes('absoluto b') && 
-                    !name.includes('absoluto c') && 
-                    !name.includes('absoluto d') &&
-                    !name.includes('iniciante');
-      return isAge;
+      const name = cat.name?.toLowerCase().trim() || '';
+      
+      // Regex para detectar categorias técnicas: "absoluto" seguido de espaço e letra A/B/C/D
+      const isTechnical = /^absoluto\s+[abcd]/i.test(name) || name.startsWith('iniciante');
+      
+      // Filtrar por tipo (idade) E gênero
+      const isCorrectGender = cat.gender?.toLowerCase() === formData.gender?.toLowerCase();
+      
+      return !isTechnical && isCorrectGender; // Retorna apenas as que NÃO são técnicas E do gênero correto
     });
     
-    console.log("📅 Categorias por idade:", ageCategories.map((c: any) => c.name));
+    console.log("📅 Categorias por idade (gênero:", formData.gender, "):", ageCategories.map((c: any) => c.name));
     return ageCategories;
   };
 
@@ -98,18 +101,21 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       return [];
     }
     
-    // Filtrar apenas categorias TÉCNICAS
+    // Filtrar apenas categorias TÉCNICAS E do gênero selecionado
+    // Categorias técnicas começam com "Absoluto" seguido de letra (A, B, C, D) ou são "Iniciante"
     const technicalCategories = tournamentData.categories.filter((cat: any) => {
-      const name = cat.name?.toLowerCase() || '';
-      const isTechnical = name.includes('absoluto a') || 
-                          name.includes('absoluto b') || 
-                          name.includes('absoluto c') || 
-                          name.includes('absoluto d') ||
-                          name.includes('iniciante');
-      return isTechnical;
+      const name = cat.name?.toLowerCase().trim() || '';
+      
+      // Regex para detectar categorias técnicas: "absoluto" seguido de espaço e letra A/B/C/D
+      const isTechnical = /^absoluto\s+[abcd]/i.test(name) || name.startsWith('iniciante');
+      
+      // Filtrar por tipo (técnica) E gênero
+      const isCorrectGender = cat.gender?.toLowerCase() === formData.gender?.toLowerCase();
+      
+      return isTechnical && isCorrectGender; // Retorna apenas as que SÃO técnicas E do gênero correto
     });
     
-    console.log("🎯 Categorias técnicas:", technicalCategories.map((c: any) => c.name));
+    console.log("🎯 Categorias técnicas (gênero:", formData.gender, "):", technicalCategories.map((c: any) => c.name));
     return technicalCategories;
   };
 
@@ -652,7 +658,14 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                     
                     <div>
                       <Label htmlFor="gender">Gênero *</Label>
-                      <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
+                      <Select value={formData.gender} onValueChange={(value) => {
+                        setFormData({
+                          ...formData, 
+                          gender: value,
+                          category: '', // Limpar categoria de idade ao mudar gênero
+                          technicalCategory: '' // Limpar categoria técnica ao mudar gênero
+                        });
+                      }}>
                         <SelectTrigger data-testid="select-gender">
                           <SelectValue />
                         </SelectTrigger>
