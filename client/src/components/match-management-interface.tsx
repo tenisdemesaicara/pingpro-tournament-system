@@ -39,6 +39,16 @@ export default function MatchManagementInterface({
   const [tempSets, setTempSets] = useState<Array<{player1Score: number, player2Score: number}>>([]);
   const { toast } = useToast();
 
+  // Auto-selecionar fase se houver apenas uma opção disponível
+  useEffect(() => {
+    if (!selectedCategory) return;
+    
+    const phases = getAvailablePhases();
+    if (phases.length === 1 && !selectedPhase) {
+      setSelectedPhase(phases[0]);
+    }
+  }, [selectedCategory]);
+
   // Resetar rodada selecionada quando filtros mudarem
   useEffect(() => {
     // Verificar se deve mostrar seletor de rodadas
@@ -111,21 +121,33 @@ export default function MatchManagementInterface({
   const getAvailableGenders = () => {
     if (!selectedCategory || !tournament.categories) return [];
     
-    // Se categoria é mista, não mostrar opções de gênero
-    if (isMixedCategory()) return [];
-    
     // Encontrar a categoria selecionada
     const category = tournament.categories.find(c => c.name === selectedCategory);
     if (!category) return [];
     
-    // Obter gêneros dos atletas que se inscreveram nesta categoria
+    // Se categoria é mista, não mostrar opções de gênero
+    if (isMixedCategory()) return [];
+    
+    // Se a categoria tem gênero definido (masculino ou feminino), não mostrar filtro
+    // pois todos os jogadores já são daquele gênero
+    if (category.gender && (category.gender.toLowerCase() === 'masculino' || category.gender.toLowerCase() === 'feminino')) {
+      return [];
+    }
+    
+    // Obter gêneros dos participantes DESTA CATEGORIA específica
     if (!tournament.participants) return [];
     
-    const gendersInCategory = tournament.participants
-      .map(p => p.gender) // Usando o campo gender do atleta
+    const participantsInCategory = tournament.participants.filter((p: any) => p.categoryId === category.id);
+    const gendersInCategory = participantsInCategory
+      .map((p: any) => p.gender)
       .filter(Boolean);
     
-    return Array.from(new Set(gendersInCategory));
+    const uniqueGenders = Array.from(new Set(gendersInCategory));
+    
+    // Se há apenas um gênero na categoria, não mostrar filtro
+    if (uniqueGenders.length <= 1) return [];
+    
+    return uniqueGenders;
   };
 
   // Obter fases disponíveis para a categoria selecionada baseado no formato
