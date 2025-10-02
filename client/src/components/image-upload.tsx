@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Camera, Upload } from "lucide-react";
 
 interface ImageUploadProps {
   onImageSelect: (imageUrl: string) => void;
@@ -8,6 +9,7 @@ interface ImageUploadProps {
   maxSizeMB?: number;
   aspectRatio?: string;
   label?: string;
+  enableCamera?: boolean;
 }
 
 export default function ImageUpload({ 
@@ -15,12 +17,31 @@ export default function ImageUpload({
   currentImage, 
   maxSizeMB = 10,
   aspectRatio = "aspect-video",
-  label = "Imagem"
+  label = "Imagem",
+  enableCamera = true
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(currentImage || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (currentImage) {
+      setPreview(currentImage);
+    } else {
+      setPreview(null);
+    }
+  }, [currentImage]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -50,8 +71,14 @@ export default function ImageUpload({
     setUploading(true);
 
     try {
+      // Revogar URL anterior se existir
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+
       // Criar preview local
       const previewUrl = URL.createObjectURL(file);
+      previewUrlRef.current = previewUrl;
       setPreview(previewUrl);
 
       // Converter imagem para base64 para armazenamento local
@@ -87,10 +114,19 @@ export default function ImageUpload({
   };
 
   const handleRemoveImage = () => {
+    // Revogar URL do preview se existir
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    
     setPreview(null);
     onImageSelect("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
     }
   };
 
@@ -129,23 +165,51 @@ export default function ImageUpload({
             </div>
           </div>
         ) : (
-          <div 
-            className="w-full h-full flex flex-col items-center justify-center cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="text-4xl text-muted-foreground mb-2">
+          <div className="w-full h-full flex flex-col items-center justify-center p-4">
+            <div className="text-4xl text-muted-foreground mb-3">
               {uploading ? "📤" : "🖼️"}
             </div>
-            <p className="text-sm text-muted-foreground text-center px-4">
-              {uploading ? "Carregando..." : `Clique para adicionar ${label.toLowerCase()}`}
+            <p className="text-sm text-muted-foreground text-center mb-4">
+              {uploading ? "Carregando..." : `Adicione ${label.toLowerCase()}`}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            
+            {!uploading && (
+              <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+                {enableCamera && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex-1"
+                    data-testid="button-camera"
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Tirar Foto
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1"
+                  data-testid="button-upload"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Escolher Arquivo
+                </Button>
+              </div>
+            )}
+            
+            <p className="text-xs text-muted-foreground mt-3">
               Máximo {maxSizeMB}MB • JPG, PNG, GIF
             </p>
           </div>
         )}
       </div>
 
+      {/* Input para escolher arquivo da galeria */}
       <input
         ref={fileInputRef}
         type="file"
@@ -153,7 +217,22 @@ export default function ImageUpload({
         onChange={handleFileSelect}
         className="hidden"
         disabled={uploading}
+        data-testid="input-file"
       />
+      
+      {/* Input para capturar foto com câmera */}
+      {enableCamera && (
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          onChange={handleFileSelect}
+          className="hidden"
+          disabled={uploading}
+          data-testid="input-camera"
+        />
+      )}
     </div>
   );
 }

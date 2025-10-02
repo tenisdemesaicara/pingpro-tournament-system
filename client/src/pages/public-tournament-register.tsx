@@ -187,6 +187,7 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
         neighborhood: athlete.neighborhood || '',
         zipCode: athlete.zipCode || '',
         club: athlete.club || '',
+        photoUrl: athlete.photoUrl || '',
       });
       setCurrentStep('found');
     } else {
@@ -590,6 +591,19 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
                         required
                         data-testid="input-zipcode"
                       />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <ImageUpload
+                        onImageSelect={(imageUrl) => setFormData({...formData, photoUrl: imageUrl})}
+                        currentImage={formData.photoUrl}
+                        aspectRatio="aspect-square"
+                        label="Foto do Rosto *"
+                        enableCamera={true}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Obrigatório • Use uma foto clara do seu rosto para identificação
+                      </p>
                     </div>
                   </div>
 
