@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, MapPin, Trophy, Users, Clock, AlertCircle, Filter, Star, Award, Target } from "lucide-react";
-import PublicMatchDisplay from "@/components/public-match-display";
+import MatchManagementInterface from "@/components/match-management-interface";
 import { type Athlete } from "@shared/schema";
 
 export default function PublicTournamentView() {
@@ -386,13 +386,18 @@ export default function PublicTournamentView() {
           )}
 
           {/* Matches Section */}
-          {tournamentStarted && tournamentData && matchesData && athletes && (
+          {tournamentStarted && tournamentData && (
             <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-              <PublicMatchDisplay 
-                tournament={tournamentData}
-                matches={matchesData}
-                athletes={athletes}
-              />
+              <CardContent className="p-6">
+                <MatchManagementInterface 
+                  tournament={tournamentData}
+                  matches={matchesData || null}
+                  getPlayerName={getPlayerName}
+                  getPlayerFullInfo={getPlayerFullInfo}
+                  athletes={athletes}
+                  handleClearAttentionClick={handleClearAttentionClick}
+                />
+              </CardContent>
             </Card>
           )}
 
