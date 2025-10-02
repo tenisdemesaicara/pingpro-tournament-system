@@ -95,6 +95,11 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       const isGenderCompatible = categoryGender === 'mista' || categoryGender === athleteGender;
       
       return !isTechnical && isGenderCompatible;
+    }).sort((a: any, b: any) => {
+      // Ordenar por idade mínima (mais novos primeiro)
+      const aMinAge = a.minAge || a.maxAge || 0;
+      const bMinAge = b.minAge || b.maxAge || 0;
+      return aMinAge - bMinAge;
     });
     
     console.log("📅 Categorias por idade (gênero:", formData.gender, "):", ageCategories.map((c: any) => c.name));
@@ -123,6 +128,30 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
       const isGenderCompatible = categoryGender === 'mista' || categoryGender === athleteGender;
       
       return isTechnical && isGenderCompatible;
+    }).sort((a: any, b: any) => {
+      // Ordenar categorias Absoluto na ordem A, B, C, D (ignorando sufixos de gênero)
+      const order = ['iniciante', 'absoluto a', 'absoluto b', 'absoluto c', 'absoluto d'];
+      
+      // Normalizar nomes: remover sufixos de gênero (feminino/masculino/mista)
+      const normalizeName = (name: string) => {
+        return name?.toLowerCase().trim()
+          .replace(/\s+(feminino|masculino|mista)$/, '')
+          .trim() || '';
+      };
+      
+      const aNormalized = normalizeName(a.name);
+      const bNormalized = normalizeName(b.name);
+      
+      const aIndex = order.indexOf(aNormalized);
+      const bIndex = order.indexOf(bNormalized);
+      
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      }
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      
+      return a.name.localeCompare(b.name);
     });
     
     console.log("🎯 Categorias técnicas (gênero:", formData.gender, "):", technicalCategories.map((c: any) => c.name));

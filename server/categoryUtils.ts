@@ -27,8 +27,8 @@ export function getEligibleCategoriesForAthlete(
     // Verificar se o atleta está dentro da faixa etária da categoria
     const isWithinAgeRange = checkAgeEligibility(age, category);
     
-    // Verificar se o gênero é compatível (misto aceita todos)
-    const isGenderCompatible = category.gender === "misto" || 
+    // Verificar se o gênero é compatível (mista aceita todos)
+    const isGenderCompatible = category.gender === "mista" || 
                               category.gender === gender || 
                               (category.gender === "M" && gender === "masculino") ||
                               (category.gender === "F" && gender === "feminino");

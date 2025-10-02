@@ -907,7 +907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Verificar gênero também
           if (eligibleByAge) {
-            if (category.gender === "misto") {
+            if (category.gender === "mista") {
               isEligible = true; // Categoria mista aceita qualquer gênero
             } else {
               // Normalizar gêneros para comparação
@@ -1967,7 +1967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Validate gender eligibility
-          if (category.gender !== 'misto') {
+          if (category.gender !== 'mista') {
             const normalizedAthleteGender = athleteData.gender === 'masculino' ? 'masculino' : 'feminino';
             const normalizedCategoryGender = category.gender === 'masculino' ? 'masculino' : 'feminino';
             
