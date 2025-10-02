@@ -210,7 +210,7 @@ export default function PublicTournamentRegister({ tournamentId }: PublicTournam
         cpf: data.cpf,
         phone: data.phone ? unformatPhone(data.phone) : '',
         tournamentId,
-        technicalCategory: data.technicalCategory || null,
+        technicalCategory: data.technicalCategory || '',
         consentData,
         athleteId: foundAthlete?.id || null
       };
