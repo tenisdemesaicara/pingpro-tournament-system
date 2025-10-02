@@ -64,6 +64,7 @@ async function deployEssentialFiles() {
     const criticalFiles = [
       'client/src/pages/tournament-public.tsx',
       'client/src/components/direct-enrollment-interface.tsx',
+      'client/src/data/table-tennis-facts.ts',
       'server/routes.ts'
     ];
     
