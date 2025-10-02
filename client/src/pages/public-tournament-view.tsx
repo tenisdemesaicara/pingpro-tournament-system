@@ -87,6 +87,13 @@ export default function PublicTournamentView() {
     e.stopPropagation();
   };
 
+  // Debug para verificar dados
+  console.log("🏆 DEBUG PÁGINA PÚBLICA:");
+  console.log("  - Tournament data:", tournamentData ? "✅" : "❌");
+  console.log("  - Matches data:", matchesData ? `✅ ${matchesData.length} partidas` : "❌");
+  console.log("  - Athletes data:", athletes ? `✅ ${athletes.length} atletas` : "❌");
+  console.log("  - Tournament started:", tournamentStarted);
+
   // Filtrar participantes
   const filteredParticipants = useMemo(() => {
     if (!tournamentData?.participants) return [];
@@ -386,12 +393,12 @@ export default function PublicTournamentView() {
           )}
 
           {/* Matches Section */}
-          {tournamentStarted && tournamentData && (
+          {tournamentStarted && tournamentData && matchesData && athletes ? (
             <Card className="bg-white/5 backdrop-blur-lg border-white/10">
               <CardContent className="p-6">
                 <MatchManagementInterface 
                   tournament={tournamentData}
-                  matches={matchesData || null}
+                  matches={matchesData}
                   getPlayerName={getPlayerName}
                   getPlayerFullInfo={getPlayerFullInfo}
                   athletes={athletes}
@@ -399,7 +406,15 @@ export default function PublicTournamentView() {
                 />
               </CardContent>
             </Card>
-          )}
+          ) : tournamentStarted && tournamentData ? (
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardContent className="p-8 text-center">
+                <div className="text-white/60">
+                  Carregando partidas...
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Filters Section */}
           <Card className="bg-white/5 backdrop-blur-lg border-white/10">
