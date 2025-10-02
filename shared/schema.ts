@@ -713,8 +713,8 @@ export type Consent = typeof consents.$inferSelect;
 export const tournamentRegistrationSchema = z.object({
   // Tournament and participation data
   tournamentId: z.string().uuid("ID do torneio inválido"),
-  category: z.string().uuid("ID da categoria inválido").optional().or(z.literal("")), // Age category (optional, allows empty string)
-  technicalCategory: z.string().uuid("ID da categoria técnica inválido").optional().or(z.literal("")), // Technical category UUID (optional, allows empty string)
+  category: z.union([z.string().uuid("ID da categoria inválido"), z.literal("")]).optional(), // Age category (optional, allows empty string)
+  technicalCategory: z.union([z.string().uuid("ID da categoria técnica inválido"), z.literal("")]).optional(), // Technical category UUID (optional, allows empty string)
   athleteId: z.string().uuid().nullish(), // For existing athletes - allows null/undefined for new athletes
   
   // Athlete data (required for new athletes)
