@@ -368,9 +368,37 @@ export default function PublicTournamentView() {
             </Card>
           )}
 
-          {/* Tournament Status Message */}
-          {!tournamentStarted && (
-            <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30 overflow-hidden">
+          {/* Matches Section - SEMPRE MOSTRAR SE EXISTIR */}
+          {matchesData && matchesData.length > 0 ? (
+            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-2xl text-white flex items-center gap-3">
+                  <Trophy className="w-6 h-6 text-yellow-400" />
+                  Partidas e Resultados
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <PublicMatchView 
+                  tournament={tournamentData}
+                  matches={matchesData}
+                  athletes={athletes}
+                  getPlayerName={getPlayerName}
+                  getPlayerFullInfo={getPlayerFullInfo}
+                />
+              </CardContent>
+            </Card>
+          ) : tournamentStarted ? (
+            <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
+              <CardContent className="p-8 text-center">
+                <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+                <h3 className="text-2xl font-bold text-white mb-3">Partidas em Preparação</h3>
+                <p className="text-white/80">
+                  As partidas serão exibidas em breve. Aguarde enquanto organizamos as chaves!
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
               <CardContent className="p-8 text-center">
                 <Clock className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-white mb-3">Torneio Ainda Não Iniciado</h3>
@@ -381,39 +409,6 @@ export default function PublicTournamentView() {
                 <p className="text-white/70 text-sm">
                   Acompanhe esta página para ver os jogos e resultados quando o torneio começar.
                 </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Matches Section */}
-          {tournamentStarted && tournamentData && (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-              <CardHeader>
-                <CardTitle className="text-2xl text-white flex items-center gap-3">
-                  <Trophy className="w-6 h-6 text-yellow-400" />
-                  Partidas do Torneio
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                {matchesData ? (
-                  <PublicMatchView 
-                    tournament={tournamentData}
-                    matches={matchesData}
-                    athletes={athletes}
-                    getPlayerName={getPlayerName}
-                    getPlayerFullInfo={getPlayerFullInfo}
-                  />
-                ) : tournamentStarted ? (
-                  <div className="text-center p-8">
-                    <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-white/60">Carregando partidas...</p>
-                  </div>
-                ) : (
-                  <div className="text-center p-8">
-                    <Trophy className="w-16 h-16 text-white/30 mx-auto mb-4" />
-                    <p className="text-white/60">As partidas serão exibidas quando o torneio iniciar</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
