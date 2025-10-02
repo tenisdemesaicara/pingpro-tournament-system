@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, MapPin, Trophy, Users, Clock, AlertCircle, Filter, Star, Award, Target } from "lucide-react";
+import MatchManagementInterface from "@/components/match-management-interface";
+import { type Athlete } from "@shared/schema";
 
 export default function PublicTournamentView() {
   const { id } = useParams() as { id: string };
@@ -30,6 +32,60 @@ export default function PublicTournamentView() {
   });
 
   const matchesData = matches as any[];
+
+  // Buscar atletas para o pódio
+  const { data: athletes } = useQuery<Athlete[]>({
+    queryKey: ['/api/athletes'],
+    enabled: tournamentStarted
+  });
+
+  // Funções helper para nomes de jogadores (igual ao tournament-detail)
+  const getPlayerName = (rawId: string | number | null): string | null => {
+    if (rawId == null) return null;
+    const id = String(rawId);
+    
+    const athlete = athletes?.find(a => String(a.id) === id);
+    if (athlete) return athlete.name;
+    
+    const participant = tournamentData?.participants?.find((p: any) => String(p.id) === id);
+    if (participant) return participant.name;
+    
+    return null;
+  };
+
+  const getPlayerFullInfo = (rawId: string | number | null): { name: string; club?: string; city?: string; state?: string } | null => {
+    if (rawId == null) return null;
+    const id = String(rawId);
+    
+    const participant = tournamentData?.participants?.find((p: any) => 
+      String(p.id) === id || String((p as any).athleteId) === id
+    );
+    if (participant) {
+      return {
+        name: (participant as any).name ?? (participant as any).athleteName,
+        club: participant.club || undefined,
+        city: participant.city || undefined,
+        state: participant.state || undefined
+      };
+    }
+    
+    const athlete = athletes?.find(a => String(a.id) === id);
+    if (athlete) {
+      return {
+        name: athlete.name,
+        club: athlete.club || undefined,
+        city: athlete.city || undefined,
+        state: athlete.state || undefined
+      };
+    }
+    
+    return null;
+  };
+
+  const handleClearAttentionClick = async (e: React.MouseEvent, matchId: string) => {
+    // Versão pública - não permite ações
+    e.stopPropagation();
+  };
 
   // Filtrar participantes
   const filteredParticipants = useMemo(() => {
@@ -329,144 +385,18 @@ export default function PublicTournamentView() {
             </Card>
           )}
 
-          {/* Matches Section - Only show if tournament has started */}
-          {tournamentStarted && matchesData && matchesData.length > 0 && (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 overflow-hidden">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-2xl text-white flex items-center gap-3">
-                  <Trophy className="w-6 h-6 text-purple-400" />
-                  Partidas e Resultados
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Category Filter for Matches */}
-                <div className="mb-6">
-                  <label className="text-sm text-white/70 mb-2 block">Filtrar por Categoria</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white max-w-md">
-                      <SelectValue placeholder="Todas as categorias" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-gray-700">
-                      <SelectItem value="all" className="text-white hover:bg-gray-800">Todas as Categorias</SelectItem>
-                      {tournamentData.categories?.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id} className="text-white hover:bg-gray-800">
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Display Matches by Category */}
-                <div className="space-y-6">
-                  {tournamentData.categories?.map((category: any) => {
-                    // Filter matches by selected category
-                    if (selectedCategory !== "all" && selectedCategory !== category.id) {
-                      return null;
-                    }
-
-                    // Garantir que matchesData existe
-                    if (!matchesData || matchesData.length === 0) {
-                      return null;
-                    }
-
-                    const categoryMatches = matchesData.filter((match: any) => {
-                      // Debug
-                      console.log(`🔍 Comparando match.categoryId: ${match.categoryId} com category.id: ${category.id}`);
-                      return String(match.categoryId) === String(category.id);
-                    });
-                    
-                    console.log(`📊 Categoria "${category.name}" (${category.id}): ${categoryMatches.length} partidas encontradas`);
-                    
-                    if (categoryMatches.length === 0) return null;
-
-                    return (
-                      <div key={category.id} className="space-y-4">
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                          <Trophy className="w-5 h-5 text-purple-400" />
-                          {category.name}
-                        </h3>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {categoryMatches.map((match: any) => {
-                            const player1 = tournamentData.participants?.find((p: any) => 
-                              String(p.id) === String(match.player1Id) || String(p.athleteId) === String(match.player1Id)
-                            );
-                            const player2 = tournamentData.participants?.find((p: any) => 
-                              String(p.id) === String(match.player2Id) || String(p.athleteId) === String(match.player2Id)
-                            );
-
-                            const player1Name = player1?.name || player1?.athleteName || match.player1Name || 'BYE';
-                            const player2Name = player2?.name || player2?.athleteName || match.player2Name || 'BYE';
-                            
-                            const isCompleted = match.status === 'completed';
-                            const isInProgress = match.status === 'in_progress';
-
-                            return (
-                              <Card key={match.id} className={`
-                                ${isCompleted ? 'bg-green-500/10 border-green-400/30' : 
-                                  isInProgress ? 'bg-blue-500/10 border-blue-400/30' : 
-                                  'bg-white/5 border-white/10'}
-                                backdrop-blur-lg
-                              `}>
-                                <CardContent className="p-4">
-                                  {/* Match Header */}
-                                  <div className="flex items-center justify-between mb-3">
-                                    <span className="text-xs text-white/60">
-                                      {match.phase === 'group' && match.groupName ? `${match.groupName}` : ''}
-                                      {match.phase === 'knockout' ? 'Eliminatória' : ''}
-                                      {match.phase === 'league' && match.round ? ` Rodada ${match.round}` : ''}
-                                    </span>
-                                    <Badge variant={isCompleted ? "default" : isInProgress ? "secondary" : "outline"} 
-                                           className={`text-xs ${isCompleted ? 'bg-green-500/20 text-green-300 border-green-400/30' : 
-                                                        isInProgress ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 
-                                                        'bg-white/10 text-white/70 border-white/20'}`}>
-                                      {isCompleted ? 'Finalizada' : isInProgress ? 'Em Andamento' : 'Agendada'}
-                                    </Badge>
-                                  </div>
-
-                                  {/* Players */}
-                                  <div className="space-y-2">
-                                    <div className="flex items-center justify-between p-3 bg-white/5 rounded">
-                                      <span className="text-white font-medium">{player1Name}</span>
-                                      <span className="text-2xl font-bold text-white">
-                                        {match.player1Score ?? '-'}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center justify-between p-3 bg-white/5 rounded">
-                                      <span className="text-white font-medium">{player2Name}</span>
-                                      <span className="text-2xl font-bold text-white">
-                                        {match.player2Score ?? '-'}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Set Scores */}
-                                  {match.sets && match.sets.length > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-white/10">
-                                      <div className="flex gap-2 justify-center">
-                                        {match.sets.map((set: any, index: number) => (
-                                          <div key={index} className="text-center px-3 py-1 bg-white/5 rounded">
-                                            <div className="text-xs text-white/60 mb-1">Set {index + 1}</div>
-                                            <div className="text-sm text-white font-medium">
-                                              {set.player1Score} - {set.player2Score}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Matches Section - Using the same component as internal system */}
+          {tournamentStarted && tournamentData && matchesData && (
+            <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-lg p-6">
+              <MatchManagementInterface 
+                tournament={tournamentData}
+                matches={matchesData}
+                getPlayerName={getPlayerName}
+                getPlayerFullInfo={getPlayerFullInfo}
+                athletes={athletes}
+                handleClearAttentionClick={handleClearAttentionClick}
+              />
+            </div>
           )}
 
           {/* Filters Section */}
