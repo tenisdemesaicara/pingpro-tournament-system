@@ -6,6 +6,17 @@ PingPong Pro is a comprehensive table tennis tournament management platform buil
 
 ### Latest Updates (October 2025)
 
+**Public Match View Enhancement (Oct 2 - Latest):**
+- **Full Parity with Internal View**: Public match pages now mirror the internal "Partidas" tab exactly in functionality and appearance
+- **Complete Match Display**: All matches visible regardless of status (pending, in_progress, completed)
+- **Professional UI**: White card backgrounds with proper contrast, identical to admin view
+- **Athlete Photos**: Avatar display with photoUrl support, including proper ID normalization (string comparison)
+- **Visual Feedback**: Color-coded status badges (green for completed, yellow for in-progress, gray for pending)
+- **Set Details**: Orange/amber colored set scores for completed matches
+- **Match Metadata**: Table number and match number displayed for each game
+- **Trophy Indicators**: Yellow trophy icon (🏆) shown next to winning player's score
+- **Smart Filtering**: Category, phase, and group filters working correctly with English database values
+
 **Photo Upload Enhancement (Oct 2):**
 - **Camera Capture Support**: Athletes can now take photos directly with their device's camera using HTML5 `capture="user"` attribute
 - **Gallery Selection**: Alternative option to select existing photos from device gallery

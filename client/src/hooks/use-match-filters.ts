@@ -35,8 +35,23 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
   
   // Obter fases disponíveis baseado no formato (retorna valores em inglês como no banco)
   const getAvailablePhases = (categoryId?: string) => {
+    console.log('🔍 getAvailablePhases chamado:', { categoryId, format: tournament.format, hasMatches: !!matches });
+    
     const format = tournament.format;
     
+    // Se categoryId fornecido E temos matches, detectar fases reais das partidas
+    if (categoryId && matches) {
+      const categoryMatches = matches.filter(m => m.categoryId === categoryId);
+      const uniquePhases = Array.from(new Set(categoryMatches.map(m => m.phase).filter(Boolean)));
+      
+      console.log('🎯 Fases reais encontradas nas partidas da categoria:', uniquePhases);
+      
+      if (uniquePhases.length > 0) {
+        return uniquePhases as string[];
+      }
+    }
+    
+    // Fallback: usar formato do torneio
     if (format === 'groups_elimination' || format === 'group_stage_knockout' || format === 'cup') {
       return ['group', 'knockout'];
     } else if (format === 'single_elimination' || format === 'double_elimination') {
@@ -45,19 +60,6 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
       return ['league'];
     } else if (format === 'swiss') {
       return ['swiss'];
-    }
-    
-    // Para grupos com mata-mata - detectar fases reais do torneio
-    if (categoryId && matches) {
-      const categoryMatches = matches.filter(m => m.categoryId === categoryId);
-      const hasGroups = categoryMatches.some(m => m.phase === 'group');
-      const hasKnockout = categoryMatches.some(m => 
-        m.phase && ['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'].includes(m.phase)
-      );
-      
-      if (hasGroups && hasKnockout) {
-        return ['group', 'knockout'];
-      }
     }
     
     return ['league']; // Padrão

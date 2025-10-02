@@ -1,15 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Trophy } from "lucide-react";
-import type { Match } from "@shared/schema";
+import type { Match, Athlete } from "@shared/schema";
 import { useMatchFilters } from "@/hooks/use-match-filters";
 
 interface PublicMatchViewProps {
   tournament: any;
   matches: Match[] | null;
+  athletes?: Athlete[];
   getPlayerName: (id: string | number | null) => string | null;
   getPlayerFullInfo: (id: string | number | null) => { name: string; club?: string; city?: string; state?: string } | null;
 }
@@ -17,6 +16,7 @@ interface PublicMatchViewProps {
 export default function PublicMatchView({ 
   tournament, 
   matches, 
+  athletes,
   getPlayerName, 
   getPlayerFullInfo
 }: PublicMatchViewProps) {
@@ -27,10 +27,22 @@ export default function PublicMatchView({
   
   const { getAvailablePhases, getAvailableGroups, getAvailableRounds } = useMatchFilters(tournament, matches);
 
+  // Debug: Log props
+  useEffect(() => {
+    console.log('🎮 PublicMatchView props:', {
+      tournamentName: tournament?.name,
+      categoriesCount: tournament?.categories?.length,
+      matchesCount: matches?.length,
+      categories: tournament?.categories?.map((c: any) => ({ id: c.id, name: c.name })),
+      firstFewMatches: matches?.slice(0, 3).map(m => ({ categoryId: m.categoryId, phase: m.phase }))
+    });
+  }, [tournament, matches]);
+
   // Auto-selecionar primeira categoria
   useEffect(() => {
     if (!selectedCategory && tournament.categories && tournament.categories.length > 0) {
       const firstCategory = tournament.categories[0];
+      console.log('📋 Auto-selecionando categoria:', firstCategory.name, 'ID:', firstCategory.id);
       setSelectedCategory(firstCategory.id);
     }
   }, [tournament.categories, selectedCategory]);
@@ -40,18 +52,24 @@ export default function PublicMatchView({
     if (!selectedCategory) return;
     
     const phases = getAvailablePhases(selectedCategory);
+    console.log('🎯 Fases disponíveis para categoria', selectedCategory, ':', phases);
     if (phases.length === 1 && !selectedPhase) {
+      console.log('✅ Auto-selecionando fase única:', phases[0]);
       setSelectedPhase(phases[0]);
     } else if (phases.length > 0 && !selectedPhase) {
+      console.log('✅ Auto-selecionando primeira fase:', phases[0]);
       setSelectedPhase(phases[0]);
     }
   }, [selectedCategory]);
 
   // Filtrar partidas
   const filteredMatches = useMemo(() => {
-    if (!matches || !selectedCategory) return [];
+    if (!matches || !selectedCategory) {
+      console.log('❌ Sem matches ou categoria selecionada:', { hasMatches: !!matches, selectedCategory });
+      return [];
+    }
 
-    return matches.filter(match => {
+    const filtered = matches.filter(match => {
       if (match.categoryId !== selectedCategory) return false;
       if (selectedPhase && match.phase !== selectedPhase) return false;
       if (selectedGroup && match.groupName !== selectedGroup) return false;
@@ -59,6 +77,18 @@ export default function PublicMatchView({
       
       return true;
     });
+    
+    console.log('🎯 Filtros aplicados:', {
+      totalMatches: matches.length,
+      selectedCategory,
+      selectedPhase,
+      selectedGroup,
+      selectedRound,
+      filteredCount: filtered.length,
+      sampleMatch: filtered[0] ? { categoryId: filtered[0].categoryId, phase: filtered[0].phase } : null
+    });
+    
+    return filtered;
   }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedRound]);
 
   // Grupos disponíveis
@@ -73,120 +103,156 @@ export default function PublicMatchView({
     return getAvailableRounds(selectedCategory, selectedPhase, selectedGroup || undefined);
   }, [selectedCategory, selectedPhase, selectedGroup, getAvailableRounds]);
 
-
-  // Renderizar placar de partida
-  const renderMatchScore = (match: Match) => {
-    const player1Name = getPlayerName(match.player1Id);
-    const player2Name = getPlayerName(match.player2Id);
-    const player1Info = getPlayerFullInfo(match.player1Id);
-    const player2Info = getPlayerFullInfo(match.player2Id);
-
-    const isCompleted = match.status === 'completed';
-    const hasWinner = match.winnerId != null;
+  // Helper function to calculate match results
+  const getMatchResults = (match: Match) => {
+    const sets = (match.sets ?? []) as Array<{ player1Score: number; player2Score: number }>;
     
-    // Parse do score
-    let player1Score = 0;
-    let player2Score = 0;
-    if (match.score) {
-      const parts = match.score.split('-');
-      if (parts.length === 2) {
-        player1Score = parseInt(parts[0]) || 0;
-        player2Score = parseInt(parts[1]) || 0;
-      }
-    }
+    let player1Sets = 0;
+    let player2Sets = 0;
     
-    // Parse dos sets
-    const matchSets = (match.sets as any) || [];
+    sets.forEach(set => {
+      if (set.player1Score > set.player2Score) player1Sets++;
+      else if (set.player2Score > set.player1Score) player2Sets++;
+    });
+    
+    return {
+      player1Sets,
+      player2Sets,
+      player1Wins: player1Sets > player2Sets,
+      player2Wins: player2Sets > player1Sets
+    };
+  };
 
+  // Helper component to render player score
+  const PlayerScore = ({ match, isPlayer1 }: { match: Match; isPlayer1: boolean }) => {
+    const results = getMatchResults(match);
+    if (results.player1Sets === 0 && results.player2Sets === 0) return null;
+    
+    const sets = isPlayer1 ? results.player1Sets : results.player2Sets;
+    const wins = isPlayer1 ? results.player1Wins : results.player2Wins;
+    
     return (
-      <Card key={match.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-all">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            {/* Player 1 */}
-            <div className="flex-1 flex items-center gap-3">
-              <Avatar className="w-10 h-10 border-2 border-white/20">
-                <AvatarImage src={player1Info?.name ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${player1Info.name}` : undefined} />
-                <AvatarFallback className="bg-purple-500 text-white">
-                  {player1Name?.charAt(0) || '?'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
+      <>
+        <span className="text-green-600 font-bold">({sets})</span>
+        {wins && <span className="text-yellow-500">🏆</span>}
+      </>
+    );
+  };
+
+  // Renderizar card de partida (baseado na aba Partidas interna)
+  const renderMatchCard = (match: Match) => {
+    const sets = (match.sets ?? []) as Array<{ player1Score: number; player2Score: number }>;
+    
+    return (
+      <Card key={match.id} className="p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            {/* NOVA ESTRUTURA: NOMES COM PLACAR AO LADO + STATUS ABAIXO DE VS */}
+            <div className="text-center mb-3">
+              <div className="flex items-center justify-center gap-4 mb-1">
+                {/* JOGADOR 1 COM PLACAR */}
                 <div className="flex items-center gap-2">
-                  <span className={`font-semibold ${hasWinner && match.winnerId === match.player1Id ? 'text-yellow-400' : 'text-white'}`}>
-                    {player1Name || 'Aguardando'}
+                  {/* Foto do Jogador 1 */}
+                  <Avatar className="w-8 h-8">
+                    {(() => {
+                      const player = athletes?.find(a => String(a.id) === String(match.player1Id));
+                      return player?.photoUrl ? (
+                        <AvatarImage 
+                          src={player.photoUrl} 
+                          alt={player.name}
+                          className="object-cover"
+                        />
+                      ) : null;
+                    })()}
+                    <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                      {getPlayerName(match.player1Id)?.charAt(0).toUpperCase() || '🏓'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">
+                    {getPlayerName(match.player1Id) || 'Jogador 1'}
                   </span>
-                  {hasWinner && match.winnerId === match.player1Id && (
-                    <Trophy className="w-4 h-4 text-yellow-400" />
+                  <PlayerScore match={match} isPlayer1={true} />
+                </div>
+
+                {/* VS */}
+                <div className="text-lg font-bold text-muted-foreground">
+                  VS
+                </div>
+
+                {/* JOGADOR 2 COM PLACAR */}
+                <div className="flex items-center gap-2">
+                  <PlayerScore match={match} isPlayer1={false} />
+                  <span className="font-medium">
+                    {match.player2Id ? (getPlayerName(match.player2Id) || 'Jogador 2') : '🚫 BYE'}
+                  </span>
+                  {/* Foto do Jogador 2 */}
+                  {match.player2Id && (
+                    <Avatar className="w-8 h-8">
+                      {(() => {
+                        const player = athletes?.find(a => String(a.id) === String(match.player2Id));
+                        return player?.photoUrl ? (
+                          <AvatarImage 
+                            src={player.photoUrl} 
+                            alt={player.name}
+                            className="object-cover"
+                          />
+                        ) : null;
+                      })()}
+                      <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-green-500 to-green-600 text-white">
+                        {getPlayerName(match.player2Id)?.charAt(0).toUpperCase() || '⚽'}
+                      </AvatarFallback>
+                    </Avatar>
                   )}
                 </div>
-                {player1Info?.club && (
-                  <div className="text-xs text-white/50">{player1Info.club}</div>
-                )}
+              </div>
+
+              {/* STATUS CENTRALIZADO ABAIXO DE VS */}
+              <div className="mt-2">
+                <span className={`px-2 py-1 rounded text-xs ${
+                  match.status === 'completed' ? 'bg-green-100 text-green-800' :
+                  match.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {match.status === 'completed' ? 'Finalizada' :
+                   match.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
+                </span>
               </div>
             </div>
 
-            {/* Score */}
-            <div className="px-6">
-              {isCompleted ? (
-                <div className="flex items-center gap-3">
-                  <span className={`text-2xl font-bold ${hasWinner && match.winnerId === match.player1Id ? 'text-yellow-400' : 'text-white'}`}>
-                    {player1Score}
+            {/* PONTOS DOS SETS */}
+            {match.status === "completed" && sets.length > 0 && (
+              <div className="flex flex-row flex-wrap justify-center gap-1 text-xs mb-3">
+                {sets.flatMap((set, setIndex) => [
+                  <span 
+                    key={`${setIndex}-p1`} 
+                    className="bg-orange-400 text-white px-2 py-1 rounded font-bold min-w-6 text-center"
+                    data-testid={`set-${setIndex}-player1-score`}
+                  >
+                    {set.player1Score}
+                  </span>,
+                  <span 
+                    key={`${setIndex}-p2`} 
+                    className="bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold min-w-6 text-center border"
+                    data-testid={`set-${setIndex}-player2-score`}
+                  >
+                    {set.player2Score}
                   </span>
-                  <span className="text-white/50">×</span>
-                  <span className={`text-2xl font-bold ${hasWinner && match.winnerId === match.player2Id ? 'text-yellow-400' : 'text-white'}`}>
-                    {player2Score}
-                  </span>
-                </div>
-              ) : (
-                <Badge variant="outline" className="bg-white/10 border-white/20 text-white">
-                  Aguardando
-                </Badge>
-              )}
-            </div>
-
-            {/* Player 2 */}
-            <div className="flex-1 flex items-center gap-3 flex-row-reverse">
-              <Avatar className="w-10 h-10 border-2 border-white/20">
-                <AvatarImage src={player2Info?.name ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${player2Info.name}` : undefined} />
-                <AvatarFallback className="bg-blue-500 text-white">
-                  {player2Name?.charAt(0) || '?'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 text-right">
-                <div className="flex items-center gap-2 justify-end">
-                  {hasWinner && match.winnerId === match.player2Id && (
-                    <Trophy className="w-4 h-4 text-yellow-400" />
-                  )}
-                  <span className={`font-semibold ${hasWinner && match.winnerId === match.player2Id ? 'text-yellow-400' : 'text-white'}`}>
-                    {player2Name || 'Aguardando'}
-                  </span>
-                </div>
-                {player2Info?.club && (
-                  <div className="text-xs text-white/50">{player2Info.club}</div>
-                )}
+                ])}
               </div>
+            )}
+
+            {/* MESA E PARTIDA NAS EXTREMIDADES */}
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              {/* MESA (ESQUERDA) */}
+              <div className="flex items-center gap-2">
+                <span>Mesa {match.tableNumber || 1}</span>
+              </div>
+
+              {/* PARTIDA (DIREITA) */}
+              <span>Partida #{match.matchNumber}</span>
             </div>
           </div>
-
-          {/* Sets detalhados */}
-          {matchSets && matchSets.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-white/10">
-              <div className="flex gap-2 justify-center">
-                {matchSets.map((set: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-1 text-sm">
-                    <span className={set.player1Score > set.player2Score ? 'text-yellow-400 font-bold' : 'text-white/70'}>
-                      {set.player1Score}
-                    </span>
-                    <span className="text-white/50">-</span>
-                    <span className={set.player2Score > set.player1Score ? 'text-yellow-400 font-bold' : 'text-white/70'}>
-                      {set.player2Score}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </CardContent>
+        </div>
       </Card>
     );
   };
@@ -197,9 +263,9 @@ export default function PublicMatchView({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Categoria */}
         <div>
-          <label className="text-sm text-white/70 mb-2 block">Categoria</label>
+          <label className="text-sm text-white/90 mb-2 block font-semibold">Categoria</label>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-category">
+            <SelectTrigger className="bg-white/10 border-white/30 text-white hover:bg-white/20 focus:border-purple-400" data-testid="select-category">
               <SelectValue placeholder="Selecione categoria" />
             </SelectTrigger>
             <SelectContent className="bg-gray-900 border-gray-700">
@@ -215,9 +281,9 @@ export default function PublicMatchView({
         {/* Fase */}
         {selectedCategory && (
           <div>
-            <label className="text-sm text-white/70 mb-2 block">Fase</label>
+            <label className="text-sm text-white/90 mb-2 block font-semibold">Fase</label>
             <Select value={selectedPhase} onValueChange={setSelectedPhase}>
-              <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-phase">
+              <SelectTrigger className="bg-white/10 border-white/30 text-white hover:bg-white/20 focus:border-purple-400" data-testid="select-phase">
                 <SelectValue placeholder="Selecione fase" />
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-700">
@@ -248,9 +314,9 @@ export default function PublicMatchView({
         {/* Grupo */}
         {availableGroups.length > 0 && (
           <div>
-            <label className="text-sm text-white/70 mb-2 block">Grupo</label>
+            <label className="text-sm text-white/90 mb-2 block font-semibold">Grupo</label>
             <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-              <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-group">
+              <SelectTrigger className="bg-white/10 border-white/30 text-white hover:bg-white/20 focus:border-purple-400" data-testid="select-group">
                 <SelectValue placeholder="Todos os grupos" />
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-700">
@@ -267,30 +333,58 @@ export default function PublicMatchView({
       </div>
 
       {/* Lista de Partidas */}
-      <div className="space-y-3">
-        {filteredMatches.length > 0 ? (
-          filteredMatches.map(match => renderMatchScore(match))
-        ) : selectedCategory ? (
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-8 text-center">
-              <div className="text-white/60">
-                <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-lg font-semibold mb-2">Nenhuma partida encontrada</p>
-                <p className="text-sm">Selecione outros filtros ou aguarde o início do torneio.</p>
+      {filteredMatches && filteredMatches.length > 0 && (
+        <div className="space-y-4">
+          {selectedPhase === 'group' ? (
+            // VISUALIZAÇÃO POR GRUPOS - FASE DE GRUPOS
+            (() => {
+              // Agrupar partidas por grupo
+              const matchesByGroup = new Map<string, typeof filteredMatches>();
+              filteredMatches.forEach(match => {
+                const group = match.groupName || 'Sem Grupo';
+                if (!matchesByGroup.has(group)) {
+                  matchesByGroup.set(group, []);
+                }
+                matchesByGroup.get(group)!.push(match);
+              });
+
+              // Ordenar grupos alfabeticamente
+              const sortedGroups = Array.from(matchesByGroup.keys()).sort();
+
+              return (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-white">Partidas por Grupo</h3>
+                  {sortedGroups.map(group => (
+                    <div key={group} className="space-y-3">
+                      <h4 className="text-md font-medium bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-2 rounded-lg shadow-sm">
+                        📊 Grupo {group}
+                      </h4>
+                      <div className="grid gap-3">
+                        {matchesByGroup.get(group)!.map(match => renderMatchCard(match))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          ) : (
+            // VISUALIZAÇÃO ÚNICA - OUTRAS FASES
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-white">Partidas do Torneio</h3>
+              <div className="grid gap-4">
+                {filteredMatches.map(match => renderMatchCard(match))}
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-8 text-center">
-              <div className="text-white/60">
-                <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-lg font-semibold">Selecione uma categoria para ver as partidas</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sem partidas */}
+      {(!filteredMatches || filteredMatches.length === 0) && selectedCategory && selectedPhase && (
+        <div className="text-center py-12">
+          <p className="text-white/70">Nenhuma partida encontrada para os filtros selecionados.</p>
+        </div>
+      )}
     </div>
   );
 }

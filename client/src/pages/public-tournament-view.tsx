@@ -399,6 +399,7 @@ export default function PublicTournamentView() {
                   <PublicMatchView 
                     tournament={tournamentData}
                     matches={matchesData}
+                    athletes={athletes}
                     getPlayerName={getPlayerName}
                     getPlayerFullInfo={getPlayerFullInfo}
                   />
