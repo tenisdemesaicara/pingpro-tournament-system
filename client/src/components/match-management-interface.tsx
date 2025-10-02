@@ -39,6 +39,14 @@ export default function MatchManagementInterface({
   const [tempSets, setTempSets] = useState<Array<{player1Score: number, player2Score: number}>>([]);
   const { toast } = useToast();
 
+  // Auto-selecionar primeira categoria se nenhuma estiver selecionada
+  useEffect(() => {
+    if (!selectedCategory && tournament.categories && tournament.categories.length > 0) {
+      const firstCategory = tournament.categories[0];
+      setSelectedCategory(firstCategory.name);
+    }
+  }, [tournament.categories, selectedCategory]);
+
   // Auto-selecionar fase se houver apenas uma opção disponível
   useEffect(() => {
     if (!selectedCategory) return;
