@@ -21,12 +21,11 @@ export default function PublicMatchView({
   getPlayerFullInfo
 }: PublicMatchViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedGender, setSelectedGender] = useState<string>("all");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [selectedPhase, setSelectedPhase] = useState<string>("");
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   
-  const { isMixedCategory, getAvailablePhases, getAvailableGroups, getAvailableRounds } = useMatchFilters(tournament, matches);
+  const { getAvailablePhases, getAvailableGroups, getAvailableRounds } = useMatchFilters(tournament, matches);
 
   // Auto-selecionar primeira categoria
   useEffect(() => {
@@ -58,21 +57,9 @@ export default function PublicMatchView({
       if (selectedGroup && match.groupName !== selectedGroup) return false;
       if (selectedRound != null && match.round !== selectedRound) return false;
       
-      // Filtro de gênero
-      if (selectedGender && selectedGender !== 'all') {
-        const category = tournament.categories?.find((c: any) => c.id === match.categoryId);
-        const categoryName = category?.name?.toLowerCase() || '';
-        
-        if (selectedGender === 'masculino') {
-          if (!categoryName.includes('masculino') && !categoryName.includes('masc')) return false;
-        } else if (selectedGender === 'feminino') {
-          if (!categoryName.includes('feminino') && !categoryName.includes('fem')) return false;
-        }
-      }
-      
       return true;
     });
-  }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedRound, selectedGender, tournament.categories]);
+  }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedRound]);
 
   // Grupos disponíveis
   const availableGroups = useMemo(() => {
@@ -86,8 +73,6 @@ export default function PublicMatchView({
     return getAvailableRounds(selectedCategory, selectedPhase, selectedGroup || undefined);
   }, [selectedCategory, selectedPhase, selectedGroup, getAvailableRounds]);
 
-  // Verificar se categoria é mista
-  const isMixed = selectedCategory ? isMixedCategory(selectedCategory) : false;
 
   // Renderizar placar de partida
   const renderMatchScore = (match: Match) => {
@@ -261,23 +246,6 @@ export default function PublicMatchView({
                     Grupo {group}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Gênero (apenas se não for mista) */}
-        {!isMixed && (
-          <div>
-            <label className="text-sm text-white/70 mb-2 block">Gênero</label>
-            <Select value={selectedGender} onValueChange={setSelectedGender}>
-              <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-gender">
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-900 border-gray-700">
-                <SelectItem value="all" className="text-white hover:bg-gray-800">Todos</SelectItem>
-                <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
-                <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
               </SelectContent>
             </Select>
           </div>
