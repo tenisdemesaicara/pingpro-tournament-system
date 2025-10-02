@@ -25,7 +25,7 @@ export default function PublicTournamentView() {
     ['in_progress', 'paused', 'completed', 'ready_to_finish'].includes(tournamentData.status);
   
   const { data: matches } = useQuery({
-    queryKey: ['/api/tournaments', id, 'matches'],
+    queryKey: ['/api/public/tournaments', id, 'matches'],
     enabled: !!id && tournamentStarted
   });
 
