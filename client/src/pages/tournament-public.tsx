@@ -36,7 +36,7 @@ export default function TournamentPublic() {
     if (!category) return false;
     
     const categoryName = category.name.toLowerCase();
-    return categoryName.includes('misto') || categoryName.includes('mixed') || categoryName.includes('mixto');
+    return categoryName.includes('misto') || categoryName.includes('mista') || categoryName.includes('mixed') || categoryName.includes('mixto');
   }, [selectedCategory, tournamentData?.categories]);
 
   // 🏆 LÓGICA DO PÓDIUM - Calcular posições quando categoria está completa
@@ -788,26 +788,26 @@ export default function TournamentPublic() {
 
           {/* Tournament Description */}
           {tournamentData.description && (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+            <Card className="bg-white dark:bg-slate-800 backdrop-blur-lg border-slate-300 dark:border-slate-600">
               <CardHeader>
-                <CardTitle className="text-xl text-white">Sobre o Torneio</CardTitle>
+                <CardTitle className="text-xl text-slate-900 dark:text-white">Sobre o Torneio</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-white/80 leading-relaxed">{tournamentData.description}</p>
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{tournamentData.description}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Footer */}
-          <Card className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 backdrop-blur-lg border-purple-400/30">
+          <Card className="bg-white dark:bg-slate-800 backdrop-blur-lg border-slate-300 dark:border-slate-600">
             <CardContent className="p-8 text-center">
               <div className="flex items-center justify-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-purple-600 dark:bg-purple-500 rounded-lg flex items-center justify-center">
                   <Trophy className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-white">PingPong Pro</h3>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">PingPong Pro</h3>
               </div>
-              <p className="text-white/70 mb-6 max-w-2xl mx-auto">
+              <p className="text-slate-700 dark:text-slate-300 mb-6 max-w-2xl mx-auto">
                 Plataforma profissional para gerenciamento de torneios de tênis de mesa. 
                 Organização moderna, resultados em tempo real e experiência completa para atletas e espectadores.
               </p>
@@ -815,14 +815,14 @@ export default function TournamentPublic() {
                 <Button 
                   variant="outline" 
                   onClick={() => window.history.back()}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600"
                 >
                   ← Voltar
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={() => window.close()}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-600"
                 >
                   Fechar
                 </Button>
