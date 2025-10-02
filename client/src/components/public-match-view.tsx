@@ -38,29 +38,34 @@ export default function PublicMatchView({
     });
   }, [tournament, matches]);
 
-  // Auto-selecionar primeira categoria
+  // Inicializar categoria na primeira renderização
   useEffect(() => {
-    if (!selectedCategory && tournament.categories && tournament.categories.length > 0) {
+    if (!selectedCategory && tournament?.categories && tournament.categories.length > 0) {
       const firstCategory = tournament.categories[0];
-      console.log('📋 Auto-selecionando categoria:', firstCategory.name, 'ID:', firstCategory.id);
+      console.log('📋 Inicializando categoria:', firstCategory.name, 'ID:', firstCategory.id);
       setSelectedCategory(firstCategory.id);
     }
-  }, [tournament.categories, selectedCategory]);
+  }, [tournament?.categories]);
 
-  // Auto-selecionar fase se houver apenas uma
+  // Inicializar fase quando categoria muda
   useEffect(() => {
-    if (!selectedCategory) return;
+    if (!selectedCategory) {
+      setSelectedPhase("");
+      return;
+    }
     
     const phases = getAvailablePhases(selectedCategory);
     console.log('🎯 Fases disponíveis para categoria', selectedCategory, ':', phases);
-    if (phases.length === 1 && !selectedPhase) {
+    
+    // Auto-selecionar SOMENTE se houver apenas uma fase
+    if (phases.length === 1) {
       console.log('✅ Auto-selecionando fase única:', phases[0]);
       setSelectedPhase(phases[0]);
-    } else if (phases.length > 0 && !selectedPhase) {
-      console.log('✅ Auto-selecionando primeira fase:', phases[0]);
-      setSelectedPhase(phases[0]);
+    } else {
+      // Resetar fase para forçar usuário a escolher
+      setSelectedPhase("");
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, getAvailablePhases]);
 
   // Filtrar partidas
   const filteredMatches = useMemo(() => {
@@ -379,7 +384,19 @@ export default function PublicMatchView({
         </div>
       )}
 
-      {/* Sem partidas */}
+      {/* Mensagem quando precisa selecionar fase */}
+      {selectedCategory && !selectedPhase && getAvailablePhases(selectedCategory).length > 1 && (
+        <div className="text-center py-12 px-4">
+          <div className="inline-block bg-purple-500/20 border border-purple-400/30 rounded-lg p-6 max-w-md">
+            <p className="text-white text-lg font-semibold mb-2">👆 Selecione uma Fase</p>
+            <p className="text-white/70">
+              Escolha a fase acima para visualizar as partidas e resultados.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Sem partidas após filtros */}
       {(!filteredMatches || filteredMatches.length === 0) && selectedCategory && selectedPhase && (
         <div className="text-center py-12">
           <p className="text-white/70">Nenhuma partida encontrada para os filtros selecionados.</p>
