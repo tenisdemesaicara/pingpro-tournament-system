@@ -33,9 +33,9 @@ export default function PublicTournamentView() {
 
   const matchesData = matches as any[];
 
-  // Buscar atletas para o pódio
+  // Buscar atletas para o pódio (endpoint público)
   const { data: athletes } = useQuery<Athlete[]>({
-    queryKey: ['/api/athletes'],
+    queryKey: ['/api/public/athletes'],
     enabled: tournamentStarted
   });
 
