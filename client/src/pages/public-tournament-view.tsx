@@ -9,11 +9,13 @@ import { Calendar, MapPin, Trophy, Users, Clock, AlertCircle, Filter, Star, Awar
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PublicMatchView from "@/components/public-match-view";
 import { type Athlete } from "@shared/schema";
+import { getRandomFact } from "@/data/table-tennis-facts";
 
 export default function PublicTournamentView() {
   const { id } = useParams() as { id: string };
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedGender, setSelectedGender] = useState<string>("all");
+  const [curiosity, setCuriosity] = useState<string>("");
 
   console.log('🎬 PublicTournamentView renderizado! ID do torneio:', id);
 
@@ -26,6 +28,20 @@ export default function PublicTournamentView() {
   console.log('📊 Query state:', { isLoading, hasData: !!tournament, error });
 
   const tournamentData = tournament as any;
+
+  // Definir título da página dinamicamente
+  useEffect(() => {
+    if (tournamentData?.name) {
+      document.title = `${tournamentData.name} - PingPong Pro`;
+    } else {
+      document.title = "Torneio - PingPong Pro";
+    }
+  }, [tournamentData?.name]);
+
+  // Carregar curiosidade aleatória
+  useEffect(() => {
+    setCuriosity(getRandomFact());
+  }, []);
 
   // Buscar partidas se o torneio estiver iniciado
   const tournamentStarted = tournamentData?.status && 
@@ -440,6 +456,34 @@ export default function PublicTournamentView() {
                         <div className="text-sm text-gray-600">Feminino</div>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Curiosidades sobre Tênis de Mesa */}
+              {curiosity && (
+                <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 shadow-lg">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl text-gray-900 flex items-center gap-3">
+                      <div className="p-2 bg-amber-500 rounded-lg">
+                        <Info className="w-5 h-5 text-white" />
+                      </div>
+                      <span>Curiosidade sobre Tênis de Mesa</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg text-gray-700 leading-relaxed italic">
+                      "{curiosity}"
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-4 border-amber-300 hover:bg-amber-100"
+                      onClick={() => setCuriosity(getRandomFact())}
+                    >
+                      <Trophy className="w-4 h-4 mr-2" />
+                      Nova Curiosidade
+                    </Button>
                   </CardContent>
                 </Card>
               )}

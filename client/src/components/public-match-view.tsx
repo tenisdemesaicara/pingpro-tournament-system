@@ -90,23 +90,35 @@ export default function PublicMatchView({
     return grouped;
   }, [filteredMatches]);
 
-  // Verificar se há jogos completos na categoria selecionada
-  const categoryMatches = useMemo(() => {
-    if (!matches || !selectedCategory) return [];
-    return matches.filter(m => String(m.categoryId) === String(selectedCategory));
-  }, [matches, selectedCategory]);
+  // Determinar se deve mostrar classificação
+  const shouldShowStandings = useMemo(() => {
+    if (!selectedCategory || !selectedPhase) return false;
+    
+    // Se for fase de grupos, exige que um grupo específico seja selecionado
+    if (selectedPhase === 'group') {
+      return selectedGroup && selectedGroup !== '__all';
+    }
+    
+    // Para outras fases, basta ter categoria e fase
+    return true;
+  }, [selectedCategory, selectedPhase, selectedGroup]);
+
+  // Partidas para classificação (já filtradas por categoria, fase e grupo)
+  const standingsMatches = useMemo(() => {
+    return filteredMatches;
+  }, [filteredMatches]);
 
   const hasCompletedMatches = useMemo(() => {
-    return categoryMatches.some(m => m.status === 'completed');
-  }, [categoryMatches]);
+    return standingsMatches.some(m => m.status === 'completed');
+  }, [standingsMatches]);
 
   const allMatchesCompleted = useMemo(() => {
-    return categoryMatches.length > 0 && categoryMatches.every(m => m.status === 'completed');
-  }, [categoryMatches]);
+    return standingsMatches.length > 0 && standingsMatches.every(m => m.status === 'completed');
+  }, [standingsMatches]);
 
   // Calcular classificação
   const standings = useMemo(() => {
-    if (!categoryMatches || categoryMatches.length === 0) return [];
+    if (!shouldShowStandings || !standingsMatches || standingsMatches.length === 0) return [];
 
     const playerStats = new Map<string, {
       playerId: string;
@@ -120,7 +132,7 @@ export default function PublicMatchView({
     }>();
 
     // Processar apenas partidas completas
-    categoryMatches
+    standingsMatches
       .filter(m => m.status === 'completed' && m.player2Id !== null)
       .forEach(match => {
         const sets = (match.sets ?? []) as Array<{ player1Score: number; player2Score: number }>;
@@ -207,7 +219,7 @@ export default function PublicMatchView({
     });
 
     return sorted;
-  }, [categoryMatches, getPlayerName]);
+  }, [standingsMatches, getPlayerName]);
 
   // Grupos disponíveis
   const availableGroups = useMemo(() => {
@@ -377,8 +389,8 @@ export default function PublicMatchView({
 
   return (
     <div className="space-y-6">
-      {/* Classificação - Aparece quando há jogos completos na categoria */}
-      {selectedCategory && hasCompletedMatches && (
+      {/* Classificação - Aparece quando filtros necessários estão selecionados e há jogos completos */}
+      {shouldShowStandings && hasCompletedMatches && (
         <Card className="bg-white border shadow-sm">
           <CardHeader>
             <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">

@@ -6,7 +6,19 @@ PingPong Pro is a comprehensive table tennis tournament management platform buil
 
 ### Latest Updates (October 2025)
 
-**Public Match View Enhancement (Oct 2 - Latest):**
+**Public Tournament Page Enhancements (Oct 3 - Latest):**
+- **Favicon Support**: Dynamic page title updates with tournament name, ensuring correct favicon display in browser tabs
+- **Curiosities Feature**: Added interactive "Curiosidades sobre Tênis de Mesa" card in Information tab with random table tennis facts and refresh button
+- **Smart Classification Display**: Classification table now only appears after selecting all required filters:
+  - For group phase: requires category + phase + specific group selection
+  - For other phases: requires category + phase selection
+  - Classification calculated per group when in group phase (separated standings)
+  - Real-time standings with wins, losses, sets balance, and points balance
+  - Top 3 positions highlighted with medals (🥇🥈🥉)
+- **ID Normalization**: All category ID comparisons use String() normalization for consistent filtering across components
+- **Group Filter Fix**: Changed empty string value to "__all" sentinel value to prevent SelectItem errors
+
+**Public Match View Enhancement (Oct 2):**
 - **Full Parity with Internal View**: Public match pages now mirror the internal "Partidas" tab exactly in functionality and appearance
 - **Complete Match Display**: All matches visible regardless of status (pending, in_progress, completed)
 - **Professional UI**: White card backgrounds with proper contrast, identical to admin view
