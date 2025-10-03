@@ -21,7 +21,7 @@ export default function PublicMatchView({
   getPlayerFullInfo
 }: PublicMatchViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedGroup, setSelectedGroup] = useState<string>("");
+  const [selectedGroup, setSelectedGroup] = useState<string>("__all");
   const [selectedPhase, setSelectedPhase] = useState<string>("");
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   
@@ -41,7 +41,7 @@ export default function PublicMatchView({
   // Resetar fase quando categoria muda
   useEffect(() => {
     setSelectedPhase("");
-    setSelectedGroup("");
+    setSelectedGroup("__all");
   }, [selectedCategory]);
 
   // Filtrar partidas
@@ -52,9 +52,10 @@ export default function PublicMatchView({
     }
 
     const filtered = matches.filter(match => {
-      if (match.categoryId !== selectedCategory) return false;
+      // Normalizar IDs para string antes de comparar
+      if (String(match.categoryId) !== String(selectedCategory)) return false;
       if (selectedPhase && match.phase !== selectedPhase) return false;
-      if (selectedGroup && match.groupName !== selectedGroup) return false;
+      if (selectedGroup && selectedGroup !== "__all" && match.groupName !== selectedGroup) return false;
       if (selectedRound != null && match.round !== selectedRound) return false;
       
       return true;
@@ -92,7 +93,7 @@ export default function PublicMatchView({
   // Verificar se há jogos completos na categoria selecionada
   const categoryMatches = useMemo(() => {
     if (!matches || !selectedCategory) return [];
-    return matches.filter(m => m.categoryId === selectedCategory);
+    return matches.filter(m => String(m.categoryId) === String(selectedCategory));
   }, [matches, selectedCategory]);
 
   const hasCompletedMatches = useMemo(() => {
@@ -355,7 +356,7 @@ export default function PublicMatchView({
                 <SelectValue placeholder="Todos os grupos" />
               </SelectTrigger>
               <SelectContent className="bg-white border-gray-200">
-                <SelectItem value="" className="text-gray-900 hover:bg-gray-100">Todos os Grupos</SelectItem>
+                <SelectItem value="__all" className="text-gray-900 hover:bg-gray-100">Todos os Grupos</SelectItem>
                 {availableGroups.map((group) => (
                   <SelectItem key={group} value={group} className="text-gray-900 hover:bg-gray-100">
                     Grupo {group}
@@ -380,7 +381,7 @@ export default function PublicMatchView({
                     📊 Grupo {group}
                   </h4>
                   <div className="grid gap-3">
-                    {matchesByGroup.get(group)!.map(match => renderMatchCard(match))}
+                    {matchesByGroup.get(group)!.map((match: Match) => renderMatchCard(match))}
                   </div>
                 </div>
               ))}

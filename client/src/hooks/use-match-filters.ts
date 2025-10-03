@@ -27,7 +27,7 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
   
   // Detectar se categoria é mista
   const isMixedCategory = (categoryId: string) => {
-    const category = tournament.categories?.find(c => c.id === categoryId);
+    const category = tournament.categories?.find(c => String(c.id) === String(categoryId));
     if (!category) return false;
     const name = category.name.toLowerCase();
     return name.includes('misto') || name.includes('mista') || name.includes('mixed');
@@ -41,7 +41,7 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
     
     // Se categoryId fornecido E temos matches, detectar fases reais das partidas
     if (categoryId && matches) {
-      const categoryMatches = matches.filter(m => m.categoryId === categoryId);
+      const categoryMatches = matches.filter(m => String(m.categoryId) === String(categoryId));
       const uniquePhases = Array.from(new Set(categoryMatches.map(m => m.phase).filter(Boolean)));
       
       console.log('🎯 Fases reais encontradas nas partidas da categoria:', uniquePhases);
@@ -70,7 +70,7 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
     if (!matches) return [];
     
     const groups = matches
-      .filter(m => m.categoryId === categoryId && m.phase === phase && m.groupName)
+      .filter(m => String(m.categoryId) === String(categoryId) && m.phase === phase && m.groupName)
       .map(m => m.groupName as string)
       .filter((v, i, a) => a.indexOf(v) === i)
       .sort();
@@ -84,7 +84,7 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
     
     const rounds = matches
       .filter(m => 
-        m.categoryId === categoryId && 
+        String(m.categoryId) === String(categoryId) && 
         m.phase === phase && 
         (!group || m.groupName === group) &&
         m.round != null
@@ -107,14 +107,14 @@ export function useMatchFilters(tournament: Tournament, matches: Match[] | null)
     if (!matches) return [];
     
     return matches.filter(match => {
-      if (categoryId && match.categoryId !== categoryId) return false;
+      if (categoryId && String(match.categoryId) !== String(categoryId)) return false;
       if (phase && match.phase !== phase) return false;
-      if (group && match.group !== group) return false;
+      if (group && match.groupName !== group) return false;
       if (round != null && match.round !== round) return false;
       
       // Filtro de gênero
       if (gender && gender !== 'all') {
-        const category = tournament.categories?.find(c => c.id === match.categoryId);
+        const category = tournament.categories?.find(c => String(c.id) === String(match.categoryId));
         const categoryName = category?.name?.toLowerCase() || '';
         
         if (gender === 'masculino') {
