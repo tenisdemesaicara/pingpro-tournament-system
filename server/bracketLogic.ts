@@ -212,20 +212,66 @@ export class BracketManager {
   }
 
   /**
-   * ✅ NOVO: Gera seeding inteligente baseado nos grupos
+   * ✅ SEEDING COM CROSSOVER CORRETO (Copa do Mundo, Champions League)
+   * Garante que 1º colocados NÃO enfrentam outros 1º colocados na primeira fase
+   * Regra de crossover por pares: 1º do Grupo A vs 2º do Grupo B, 1º do Grupo B vs 2º do Grupo A
+   * 
+   * Exemplo 4 grupos: A1 vs B2, B1 vs A2, C1 vs D2, D1 vs C2
    */
   private generateIntelligentSeeding(groups: number, qualifiersPerGroup: number): string[] {
-    const seeding: string[] = [];
-    
-    // Gerar lista de classificados por posição nos grupos
     const groupNames = Array.from({ length: groups }, (_, i) => String.fromCharCode(65 + i)); // A, B, C, D...
     
-    // Distribuir por posição (1º de todos os grupos, depois 2º de todos, etc.)
-    for (let position = 1; position <= qualifiersPerGroup; position++) {
+    // Caso especial: se só classifica 1 por grupo, retorna ordem normal
+    if (qualifiersPerGroup === 1) {
+      return groupNames.map(g => `1º ${g}`);
+    }
+    
+    // CROSSOVER SEEDING CORRETO
+    // O algoritmo de bracket faz: 1 vs último, 2 vs penúltimo, etc.
+    // Precisamos ordenar o seeding para que isso resulte em crossover
+    
+    const seeding: string[] = [];
+    
+    // Para 2 qualificados por grupo, usamos estratégia de crossover por pares
+    // Exemplo com 4 grupos (A,B,C,D): [A1, B1, C1, D1, C2, D2, A2, B2]
+    // Algoritmo de bracket (1 vs 8, 2 vs 7, 3 vs 6, 4 vs 5):
+    // A1 vs B2 ✓, B1 vs A2 ✓, C1 vs D2 ✓, D1 vs C2 ✓
+    
+    if (qualifiersPerGroup === 2) {
+      // Adicionar todos os 1º colocados
       for (const groupName of groupNames) {
-        seeding.push(`${position}º ${groupName}`);
+        seeding.push(`1º ${groupName}`);
+      }
+      
+      // Adicionar 2º colocados em ordem que cria crossover
+      // Para pares de grupos (A,B) (C,D) etc: inverter dentro de cada par
+      for (let i = groups - 1; i >= 0; i -= 2) {
+        // Adicionar o par na ordem inversa
+        if (i > 0) {
+          seeding.push(`2º ${groupNames[i - 1]}`); // Par da esquerda
+          seeding.push(`2º ${groupNames[i]}`);     // Par da direita
+        } else {
+          seeding.push(`2º ${groupNames[i]}`);
+        }
+      }
+    } else {
+      // Para 3+ qualificados, usa ordem simples intercalada
+      for (let position = 1; position <= qualifiersPerGroup; position++) {
+        if (position % 2 === 1) {
+          // Posições ímpares (1º, 3º): ordem normal
+          for (const groupName of groupNames) {
+            seeding.push(`${position}º ${groupName}`);
+          }
+        } else {
+          // Posições pares (2º, 4º): ordem reversa (crossover)
+          for (let i = groupNames.length - 1; i >= 0; i--) {
+            seeding.push(`${position}º ${groupNames[i]}`);
+          }
+        }
       }
     }
+    
+    console.log(`[LOG] 🎯 CROSSOVER SEEDING (${groups} grupos, ${qualifiersPerGroup} classificados): ${seeding.join(', ')}`);
     
     return seeding;
   }

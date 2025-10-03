@@ -77,9 +77,33 @@ export default function PublicMatchView({
 
   // Detectar se fase selecionada é eliminatória
   const isEliminationPhase = useMemo(() => {
-    const eliminationPhases = ['semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32'];
+    const eliminationPhases = ['semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32', 'eliminatorias'];
     return selectedPhase && eliminationPhases.includes(selectedPhase);
   }, [selectedPhase]);
+  
+  // Agrupar fases eliminatórias em uma única opção
+  const groupedPhases = useMemo(() => {
+    if (!selectedCategory) return [];
+    
+    const rawPhases = getAvailablePhases(selectedCategory);
+    const groupPhases: string[] = [];
+    let hasEliminationPhases = false;
+    
+    rawPhases.forEach(phase => {
+      if (['semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32'].includes(phase)) {
+        hasEliminationPhases = true;
+      } else {
+        groupPhases.push(phase);
+      }
+    });
+    
+    // Adicionar "Eliminatórias" se houver qualquer fase eliminatória
+    if (hasEliminationPhases) {
+      groupPhases.push('eliminatorias');
+    }
+    
+    return groupPhases;
+  }, [selectedCategory, getAvailablePhases]);
 
   // Agrupar partidas por grupo
   const matchesByGroup = useMemo(() => {
@@ -500,10 +524,11 @@ export default function PublicMatchView({
                 <SelectValue placeholder="Selecione fase" />
               </SelectTrigger>
               <SelectContent className="bg-white border-gray-200">
-                {getAvailablePhases(selectedCategory).map((phase) => {
+                {groupedPhases.map((phase) => {
                   const phaseLabels: Record<string, string> = {
                     'group': 'Fase de Grupos',
                     'knockout': 'Eliminatórias',
+                    'eliminatorias': 'Eliminatórias',
                     'league': 'Pontos Corridos',
                     'swiss': 'Sistema Suíço',
                     'round_of_32': 'Oitavas de Final',

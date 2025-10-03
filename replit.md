@@ -7,6 +7,12 @@ PingPong Pro is a comprehensive table tennis tournament management platform buil
 ### Latest Updates (October 2025)
 
 **Public Tournament Page Enhancements (Oct 3 - Latest):**
+- **Simplified Phase Filter**: Elimination phases now grouped as single "Eliminatórias" option instead of separate Semifinal/Final selections
+- **Complete Bracket Display**: Selecting "Eliminatórias" shows full bracket with all phases (round_of_32, round_of_16, quarterfinals, semifinals, final) in World Cup-style visualization
+- **Crossover Seeding**: Implemented proper bracket seeding following Copa do Mundo/Champions League rules:
+  - 1st place teams face 2nd place teams from different groups (never 1st vs 1st)
+  - Example: A1 vs B2, B1 vs A2, C1 vs D2, D1 vs C2
+  - Rewards better group stage performance with easier opponents
 - **Favicon Support**: Dynamic page title updates with tournament name, ensuring correct favicon display in browser tabs
 - **Curiosities Feature**: Added interactive "Curiosidades sobre Tênis de Mesa" card in Information tab with random table tennis facts and refresh button
 - **Smart Classification Display**: Classification table now only appears after selecting all required filters:
@@ -17,6 +23,7 @@ PingPong Pro is a comprehensive table tennis tournament management platform buil
   - Top 3 positions highlighted with medals (🥇🥈🥉)
 - **ID Normalization**: All category ID comparisons use String() normalization for consistent filtering across components
 - **Group Filter Fix**: Changed empty string value to "__all" sentinel value to prevent SelectItem errors
+- **Mixed Category Debugging**: Added debug logs to identify gender filter display issues in mixed categories
 
 **Public Match View Enhancement (Oct 2):**
 - **Full Parity with Internal View**: Public match pages now mirror the internal "Partidas" tab exactly in functionality and appearance
