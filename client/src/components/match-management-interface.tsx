@@ -165,15 +165,38 @@ export default function MatchManagementInterface({
     return uniqueGenders;
   };
 
-  // Obter fases disponíveis para a categoria selecionada baseado no formato
+  // Obter fases disponíveis para a categoria selecionada baseado nas partidas reais
   const getAvailablePhases = () => {
     if (!selectedCategory) return [];
     
-    // Encontrar a categoria selecionada e seu formato
+    // Encontrar a categoria selecionada
     const category = tournament.categories?.find(c => c.name === selectedCategory);
+    if (!category) return [];
+    
+    // PRIMEIRO: Se temos partidas, detectar fases reais das partidas desta categoria
+    if (matches) {
+      const categoryMatches = matches.filter(m => m.categoryId === category.id);
+      const uniquePhases = Array.from(new Set(categoryMatches.map(m => m.phase).filter(Boolean))) as string[];
+      
+      // Se encontramos fases reais, processar elas
+      if (uniquePhases.length > 0) {
+        // Fases de eliminatória que devem ser agrupadas sob "knockout"
+        const eliminationPhases = ['knockout', 'round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'];
+        const hasEliminationPhases = uniquePhases.some(phase => eliminationPhases.includes(phase));
+        
+        // Se há fases de eliminatória, adicionar "knockout" como opção agregada
+        const phases = [...uniquePhases];
+        if (hasEliminationPhases && !phases.includes('knockout')) {
+          phases.unshift('knockout'); // Adicionar no início para ser a primeira opção
+        }
+        
+        return phases;
+      }
+    }
+    
+    // FALLBACK: Se não há partidas ainda, usar formato como guia
     const format = (category as any)?.format || tournament.format || 'single_elimination';
     
-    // Retornar fases baseadas no formato da categoria
     switch (format) {
       case 'groups_elimination':
       case 'group_stage_knockout':
@@ -183,13 +206,13 @@ export default function MatchManagementInterface({
         return ['knockout'];
       case 'round_robin':
       case 'league':
-        return ['league'];  // Usar 'league' como padrão para pontos corridos
+        return ['league'];
       case 'swiss':
         return ['swiss'];
       case 'cup':
         return ['group', 'knockout'];
       default:
-        return ['league']; // Padrão para formatos não reconhecidos
+        return ['league'];
     }
   };
 
@@ -835,7 +858,7 @@ export default function MatchManagementInterface({
   }, [selectedPhase, selectedGroup, filteredMatches, athletes]);
 
   // Check if we should show matches based on filters
-  const shouldShowMatches = selectedCategory && selectedPhase && (selectedPhase !== 'group' || selectedGroup) && selectedPhase !== 'knockout';
+  const shouldShowMatches = selectedCategory && selectedPhase && (selectedPhase !== 'group' || selectedGroup);
 
   // Helper functions to calculate match scores and winners
   const getMatchResults = (match: Match) => {
@@ -1379,7 +1402,8 @@ export default function MatchManagementInterface({
         )}
 
         {/* Lista de partidas existentes - ORGANIZADAS POR GRUPO */}
-        {matches && matches.length > 0 && shouldShowMatches && (() => {
+        {/* NÃO mostrar lista quando chaveamento visual está sendo exibido (evita duplicação) */}
+        {matches && matches.length > 0 && shouldShowMatches && selectedPhase !== 'knockout' && (() => {
           // Função para renderizar card individual de partida
           const renderMatchCard = (match: Match) => {
             const sets = (match.sets ?? []) as Array<{ player1Score: number; player2Score: number }>;
@@ -1600,27 +1624,29 @@ export default function MatchManagementInterface({
           );
         })()}
 
-        {/* Status messages for different tournament states */}
-        {tournament.status === 'registration_open' ? (
-          <div className="text-center p-8 text-muted-foreground">
-            <span className="material-icons text-4xl mb-4 block">schedule</span>
-            <h3 className="text-lg font-semibold mb-2">Torneio ainda não iniciado</h3>
-            <p className="mb-4">As partidas aparecerão aqui após o torneio ser iniciado.</p>
-            <p className="text-sm">Use o botão "Iniciar Torneio" para começar a competição.</p>
-          </div>
-        ) : (!filteredMatches || filteredMatches.length === 0) && selectedCategory ? (
-          <div className="text-center p-8 text-muted-foreground">
-            <span className="material-icons text-4xl mb-4 block">sports_tennis</span>
-            <h3 className="text-lg font-semibold mb-2">Nenhuma partida criada</h3>
-            <p className="mb-4">O chaveamento ainda não foi gerado para esta categoria.</p>
-            <p className="text-sm">Use a aba "Chaveamento" para gerar as partidas.</p>
-          </div>
-        ) : (!matches || matches.length === 0) && !selectedCategory ? (
-          <div className="text-center p-8 text-muted-foreground">
-            <span className="material-icons text-4xl mb-4 block">info</span>
-            <p>Nenhuma partida encontrada para este torneio.</p>
-            <p className="text-sm">Selecione uma categoria para visualizar as partidas.</p>
-          </div>
+        {/* Status messages for different tournament states - only show when NOT displaying matches */}
+        {!shouldShowMatches || (filteredMatches.length === 0) ? (
+          tournament.status === 'registration_open' ? (
+            <div className="text-center p-8 text-muted-foreground">
+              <span className="material-icons text-4xl mb-4 block">schedule</span>
+              <h3 className="text-lg font-semibold mb-2">Torneio ainda não iniciado</h3>
+              <p className="mb-4">As partidas aparecerão aqui após o torneio ser iniciado.</p>
+              <p className="text-sm">Use o botão "Iniciar Torneio" para começar a competição.</p>
+            </div>
+          ) : (!filteredMatches || filteredMatches.length === 0) && selectedCategory ? (
+            <div className="text-center p-8 text-muted-foreground">
+              <span className="material-icons text-4xl mb-4 block">sports_tennis</span>
+              <h3 className="text-lg font-semibold mb-2">Nenhuma partida criada</h3>
+              <p className="mb-4">O chaveamento ainda não foi gerado para esta categoria.</p>
+              <p className="text-sm">Use a aba "Chaveamento" para gerar as partidas.</p>
+            </div>
+          ) : (!matches || matches.length === 0) && !selectedCategory ? (
+            <div className="text-center p-8 text-muted-foreground">
+              <span className="material-icons text-4xl mb-4 block">info</span>
+              <p>Nenhuma partida encontrada para este torneio.</p>
+              <p className="text-sm">Selecione uma categoria para visualizar as partidas.</p>
+            </div>
+          ) : null
         ) : null}
 
         {/* Modal de Edição de Placar */}

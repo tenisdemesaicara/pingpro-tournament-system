@@ -3569,11 +3569,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("📝 Iniciando busca das partidas...");
       // Buscar todas as partidas da categoria organizadas por fase
-      const phases = ["group", "round_of_32", "round_of_16", "quarterfinal", "semifinal", "final"];
+      const phases = ["group", "knockout", "round_of_32", "round_of_16", "quarterfinal", "semifinal", "final"];
       const bracket: any = {};
 
       // COPA DO MUNDO: Verificar se eliminatórias existem, se não, criar placeholders automaticamente
-      const eliminationPhases = ["round_of_32", "round_of_16", "quarterfinal", "semifinal", "final"];
+      const eliminationPhases = ["knockout", "round_of_32", "round_of_16", "quarterfinal", "semifinal", "final"];
       let hasEliminationMatches = false;
       
       console.log("🔍 Verificando eliminatórias existentes...");

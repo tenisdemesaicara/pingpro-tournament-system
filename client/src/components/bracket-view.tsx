@@ -328,6 +328,7 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
   const normalizedBracketData = bracketData ? {
     ...bracketData,
     group: bracketData.group ?? [],
+    knockout: bracketData.knockout ?? [],
     round_of_32: bracketData.round_of_32 ?? [],
     round_of_16: bracketData.round_of_16 ?? [],
     quarterfinal: bracketData.quarterfinal ?? [],

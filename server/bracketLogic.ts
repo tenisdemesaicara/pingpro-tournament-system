@@ -238,19 +238,42 @@ export class BracketManager {
     // A1 vs B2 ✓, B1 vs A2 ✓, C1 vs D2 ✓, D1 vs C2 ✓
     
     if (qualifiersPerGroup === 2) {
-      // Adicionar todos os 1º colocados
+      // PASSO 1: Adicionar todos os 1º colocados em ordem
       for (const groupName of groupNames) {
         seeding.push(`1º ${groupName}`);
       }
       
-      // Adicionar 2º colocados em ordem que cria crossover
-      // Para pares de grupos (A,B) (C,D) etc: inverter dentro de cada par
-      for (let i = groups - 1; i >= 0; i -= 2) {
-        // Adicionar o par na ordem inversa
-        if (i > 0) {
-          seeding.push(`2º ${groupNames[i - 1]}`); // Par da esquerda
-          seeding.push(`2º ${groupNames[i]}`);     // Par da direita
-        } else {
+      // PASSO 2: Adicionar 2º colocados com crossover correto
+      // Algoritmo de pareamento: slot[i] vs slot[n-1-i]
+      // 
+      // Para garantir crossover (1º vs 2º de OUTRO grupo):
+      // - 2 grupos (A,B): [A1, B1, A2, B2] → (0 vs 3, 1 vs 2) = A1 vs B2 ✓, B1 vs A2 ✓
+      // - 3 grupos (A,B,C): [A1, B1, C1, A2, C2, B2] → (0 vs 5, 1 vs 4, 2 vs 3) = A1 vs B2 ✓, B1 vs C2 ✓, C1 vs A2 ✓
+      // - 4 grupos (A,B,C,D): [A1, B1, C1, D1, C2, D2, A2, B2] → (0 vs 7, 1 vs 6, 2 vs 5, 3 vs 4) = A1 vs B2 ✓, B1 vs A2 ✓, C1 vs D2 ✓, D1 vs C2 ✓
+      //
+      // Padrão depende do número de grupos:
+      // - 2 grupos: ordem normal [A2, B2]
+      // - 4+ grupos (PAR): segunda metade primeiro, primeira metade depois [C2, D2, A2, B2]
+      // - 3+ grupos (ÍMPAR): primeiro, resto reverso [A2, C2, B2]
+      
+      if (groups === 2) {
+        // Caso especial: 2 grupos, ordem normal
+        for (let i = 0; i < groups; i++) {
+          seeding.push(`2º ${groupNames[i]}`);
+        }
+      } else if (groups % 2 === 0) {
+        // PAR (4+): segunda metade primeiro, primeira metade depois
+        const halfPoint = groups / 2;
+        for (let i = halfPoint; i < groups; i++) {
+          seeding.push(`2º ${groupNames[i]}`);
+        }
+        for (let i = 0; i < halfPoint; i++) {
+          seeding.push(`2º ${groupNames[i]}`);
+        }
+      } else {
+        // ÍMPAR (3+): primeiro, depois resto reverso
+        seeding.push(`2º ${groupNames[0]}`);
+        for (let i = groups - 1; i >= 1; i--) {
           seeding.push(`2º ${groupNames[i]}`);
         }
       }

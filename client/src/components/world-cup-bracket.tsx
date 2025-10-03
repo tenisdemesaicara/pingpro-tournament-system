@@ -295,12 +295,20 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
     );
   }
 
-  if (!bracketData?.groupStandings) {
+  // Verificar se há QUALQUER dado de eliminatórias (independente de fase de grupos)
+  const eliminationPhases = ['knockout', 'round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'];
+  const hasEliminationData = eliminationPhases.some(phase => 
+    bracketData?.[phase as keyof BracketData] && 
+    Array.isArray(bracketData[phase as keyof BracketData]) && 
+    (bracketData[phase as keyof BracketData] as any[]).length > 0
+  );
+
+  if (!hasEliminationData && !bracketData?.groupStandings) {
     return (
       <div className="text-center p-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg">
         <div className="text-gray-500">
           <h3 className="text-xl font-semibold mb-2">Bracket não disponível</h3>
-          <p>Complete a fase de grupos para gerar o bracket das eliminatórias</p>
+          <p>Gere o chaveamento para visualizar as partidas</p>
         </div>
       </div>
     );
@@ -323,13 +331,6 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
     return 32;
   };
 
-  // Calcular total de atletas que VÃO se classificar (independente de quantos já se classificaram)
-  const groupsData = bracketData.groupStandings || [];
-  const qualifiersPerGroup = 2; // Padrão: 2 atletas por grupo avançam
-  const totalExpected = groupsData.length * qualifiersPerGroup;
-  // FORÇAR um bracket maior para mostrar estrutura completa
-  const totalForBracket = Math.max(nextPowerOfTwo(totalExpected), 8); // Mínimo 8 para mostrar quartas
-
   // CORRIGIDO: Calcular fases baseado na próxima potência de 2
   const getNextPowerOfTwo = (n: number) => {
     let power = 1;
@@ -347,50 +348,59 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
     return ["round_of_32", "round_of_16", "quarterfinal", "semifinal", "final"];
   };
 
-  if (totalExpected < 2) {
-    return (
-      <div className="text-center p-12 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg">
-        <div className="text-yellow-700">
-          <h3 className="text-xl font-semibold mb-2">Configuração insuficiente</h3>
-          <p>São necessários pelo menos 2 atletas para gerar o bracket</p>
-          <p className="text-sm mt-2">Grupos encontrados: {groupsData.length}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // NOVO: Gerar slots por SEEDS para incluir TODOS os grupos
+  // Calcular slots: usar grupos SE existir, senão usar partidas diretas
+  const groupsData = bracketData.groupStandings || [];
   const allSlots: QualifiedAthlete[] = [];
-  
-  // Ordenar por SEEDS: A1, B1, C1, A2, B2, C2 (não por grupos)
-  for (let position = 1; position <= qualifiersPerGroup; position++) {
-    groupsData.forEach((groupData: GroupStandingData) => {
-      const existingStanding = groupData.standings?.find(s => s.position === position);
-      const realName = existingStanding ? athleteMap.get(existingStanding.playerId) : null;
-      
-      // Buscar dados completos do atleta
-      const athleteData = existingStanding && Array.isArray(athletes) ? athletes.find((a: any) => a.id === existingStanding.playerId) : null;
-      
-      const slot: QualifiedAthlete = {
-        playerId: existingStanding?.playerId || `${groupData.group}-${position}`,
-        playerName: realName || `${position}º Grupo ${groupData.group}`,
-        position,
-        group: groupData.group,
-        isRealPlayer: !!realName,
-        photoUrl: athleteData?.photoUrl,
-      };
-      
-      allSlots.push(slot);
-    });
+  let phases: string[] = [];
+
+  if (groupsData.length > 0) {
+    // CENÁRIO 1: Torneio COM fase de grupos
+    const qualifiersPerGroup = 2;
+    const totalExpected = groupsData.length * qualifiersPerGroup;
+    
+    if (totalExpected < 2) {
+      return (
+        <div className="text-center p-12 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg">
+          <div className="text-yellow-700">
+            <h3 className="text-xl font-semibold mb-2">Configuração insuficiente</h3>
+            <p>São necessários pelo menos 2 atletas para gerar o bracket</p>
+            <p className="text-sm mt-2">Grupos encontrados: {groupsData.length}</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Gerar slots por SEEDS: A1, B1, C1, A2, B2, C2
+    for (let position = 1; position <= qualifiersPerGroup; position++) {
+      groupsData.forEach((groupData: GroupStandingData) => {
+        const existingStanding = groupData.standings?.find(s => s.position === position);
+        const realName = existingStanding ? athleteMap.get(existingStanding.playerId) : null;
+        const athleteData = existingStanding && Array.isArray(athletes) ? athletes.find((a: any) => a.id === existingStanding.playerId) : null;
+        
+        allSlots.push({
+          playerId: existingStanding?.playerId || `${groupData.group}-${position}`,
+          playerName: realName || `${position}º Grupo ${groupData.group}`,
+          position,
+          group: groupData.group,
+          isRealPlayer: !!realName,
+          photoUrl: athleteData?.photoUrl,
+        });
+      });
+    }
+    
+    const actualQualified = allSlots.length;
+    phases = getRequiredPhases(actualQualified);
+  } else {
+    // CENÁRIO 2: Torneio SEM fase de grupos (eliminatórias diretas)
+    // Usar as fases que têm dados no bracketData
+    const availablePhases = eliminationPhases.filter(phase => 
+      bracketData?.[phase as keyof BracketData] && 
+      Array.isArray(bracketData[phase as keyof BracketData]) && 
+      (bracketData[phase as keyof BracketData] as any[]).length > 0
+    );
+    phases = availablePhases;
   }
 
-  // CORRIGIDO: Calcular fases DEPOIS de criar allSlots
-  const actualQualified = allSlots.length;
-  const paddedCount = getNextPowerOfTwo(actualQualified);
-  const allPhases = getRequiredPhases(actualQualified);
-  
-  // CRITICAL FIX: Este componente é SÓ para eliminatórias - usar apenas fases eliminatórias
-  const phases = allPhases; // getRequiredPhases já não inclui 'group'
   console.log('🚨 PHASES PARA RENDERIZAR:', phases);
   console.log('🚨 BACKEND DATA KEYS:', Object.keys(bracketData || {}));
 

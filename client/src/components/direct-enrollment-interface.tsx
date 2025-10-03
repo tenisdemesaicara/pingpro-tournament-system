@@ -35,7 +35,7 @@ export function DirectEnrollmentInterface({
   const [searchTerm, setSearchTerm] = useState("");
   const [enrolledFilterCategory, setEnrolledFilterCategory] = useState<string>(""); // Filtro para aba de inscritos
 
-  // Verificar se categoria selecionada é mista OU já tem gênero específico
+  // Verificar se categoria selecionada é mista
   const isSelectedCategoryMixed = () => {
     if (!selectedCategory) return false;
     const category = categories.find(c => c.id === selectedCategory);
@@ -53,12 +53,27 @@ export function DirectEnrollmentInterface({
       return true;
     }
     
-    // Verificar se já tem gênero específico no nome
-    if (categoryName.includes('masculino') || categoryName.includes('masc') || categoryName.includes('feminino') || categoryName.includes('fem')) {
-      return true;
+    return false;
+  };
+
+  // Verificar se categoria tem gênero específico no nome (ex: "Absoluto A Feminino")
+  const getCategoryGenderFromName = () => {
+    if (!selectedCategory) return null;
+    const category = categories.find(c => c.id === selectedCategory);
+    if (!category) return null;
+    
+    const categoryName = category.name?.toLowerCase() || '';
+    
+    // Usar word boundaries + lookahead para evitar falsos positivos (ex: "Mascote" não é "Masculino")
+    // Permite pontuação no final (ex: "Masc." ou "Fem.") via lookahead (?:\b|(?=\.?\W|$))
+    if (/\b(feminino|feminina|fem)(?:\.)?(?:\b|(?=\W|$))/i.test(categoryName)) {
+      return 'feminino';
+    }
+    if (/\b(masculino|masculina|masc)(?:\.)?(?:\b|(?=\W|$))/i.test(categoryName)) {
+      return 'masculino';
     }
     
-    return false;
+    return null;
   };
 
   // Obter gêneros disponíveis para a categoria selecionada
@@ -70,11 +85,13 @@ export function DirectEnrollmentInterface({
 
     const categoryGender = category.gender?.toLowerCase();
 
-    // Se categoria é mista OU já tem gênero no nome, NÃO mostrar seletor de gênero (return vazio)
-    const categoryName = category.name?.toLowerCase() || '';
-    if (categoryGender === 'misto' || categoryGender === 'mista' || categoryGender === 'mixed' || categoryGender === 'mixto' ||
-        categoryName.includes('misto') || categoryName.includes('mista') || categoryName.includes('mixed') || categoryName.includes('mixto') ||
-        categoryName.includes('masculino') || categoryName.includes('masc') || categoryName.includes('feminino') || categoryName.includes('fem')) {
+    // Se categoria é mista, NÃO mostrar seletor de gênero (return vazio)
+    if (isSelectedCategoryMixed()) {
+      return [];
+    }
+
+    // Se categoria tem gênero no nome (ex: "Absoluto A Feminino"), NÃO mostrar seletor
+    if (getCategoryGenderFromName()) {
       return [];
     }
 
@@ -102,9 +119,28 @@ export function DirectEnrollmentInterface({
   // Filtrar atletas baseado nos filtros selecionados
   let filteredAthletes: Athlete[] = [];
 
+  // Determinar o gênero efetivo a ser usado no filtro
+  const getEffectiveGender = () => {
+    // 1. Se há gênero no nome da categoria, usar ele
+    const categoryGenderFromName = getCategoryGenderFromName();
+    if (categoryGenderFromName) return categoryGenderFromName;
+    
+    // 2. Se usuário selecionou gênero manualmente, usar ele
+    if (selectedGender) return selectedGender;
+    
+    // 3. Se categoria tem campo gender específico, usar ele
+    const category = categories.find(c => c.id === selectedCategory);
+    if (category?.gender === 'masculino' || category?.gender === 'feminino') {
+      return category.gender;
+    }
+    
+    return null;
+  };
+
   // Para categorias mistas: só precisa categoria selecionada
+  // Para categorias com gênero no nome: só precisa categoria (gênero é extraído automaticamente)
   // Para outras categorias: precisa categoria E gênero selecionados
-  const shouldShowAthletes = selectedCategory && (isSelectedCategoryMixed() || selectedGender);
+  const shouldShowAthletes = selectedCategory && (isSelectedCategoryMixed() || getCategoryGenderFromName() || selectedGender);
 
   if (shouldShowAthletes && tournament) {
     const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
@@ -133,9 +169,15 @@ export function DirectEnrollmentInterface({
           return ageEligible;
         }
         
-        // Para outras categorias: filtrar por gênero selecionado
-        const genderEligible = athlete.gender?.toLowerCase() === selectedGender.toLowerCase();
-        return ageEligible && genderEligible;
+        // Para categorias com gênero específico: filtrar pelo gênero efetivo
+        const effectiveGender = getEffectiveGender();
+        if (effectiveGender) {
+          const genderEligible = athlete.gender?.toLowerCase() === effectiveGender.toLowerCase();
+          return ageEligible && genderEligible;
+        }
+        
+        // Se não tem gênero definido, só aceita se passou na idade
+        return ageEligible;
       });
     }
   }
@@ -267,7 +309,7 @@ export function DirectEnrollmentInterface({
                 </Select>
               </div>
 
-              {/* Filtro por Naipe/Gênero OU Indicação de Categoria Mista */}
+              {/* Filtro por Naipe/Gênero OU Indicação de Categoria Mista/Específica */}
               {selectedCategory && (
                 <div>
                   {getAvailableGenders().length > 0 ? (
@@ -299,6 +341,19 @@ export function DirectEnrollmentInterface({
                         <Badge variant="secondary" className="ml-2">Misto</Badge>
                       </div>
                     </>
+                  ) : getCategoryGenderFromName() ? (
+                    // Categoria com gênero específico no nome - mostrar indicação
+                    <>
+                      <Label>Naipe</Label>
+                      <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" data-testid="text-category-gender-indicator">
+                        <span className="text-foreground">
+                          {getCategoryGenderFromName() === 'feminino' ? '♀️ Feminino' : '♂️ Masculino'}
+                        </span>
+                        <Badge variant="secondary" className="ml-2">
+                          {getCategoryGenderFromName() === 'feminino' ? 'Feminino' : 'Masculino'}
+                        </Badge>
+                      </div>
+                    </>
                   ) : null}
                 </div>
               )}
@@ -311,7 +366,7 @@ export function DirectEnrollmentInterface({
                   placeholder="Nome do atleta ou clube..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={!selectedCategory || (!isSelectedCategoryMixed() && !selectedGender)}
+                  disabled={!selectedCategory || (!isSelectedCategoryMixed() && !getCategoryGenderFromName() && !selectedGender)}
                 />
               </div>
             </div>
@@ -350,7 +405,9 @@ export function DirectEnrollmentInterface({
                           - {categories.find(c => c.id === selectedCategory)?.name}
                           {isSelectedCategoryMixed() 
                             ? ' (Ambos os gêneros)' 
-                            : selectedGender ? ` (${selectedGender === 'masculino' ? 'Masculino' : 'Feminino'})` : ''
+                            : getEffectiveGender() 
+                            ? ` (${getEffectiveGender() === 'masculino' ? 'Masculino' : 'Feminino'})` 
+                            : ''
                           }
                         </span>
                       )}
