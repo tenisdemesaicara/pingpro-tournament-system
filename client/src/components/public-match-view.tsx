@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { Match, Athlete } from "@shared/schema";
 import { useMatchFilters } from "@/hooks/use-match-filters";
+import { WorldCupBracket } from "./world-cup-bracket";
 
 interface PublicMatchViewProps {
   tournament: any;
@@ -73,6 +74,12 @@ export default function PublicMatchView({
     
     return filtered;
   }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedRound]);
+
+  // Detectar se fase selecionada é eliminatória
+  const isEliminationPhase = useMemo(() => {
+    const eliminationPhases = ['semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32'];
+    return selectedPhase && eliminationPhases.includes(selectedPhase);
+  }, [selectedPhase]);
 
   // Agrupar partidas por grupo
   const matchesByGroup = useMemo(() => {
@@ -538,8 +545,16 @@ export default function PublicMatchView({
         )}
       </div>
 
-      {/* Lista de Partidas */}
-      {filteredMatches && filteredMatches.length > 0 ? (
+      {/* Lista de Partidas ou Bracket Eliminatório */}
+      {isEliminationPhase && selectedCategory ? (
+        // CHAVEAMENTO ELIMINATÓRIO - SEMIFINAL, FINAL, ETC
+        <div className="space-y-4">
+          <WorldCupBracket 
+            tournamentId={tournament.id} 
+            categoryId={selectedCategory}
+          />
+        </div>
+      ) : filteredMatches && filteredMatches.length > 0 ? (
         <div className="space-y-4">
           {selectedPhase === 'group' && matchesByGroup.size > 0 ? (
             // VISUALIZAÇÃO POR GRUPOS - FASE DE GRUPOS
