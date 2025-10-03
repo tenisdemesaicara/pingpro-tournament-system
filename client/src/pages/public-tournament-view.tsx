@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,6 +91,52 @@ export default function PublicTournamentView() {
     // Versão pública - não permite ações
     e.stopPropagation();
   };
+
+  // Detectar o tipo de gênero da categoria selecionada
+  const selectedCategoryInfo = useMemo(() => {
+    if (selectedCategory === "all" || !tournamentData?.categories) {
+      return { gender: "all", allowsMasculino: true, allowsFeminino: true };
+    }
+    
+    const category = tournamentData.categories.find((c: any) => c.id === selectedCategory);
+    if (!category) {
+      return { gender: "all", allowsMasculino: true, allowsFeminino: true };
+    }
+    
+    const categoryGender = category.gender?.toLowerCase();
+    
+    // Categoria mista: ambos gêneros competem juntos
+    if (categoryGender === "mista" || categoryGender === "misto") {
+      return { gender: "mista", allowsMasculino: true, allowsFeminino: true };
+    }
+    
+    // Categoria masculina: apenas masculino
+    if (categoryGender === "masculino") {
+      return { gender: "masculino", allowsMasculino: true, allowsFeminino: false };
+    }
+    
+    // Categoria feminina: apenas feminino
+    if (categoryGender === "feminino") {
+      return { gender: "feminino", allowsMasculino: false, allowsFeminino: true };
+    }
+    
+    // Fallback: permitir ambos
+    return { gender: "all", allowsMasculino: true, allowsFeminino: true };
+  }, [selectedCategory, tournamentData?.categories]);
+
+  // Ajustar automaticamente o filtro de gênero quando a categoria muda
+  useEffect(() => {
+    if (selectedCategoryInfo.gender === "masculino" && selectedGender !== "masculino") {
+      setSelectedGender("masculino");
+    } else if (selectedCategoryInfo.gender === "feminino" && selectedGender !== "feminino") {
+      setSelectedGender("feminino");
+    } else if (selectedCategoryInfo.gender === "all" || selectedCategoryInfo.gender === "mista") {
+      // Quando volta para "all" ou "mista", resetar para "all"
+      if (selectedGender !== "all" && selectedGender !== "masculino" && selectedGender !== "feminino") {
+        setSelectedGender("all");
+      }
+    }
+  }, [selectedCategoryInfo, selectedGender]);
 
   // Filtrar participantes
   const filteredParticipants = useMemo(() => {
@@ -477,16 +523,32 @@ export default function PublicTournamentView() {
                     </div>
                     <div>
                       <label className="text-sm text-white/70 mb-2 block">Gênero</label>
-                      <Select value={selectedGender} onValueChange={setSelectedGender}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <Select 
+                        value={selectedGender} 
+                        onValueChange={setSelectedGender}
+                        disabled={selectedCategoryInfo.gender === "masculino" || selectedCategoryInfo.gender === "feminino"}
+                      >
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white disabled:opacity-50 disabled:cursor-not-allowed">
                           <SelectValue placeholder="Todos os gêneros" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-900 border-gray-700">
-                          <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
-                          <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
-                          <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
+                          {(selectedCategoryInfo.gender === "all" || selectedCategoryInfo.gender === "mista") && (
+                            <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
+                          )}
+                          {selectedCategoryInfo.allowsMasculino && (
+                            <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
+                          )}
+                          {selectedCategoryInfo.allowsFeminino && (
+                            <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
+                      {selectedCategoryInfo.gender === "masculino" && (
+                        <p className="text-xs text-white/50 mt-1">Categoria exclusiva masculina</p>
+                      )}
+                      {selectedCategoryInfo.gender === "feminino" && (
+                        <p className="text-xs text-white/50 mt-1">Categoria exclusiva feminina</p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 text-sm text-white/60">
