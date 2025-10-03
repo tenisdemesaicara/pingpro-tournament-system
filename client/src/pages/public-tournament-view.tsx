@@ -235,15 +235,11 @@ export default function PublicTournamentView() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Hero Section Impactante */}
-      <div className="relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='7' cy='7' r='2'/%3E%3Ccircle cx='7' cy='53' r='2'/%3E%3Ccircle cx='53' cy='7' r='2'/%3E%3Ccircle cx='53' cy='53' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-          }} />
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Section Clean */}
+      <div className="relative bg-white border-b">
+        {/* Subtle Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-gray-50 opacity-50" />
 
         {/* Header Content */}
         <div className="relative z-10 px-6 py-12 lg:py-20">
@@ -251,16 +247,16 @@ export default function PublicTournamentView() {
             {/* Tournament Cover */}
             {tournamentData.coverImage && (
               <div className="mb-8">
-                <div className="relative h-64 lg:h-80 rounded-2xl overflow-hidden shadow-2xl">
+                <div className="relative h-64 lg:h-80 rounded-xl overflow-hidden shadow-lg">
                   <img 
                     src={tournamentData.coverImage} 
                     alt={`Capa do ${tournamentData.name}`}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                   <div className="absolute bottom-8 left-8 right-8">
                     <div className="flex items-center gap-2 mb-3">
-                      <Badge className="bg-purple-500/90 text-white border-0 px-3 py-1">
+                      <Badge className="bg-blue-600 text-white border-0 px-3 py-1">
                         <Trophy className="w-4 h-4 mr-1" />
                         Torneio Oficial
                       </Badge>
@@ -281,18 +277,18 @@ export default function PublicTournamentView() {
             {!tournamentData.coverImage && (
               <div className="text-center mb-12">
                 <div className="flex justify-center mb-6">
-                  <div className="p-6 bg-purple-500/20 rounded-full">
-                    <Trophy className="w-16 h-16 text-purple-400" />
+                  <div className="p-6 bg-blue-100 rounded-full">
+                    <Trophy className="w-16 h-16 text-blue-600" />
                   </div>
                 </div>
-                <Badge className="bg-purple-500/90 text-white border-0 px-4 py-2 mb-4">
+                <Badge className="bg-blue-600 text-white border-0 px-4 py-2 mb-4">
                   <Trophy className="w-4 h-4 mr-1" />
                   Torneio Oficial
                 </Badge>
-                <h1 className="text-5xl lg:text-7xl font-bold text-white mb-4 leading-tight">
+                <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-4 leading-tight">
                   {tournamentData.name}
                 </h1>
-                <p className="text-2xl text-white/80 flex items-center justify-center gap-2">
+                <p className="text-2xl text-gray-600 flex items-center justify-center gap-2">
                   <Star className="w-6 h-6" />
                   Organizado por {tournamentData.organizer || 'Não informado'}
                 </p>
@@ -301,11 +297,11 @@ export default function PublicTournamentView() {
 
             {/* Tournament Info Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <Card className="bg-white/10 backdrop-blur-lg border-white/20 text-white">
+              <Card className="bg-white border shadow-sm">
                 <CardContent className="p-6 text-center">
-                  <Calendar className="w-8 h-8 text-purple-400 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Data do Evento</h3>
-                  <p className="text-white/80 text-sm">
+                  <Calendar className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+                  <h3 className="font-semibold text-gray-900 mb-2">Data do Evento</h3>
+                  <p className="text-gray-600 text-sm">
                     {tournamentData.startDate && tournamentData.endDate ? (
                       (() => {
                         const start = new Date(tournamentData.startDate);
@@ -349,19 +345,19 @@ export default function PublicTournamentView() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 backdrop-blur-lg border-white/20 text-white">
+              <Card className="bg-white border shadow-sm">
                 <CardContent className="p-6 text-center">
-                  <MapPin className="w-8 h-8 text-purple-400 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Local</h3>
-                  <p className="text-white/80">{tournamentData.location || 'A definir'}</p>
+                  <MapPin className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+                  <h3 className="font-semibold text-gray-900 mb-2">Local</h3>
+                  <p className="text-gray-600">{tournamentData.location || 'A definir'}</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 backdrop-blur-lg border-white/20 text-white">
+              <Card className="bg-white border shadow-sm">
                 <CardContent className="p-6 text-center">
-                  <Trophy className="w-8 h-8 text-purple-400 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Formato</h3>
-                  <p className="text-white/80">
+                  <Trophy className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+                  <h3 className="font-semibold text-gray-900 mb-2">Formato</h3>
+                  <p className="text-gray-600">
                     {tournamentData.format === 'group_stage_knockout' ? 'Grupos + Eliminatória' : 
                      tournamentData.format === 'single_elimination' ? 'Eliminatória Simples' :
                      tournamentData.format === 'double_elimination' ? 'Eliminatória Dupla' :
@@ -376,13 +372,13 @@ export default function PublicTournamentView() {
       </div>
 
       {/* Main Content - SISTEMA DE ABAS */}
-      <div className="px-6 pb-12">
+      <div className="px-6 pb-12 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <Tabs defaultValue="informacoes" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-white/5 backdrop-blur-lg border border-white/10 p-1 h-auto" data-testid="tabs-tournament">
+            <TabsList className="grid w-full grid-cols-3 bg-white border shadow-sm p-1 h-auto" data-testid="tabs-tournament">
               <TabsTrigger 
                 value="informacoes" 
-                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
+                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 text-gray-600 py-3 font-medium"
                 data-testid="tab-informacoes"
               >
                 <Info className="w-4 h-4 mr-2" />
@@ -390,7 +386,7 @@ export default function PublicTournamentView() {
               </TabsTrigger>
               <TabsTrigger 
                 value="inscritos" 
-                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
+                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 text-gray-600 py-3 font-medium"
                 data-testid="tab-inscritos"
               >
                 <Users className="w-4 h-4 mr-2" />
@@ -398,19 +394,11 @@ export default function PublicTournamentView() {
               </TabsTrigger>
               <TabsTrigger 
                 value="jogos" 
-                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
+                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 text-gray-600 py-3 font-medium"
                 data-testid="tab-jogos"
               >
                 <Trophy className="w-4 h-4 mr-2" />
                 Jogos
-              </TabsTrigger>
-              <TabsTrigger 
-                value="classificacao" 
-                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
-                data-testid="tab-classificacao"
-              >
-                <Medal className="w-4 h-4 mr-2" />
-                Classificação
               </TabsTrigger>
             </TabsList>
 
@@ -418,38 +406,38 @@ export default function PublicTournamentView() {
             <TabsContent value="informacoes" className="mt-6 space-y-6">
               {/* Statistics Dashboard */}
               {stats && (
-                <Card className="bg-white/5 backdrop-blur-lg border-white/10 overflow-hidden">
+                <Card className="bg-white border shadow-sm">
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-2xl text-white flex items-center gap-3">
-                      <Target className="w-6 h-6 text-purple-400" />
+                    <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
+                      <Target className="w-6 h-6 text-blue-600" />
                       Estatísticas do Torneio
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                      <div className="text-center p-4 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg border border-blue-400/20">
-                        <div className="text-3xl font-bold text-blue-400 mb-1">{stats.total}</div>
-                        <div className="text-sm text-white/70">Total Inscritos</div>
+                      <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+                        <div className="text-3xl font-bold text-blue-600 mb-1">{stats.total}</div>
+                        <div className="text-sm text-gray-600">Total Inscritos</div>
                       </div>
-                      <div className="text-center p-4 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg border border-green-400/20">
-                        <div className="text-3xl font-bold text-green-400 mb-1">{stats.confirmed}</div>
-                        <div className="text-sm text-white/70">Confirmados</div>
+                      <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+                        <div className="text-3xl font-bold text-green-600 mb-1">{stats.confirmed}</div>
+                        <div className="text-sm text-gray-600">Confirmados</div>
                       </div>
-                      <div className="text-center p-4 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg border border-purple-400/20">
-                        <div className="text-3xl font-bold text-purple-400 mb-1">{stats.categories}</div>
-                        <div className="text-sm text-white/70">Categorias</div>
+                      <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-100">
+                        <div className="text-3xl font-bold text-purple-600 mb-1">{stats.categories}</div>
+                        <div className="text-sm text-gray-600">Categorias</div>
                       </div>
-                      <div className="text-center p-4 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-lg border border-orange-400/20">
-                        <div className="text-3xl font-bold text-orange-400 mb-1">{stats.clubs}</div>
-                        <div className="text-sm text-white/70">Clubes</div>
+                      <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-100">
+                        <div className="text-3xl font-bold text-orange-600 mb-1">{stats.clubs}</div>
+                        <div className="text-sm text-gray-600">Clubes</div>
                       </div>
-                      <div className="text-center p-4 bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 rounded-lg border border-cyan-400/20">
-                        <div className="text-3xl font-bold text-cyan-400 mb-1">{stats.masculine}</div>
-                        <div className="text-sm text-white/70">Masculino</div>
+                      <div className="text-center p-4 bg-cyan-50 rounded-lg border border-cyan-100">
+                        <div className="text-3xl font-bold text-cyan-600 mb-1">{stats.masculine}</div>
+                        <div className="text-sm text-gray-600">Masculino</div>
                       </div>
-                      <div className="text-center p-4 bg-gradient-to-br from-pink-500/20 to-pink-600/20 rounded-lg border border-pink-400/20">
-                        <div className="text-3xl font-bold text-pink-400 mb-1">{stats.feminine}</div>
-                        <div className="text-sm text-white/70">Feminino</div>
+                      <div className="text-center p-4 bg-pink-50 rounded-lg border border-pink-100">
+                        <div className="text-3xl font-bold text-pink-600 mb-1">{stats.feminine}</div>
+                        <div className="text-sm text-gray-600">Feminino</div>
                       </div>
                     </div>
                   </CardContent>
@@ -458,20 +446,20 @@ export default function PublicTournamentView() {
 
               {/* Categorias do Torneio */}
               {tournamentData.categories && tournamentData.categories.length > 0 && (
-                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <Card className="bg-white border shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-2xl text-white flex items-center gap-3">
-                      <Award className="w-6 h-6 text-purple-400" />
+                    <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
+                      <Award className="w-6 h-6 text-blue-600" />
                       Categorias do Torneio
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {tournamentData.categories.map((category: any) => (
-                        <div key={category.id} className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-lg border border-purple-400/20">
-                          <h4 className="font-semibold text-white mb-2">{category.name}</h4>
+                        <div key={category.id} className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                          <h4 className="font-semibold text-gray-900 mb-2">{category.name}</h4>
                           {category.description && (
-                            <p className="text-sm text-white/60">{category.description}</p>
+                            <p className="text-sm text-gray-600">{category.description}</p>
                           )}
                         </div>
                       ))}
@@ -482,12 +470,12 @@ export default function PublicTournamentView() {
 
               {/* Descrição do Torneio */}
               {tournamentData.description && (
-                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <Card className="bg-white border shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-xl text-white">Sobre o Torneio</CardTitle>
+                    <CardTitle className="text-xl text-gray-900">Sobre o Torneio</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-white/80 whitespace-pre-wrap">{tournamentData.description}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">{tournamentData.description}</p>
                   </CardContent>
                 </Card>
               )}
@@ -496,25 +484,25 @@ export default function PublicTournamentView() {
             {/* ABA: INSCRITOS */}
             <TabsContent value="inscritos" className="mt-6 space-y-6">
               {/* Filters Section */}
-              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <Card className="bg-white border shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-xl text-white flex items-center gap-3">
-                    <Filter className="w-5 h-5 text-purple-400" />
+                  <CardTitle className="text-xl text-gray-900 flex items-center gap-3">
+                    <Filter className="w-5 h-5 text-blue-600" />
                     Filtrar Participantes
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm text-white/70 mb-2 block">Categoria</label>
+                      <label className="text-sm text-gray-700 mb-2 block font-medium">Categoria</label>
                       <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                           <SelectValue placeholder="Todas as categorias" />
                         </SelectTrigger>
-                        <SelectContent className="bg-gray-900 border-gray-700">
-                          <SelectItem value="all" className="text-white hover:bg-gray-800">Todas as Categorias</SelectItem>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="all" className="text-gray-900 hover:bg-gray-100">Todas as Categorias</SelectItem>
                           {tournamentData.categories?.map((category: any) => (
-                            <SelectItem key={category.id} value={category.id} className="text-white hover:bg-gray-800">
+                            <SelectItem key={category.id} value={category.id} className="text-gray-900 hover:bg-gray-100">
                               {category.name}
                             </SelectItem>
                           ))}
@@ -522,48 +510,48 @@ export default function PublicTournamentView() {
                       </Select>
                     </div>
                     <div>
-                      <label className="text-sm text-white/70 mb-2 block">Gênero</label>
+                      <label className="text-sm text-gray-700 mb-2 block font-medium">Gênero</label>
                       <Select 
                         value={selectedGender} 
                         onValueChange={setSelectedGender}
                         disabled={selectedCategoryInfo.gender === "masculino" || selectedCategoryInfo.gender === "feminino"}
                       >
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed">
                           <SelectValue placeholder="Todos os gêneros" />
                         </SelectTrigger>
-                        <SelectContent className="bg-gray-900 border-gray-700">
+                        <SelectContent className="bg-white border-gray-200">
                           {(selectedCategoryInfo.gender === "all" || selectedCategoryInfo.gender === "mista") && (
-                            <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
+                            <SelectItem value="all" className="text-gray-900 hover:bg-gray-100">Todos os Gêneros</SelectItem>
                           )}
                           {selectedCategoryInfo.allowsMasculino && (
-                            <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
+                            <SelectItem value="masculino" className="text-gray-900 hover:bg-gray-100">Masculino</SelectItem>
                           )}
                           {selectedCategoryInfo.allowsFeminino && (
-                            <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
+                            <SelectItem value="feminino" className="text-gray-900 hover:bg-gray-100">Feminino</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
                       {selectedCategoryInfo.gender === "masculino" && (
-                        <p className="text-xs text-white/50 mt-1">Categoria exclusiva masculina</p>
+                        <p className="text-xs text-gray-500 mt-1">Categoria exclusiva masculina</p>
                       )}
                       {selectedCategoryInfo.gender === "feminino" && (
-                        <p className="text-xs text-white/50 mt-1">Categoria exclusiva feminina</p>
+                        <p className="text-xs text-gray-500 mt-1">Categoria exclusiva feminina</p>
                       )}
                     </div>
                   </div>
-                  <div className="mt-4 text-sm text-white/60">
+                  <div className="mt-4 text-sm text-gray-600">
                     Mostrando {filteredParticipants.length} de {tournamentData.participants?.length || 0} participantes
                   </div>
                 </CardContent>
               </Card>
 
               {/* Participants Section */}
-              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+              <Card className="bg-white border shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-2xl text-white flex items-center gap-3">
-                    <Users className="w-6 h-6 text-purple-400" />
+                  <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
+                    <Users className="w-6 h-6 text-blue-600" />
                     Participantes Inscritos
-                    <Badge variant="secondary" className="bg-purple-500/20 text-purple-300 border-purple-400/30">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
                       {filteredParticipants.length}
                     </Badge>
                   </CardTitle>
@@ -581,10 +569,10 @@ export default function PublicTournamentView() {
                     
                     return (
                       <div key={category.id} className="space-y-4">
-                        <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                          <Award className="w-5 h-5 text-purple-400" />
-                          <h3 className="text-xl font-semibold text-white">{category.name}</h3>
-                          <Badge variant="outline" className="border-purple-400/30 text-purple-300">
+                        <div className="flex items-center gap-3 pb-3 border-b border-gray-200">
+                          <Award className="w-5 h-5 text-blue-600" />
+                          <h3 className="text-xl font-semibold text-gray-900">{category.name}</h3>
+                          <Badge variant="outline" className="border-blue-200 text-blue-700">
                             {participantsInCategory.length} atletas
                           </Badge>
                         </div>
@@ -592,12 +580,12 @@ export default function PublicTournamentView() {
                           {participantsInCategory.map((participant: any, index: number) => (
                             <div 
                               key={participant.id} 
-                              className="group relative p-4 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-lg border border-white/10 hover:border-purple-400/50 hover:shadow-lg hover:shadow-purple-500/20 transition-all duration-300"
-                              style={{ animationDelay: `${index * 100}ms` }}
+                              className="group relative p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300"
+                              style={{ animationDelay: `${index * 50}ms` }}
                             >
                               <div className="flex items-center gap-4">
                                 <div className="relative">
-                                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow">
                                     {participant.athlete?.name?.charAt(0)?.toUpperCase() || '?'}
                                   </div>
                                   {participant.status === 'confirmed' && (
@@ -605,19 +593,19 @@ export default function PublicTournamentView() {
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-semibold text-white truncate">
+                                  <h4 className="font-semibold text-gray-900 truncate">
                                     {participant.athlete?.name || 'Nome não disponível'}
                                   </h4>
-                                  <p className="text-sm text-white/60 truncate">
+                                  <p className="text-sm text-gray-600 truncate">
                                     {participant.athlete?.club || 'Independente'}
                                   </p>
                                   <div className="flex items-center gap-2 mt-1">
                                     {participant.status === 'confirmed' ? (
-                                      <Badge className="text-xs bg-green-500/20 text-green-300 border-green-400/30">
+                                      <Badge className="text-xs bg-green-100 text-green-700 border-green-200">
                                         Confirmado
                                       </Badge>
                                     ) : (
-                                      <Badge className="text-xs bg-yellow-500/20 text-yellow-300 border-yellow-400/30">
+                                      <Badge className="text-xs bg-yellow-100 text-yellow-700 border-yellow-200">
                                         Pendente
                                       </Badge>
                                     )}
@@ -633,20 +621,20 @@ export default function PublicTournamentView() {
                 </div>
               ) : (
                 <div className="text-center py-16">
-                  <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Users className="w-12 h-12 text-white/40" />
+                  <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Users className="w-12 h-12 text-gray-400" />
                   </div>
-                  <h3 className="text-2xl font-semibold text-white mb-3">
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-3">
                     {selectedCategory !== "all" || selectedGender !== "all" 
                       ? "Nenhum participante encontrado" 
                       : "Aguardando Inscrições"}
                   </h3>
-                  <p className="text-white/60 max-w-md mx-auto mb-6">
+                  <p className="text-gray-600 max-w-md mx-auto mb-6">
                     {selectedCategory !== "all" || selectedGender !== "all" 
                       ? "Tente ajustar os filtros para ver mais participantes." 
                       : "As inscrições serão exibidas aqui conforme os atletas se registrarem no torneio."}
                   </p>
-                  <div className="flex items-center justify-center gap-2 text-sm text-white/40">
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
                     <Clock className="w-4 h-4" />
                     <span>Atualizações em tempo real</span>
                   </div>
@@ -659,67 +647,76 @@ export default function PublicTournamentView() {
             {/* ABA: JOGOS */}
             <TabsContent value="jogos" className="mt-6 space-y-6">
               {matchesData && matchesData.length > 0 ? (
-                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                  <CardHeader>
-                    <CardTitle className="text-2xl text-white flex items-center gap-3">
-                      <Trophy className="w-6 h-6 text-yellow-400" />
-                      Partidas e Resultados
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <PublicMatchView 
-                      tournament={tournamentData}
-                      matches={matchesData}
-                      athletes={athletes}
-                      getPlayerName={getPlayerName}
-                      getPlayerFullInfo={getPlayerFullInfo}
-                    />
-                  </CardContent>
-                </Card>
+                <>
+                  {/* Classificação acima dos jogos */}
+                  <Card className="bg-white border shadow-sm">
+                    <CardHeader>
+                      <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
+                        <Medal className="w-6 h-6 text-amber-500" />
+                        {matchesData.every((m: any) => m.status === 'completed') 
+                          ? 'Classificação Final' 
+                          : 'Classificação Parcial'}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8 text-center">
+                      <Medal className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                        {matchesData.every((m: any) => m.status === 'completed') 
+                          ? 'Pódio e Classificação Final' 
+                          : 'Classificação em Andamento'}
+                      </h3>
+                      <p className="text-gray-600">
+                        {matchesData.every((m: any) => m.status === 'completed')
+                          ? 'A classificação final será exibida aqui após todas as partidas serem concluídas.'
+                          : 'A classificação parcial será atualizada conforme as partidas forem sendo concluídas.'}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Partidas */}
+                  <Card className="bg-white border shadow-sm">
+                    <CardHeader>
+                      <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
+                        <Trophy className="w-6 h-6 text-blue-600" />
+                        Partidas e Resultados
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <PublicMatchView 
+                        tournament={tournamentData}
+                        matches={matchesData}
+                        athletes={athletes}
+                        getPlayerName={getPlayerName}
+                        getPlayerFullInfo={getPlayerFullInfo}
+                      />
+                    </CardContent>
+                  </Card>
+                </>
               ) : tournamentStarted ? (
-                <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
+                <Card className="bg-amber-50 border border-amber-200 shadow-sm">
                   <CardContent className="p-8 text-center">
-                    <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-white mb-3">Partidas em Preparação</h3>
-                    <p className="text-white/80">
+                    <Trophy className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">Partidas em Preparação</h3>
+                    <p className="text-gray-600">
                       As partidas serão exibidas em breve. Aguarde enquanto organizamos as chaves!
                     </p>
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
+                <Card className="bg-blue-50 border border-blue-200 shadow-sm">
                   <CardContent className="p-8 text-center">
-                    <Clock className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-white mb-3">Torneio Ainda Não Iniciado</h3>
-                    <p className="text-white/80 text-lg mb-2">
+                    <Clock className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">Torneio Ainda Não Iniciado</h3>
+                    <p className="text-gray-600 text-lg mb-2">
                       {tournamentData.status === 'draft' && 'O torneio está em fase de preparação.'}
                       {tournamentData.status === 'registration_open' && 'As inscrições estão abertas! O torneio será iniciado em breve.'}
                     </p>
-                    <p className="text-white/70 text-sm">
+                    <p className="text-gray-500 text-sm">
                       Acompanhe esta página para ver os jogos e resultados quando o torneio começar.
                     </p>
                   </CardContent>
                 </Card>
               )}
-            </TabsContent>
-
-            {/* ABA: CLASSIFICAÇÃO */}
-            <TabsContent value="classificacao" className="mt-6 space-y-6">
-              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-2xl text-white flex items-center gap-3">
-                    <Medal className="w-6 h-6 text-yellow-400" />
-                    Classificação e Pódio
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-8 text-center">
-                  <Medal className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold text-white mb-3">Classificação em Desenvolvimento</h3>
-                  <p className="text-white/80">
-                    A classificação e o pódio serão exibidos aqui conforme as partidas forem sendo concluídas.
-                  </p>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </div>
