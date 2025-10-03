@@ -349,7 +349,7 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
   };
 
   // Calcular slots: usar grupos SE existir, senão usar partidas diretas
-  const groupsData = bracketData.groupStandings || [];
+  const groupsData = bracketData?.groupStandings || [];
   const allSlots: QualifiedAthlete[] = [];
   let phases: string[] = [];
 
@@ -734,6 +734,39 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
     
     if (source === 'BYE') {
       return null; // BYE real
+    }
+    
+    // Parse de placeholders de grupo: "group_1A" ou "1º A"
+    if (source && source.startsWith('group_')) {
+      const token = source.split('_')[1]; // group_1A -> "1A"
+      const seed = token.match(/\d+/)?.[0]; // extrai o número "1"
+      const group = token.match(/[A-Z]/)?.[0]; // extrai a letra "A"
+      
+      if (seed && group) {
+        return {
+          playerId: '',
+          playerName: `${seed}º do Grupo ${group}`,
+          position: parseInt(seed),
+          group: group,
+          isRealPlayer: false
+        };
+      }
+    }
+    
+    // Parse alternativo: "1º A", "2º B", etc.
+    if (source && source.match(/^\d+º\s*[A-Z]$/)) {
+      const seed = source.match(/\d+/)?.[0];
+      const group = source.match(/[A-Z]/)?.[0];
+      
+      if (seed && group) {
+        return {
+          playerId: '',
+          playerName: `${seed}º do Grupo ${group}`,
+          position: parseInt(seed),
+          group: group,
+          isRealPlayer: false
+        };
+      }
     }
     
     if (source && source.includes('Vencedor #')) {

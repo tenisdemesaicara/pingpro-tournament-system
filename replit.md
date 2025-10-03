@@ -6,7 +6,17 @@ PingPong Pro is a comprehensive table tennis tournament management platform buil
 
 ### Latest Updates (October 2025)
 
-**Public Tournament Page Enhancements (Oct 3 - Latest):**
+**Match Display & Bracket Fixes (Oct 3 - Latest):**
+- **Universal Match Detection**: Fixed match-management-interface.tsx to auto-detect available phases from actual match data instead of hardcoded format assumptions
+- **Knockout Aggregation**: When elimination phases exist (semifinal, final, etc.), automatically adds "knockout" option to view all elimination matches together
+- **Bracket Position Display**: Corrected placeholder parsing in both bracket-view.tsx and world-cup-bracket.tsx:
+  - "group_1A" now properly displays as "1º do Grupo A" (not "1º colocado")
+  - "group_2B" displays as "2º do Grupo B"
+  - Regex-based parsing extracts seed number and group letter separately
+  - Maintains fallback for unexpected formats
+- **Phase Type Support**: Added 'knockout' to PhaseType union and phaseDisplayNames mapping
+
+**Public Tournament Page Enhancements (Oct 3):**
 - **Simplified Phase Filter**: Elimination phases now grouped as single "Eliminatórias" option instead of separate Semifinal/Final selections
 - **Complete Bracket Display**: Selecting "Eliminatórias" shows full bracket with all phases (round_of_32, round_of_16, quarterfinals, semifinals, final) in World Cup-style visualization
 - **Crossover Seeding**: Implemented proper bracket seeding following Copa do Mundo/Champions League rules:

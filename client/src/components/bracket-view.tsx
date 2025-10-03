@@ -36,10 +36,11 @@ interface BracketData {
 }
 
 // Mapear nomes das fases para display
-type PhaseType = 'group' | 'round_of_32' | 'round_of_16' | 'quarterfinal' | 'semifinal' | 'final' | 'third_place';
+type PhaseType = 'group' | 'knockout' | 'round_of_32' | 'round_of_16' | 'quarterfinal' | 'semifinal' | 'final' | 'third_place';
 
 const phaseDisplayNames: Record<PhaseType, string> = {
   group: "Fase de Grupos",
+  knockout: "Eliminatórias",
   round_of_32: "32avos de Final", 
   round_of_16: "Oitavas de Final",
   quarterfinal: "Quartas de Final",
@@ -105,8 +106,14 @@ const getPlayerPlaceholder = (playerSource: string | null, matches: BracketMatch
   if (!playerSource) return "A definir";
   
   if (playerSource?.startsWith('group_')) {
-    const position = playerSource.split('_')[1]; // group_1A -> 1A
-    return `${position}º colocado`;
+    const token = playerSource.split('_')[1]; // group_1A -> "1A"
+    const seed = token.match(/\d+/)?.[0]; // extrai o número "1"
+    const group = token.match(/[A-Z]/)?.[0]; // extrai a letra "A"
+    
+    if (seed && group) {
+      return `${seed}º do Grupo ${group}`;
+    }
+    return `${token}º colocado`; // fallback
   }
   
   if (playerSource?.startsWith('match_')) {
