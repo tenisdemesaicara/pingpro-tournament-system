@@ -245,14 +245,14 @@ export default function PublicMatchView({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Categoria */}
         <div>
-          <label className="text-sm text-white/90 mb-2 block font-semibold">Categoria</label>
+          <label className="text-sm text-gray-900 mb-2 block font-semibold">Categoria</label>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="bg-white/10 border-white/30 text-white hover:bg-white/20 focus:border-purple-400" data-testid="select-category">
+            <SelectTrigger className="bg-white border-gray-300 text-gray-900 hover:border-blue-500 focus:border-blue-600" data-testid="select-category">
               <SelectValue placeholder="Selecione categoria" />
             </SelectTrigger>
-            <SelectContent className="bg-gray-900 border-gray-700">
+            <SelectContent className="bg-white border-gray-200">
               {tournament.categories?.map((category: any) => (
-                <SelectItem key={category.id} value={category.id} className="text-white hover:bg-gray-800">
+                <SelectItem key={category.id} value={category.id} className="text-gray-900 hover:bg-gray-100">
                   {category.name}
                 </SelectItem>
               ))}
@@ -263,12 +263,12 @@ export default function PublicMatchView({
         {/* Fase */}
         {selectedCategory && (
           <div>
-            <label className="text-sm text-white/90 mb-2 block font-semibold">Fase</label>
+            <label className="text-sm text-gray-900 mb-2 block font-semibold">Fase</label>
             <Select value={selectedPhase} onValueChange={setSelectedPhase}>
-              <SelectTrigger className="bg-white/10 border-white/30 text-white hover:bg-white/20 focus:border-purple-400" data-testid="select-phase">
+              <SelectTrigger className="bg-white border-gray-300 text-gray-900 hover:border-blue-500 focus:border-blue-600" data-testid="select-phase">
                 <SelectValue placeholder="Selecione fase" />
               </SelectTrigger>
-              <SelectContent className="bg-gray-900 border-gray-700">
+              <SelectContent className="bg-white border-gray-200">
                 {getAvailablePhases(selectedCategory).map((phase) => {
                   const phaseLabels: Record<string, string> = {
                     'group': 'Fase de Grupos',
@@ -283,7 +283,7 @@ export default function PublicMatchView({
                   };
                   
                   return (
-                    <SelectItem key={phase} value={phase} className="text-white hover:bg-gray-800">
+                    <SelectItem key={phase} value={phase} className="text-gray-900 hover:bg-gray-100">
                       {phaseLabels[phase] || phase}
                     </SelectItem>
                   );
@@ -296,15 +296,15 @@ export default function PublicMatchView({
         {/* Grupo */}
         {availableGroups.length > 0 && (
           <div>
-            <label className="text-sm text-white/90 mb-2 block font-semibold">Grupo</label>
+            <label className="text-sm text-gray-900 mb-2 block font-semibold">Grupo</label>
             <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-              <SelectTrigger className="bg-white/10 border-white/30 text-white hover:bg-white/20 focus:border-purple-400" data-testid="select-group">
+              <SelectTrigger className="bg-white border-gray-300 text-gray-900 hover:border-blue-500 focus:border-blue-600" data-testid="select-group">
                 <SelectValue placeholder="Todos os grupos" />
               </SelectTrigger>
-              <SelectContent className="bg-gray-900 border-gray-700">
-                <SelectItem value="" className="text-white hover:bg-gray-800">Todos os Grupos</SelectItem>
+              <SelectContent className="bg-white border-gray-200">
+                <SelectItem value="" className="text-gray-900 hover:bg-gray-100">Todos os Grupos</SelectItem>
                 {availableGroups.map((group) => (
-                  <SelectItem key={group} value={group} className="text-white hover:bg-gray-800">
+                  <SelectItem key={group} value={group} className="text-gray-900 hover:bg-gray-100">
                     Grupo {group}
                   </SelectItem>
                 ))}
@@ -335,10 +335,10 @@ export default function PublicMatchView({
 
               return (
                 <div className="space-y-6">
-                  <h3 className="text-lg font-semibold text-white">Partidas por Grupo</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Partidas por Grupo</h3>
                   {sortedGroups.map(group => (
                     <div key={group} className="space-y-3">
-                      <h4 className="text-md font-medium bg-gradient-to-r from-purple-600 to-purple-500 text-white px-4 py-2 rounded-lg shadow-sm">
+                      <h4 className="text-md font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-2 rounded-lg shadow-sm">
                         📊 Grupo {group}
                       </h4>
                       <div className="grid gap-3">
@@ -352,7 +352,7 @@ export default function PublicMatchView({
           ) : (
             // VISUALIZAÇÃO ÚNICA - OUTRAS FASES
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Partidas do Torneio</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Partidas do Torneio</h3>
               <div className="grid gap-4">
                 {filteredMatches.map(match => renderMatchCard(match))}
               </div>
@@ -364,9 +364,9 @@ export default function PublicMatchView({
       {/* Mensagem quando NÃO há categoria selecionada */}
       {!selectedCategory && (
         <div className="text-center py-12 px-4">
-          <div className="inline-block bg-purple-500/20 border border-purple-400/30 rounded-lg p-6 max-w-md">
-            <p className="text-white text-lg font-semibold mb-2">📋 Selecione uma Categoria</p>
-            <p className="text-white/70">
+          <div className="inline-block bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md">
+            <p className="text-gray-900 text-lg font-semibold mb-2">📋 Selecione uma Categoria</p>
+            <p className="text-gray-600">
               Escolha a categoria acima para começar a visualizar as partidas.
             </p>
           </div>
@@ -376,9 +376,9 @@ export default function PublicMatchView({
       {/* Mensagem quando precisa selecionar fase */}
       {selectedCategory && !selectedPhase && (
         <div className="text-center py-12 px-4">
-          <div className="inline-block bg-purple-500/20 border border-purple-400/30 rounded-lg p-6 max-w-md">
-            <p className="text-white text-lg font-semibold mb-2">🎯 Selecione uma Fase</p>
-            <p className="text-white/70">
+          <div className="inline-block bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md">
+            <p className="text-gray-900 text-lg font-semibold mb-2">🎯 Selecione uma Fase</p>
+            <p className="text-gray-600">
               Escolha a fase acima para visualizar as partidas e resultados.
             </p>
           </div>
@@ -388,7 +388,7 @@ export default function PublicMatchView({
       {/* Sem partidas após filtros */}
       {(!filteredMatches || filteredMatches.length === 0) && selectedCategory && selectedPhase && (
         <div className="text-center py-12">
-          <p className="text-white/70">Nenhuma partida encontrada para os filtros selecionados.</p>
+          <p className="text-gray-600">Nenhuma partida encontrada para os filtros selecionados.</p>
         </div>
       )}
     </div>

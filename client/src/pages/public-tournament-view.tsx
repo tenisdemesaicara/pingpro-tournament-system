@@ -648,30 +648,32 @@ export default function PublicTournamentView() {
             <TabsContent value="jogos" className="mt-6 space-y-6">
               {matchesData && matchesData.length > 0 ? (
                 <>
-                  {/* Classificação acima dos jogos */}
-                  <Card className="bg-white border shadow-sm">
-                    <CardHeader>
-                      <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
-                        <Medal className="w-6 h-6 text-amber-500" />
-                        {matchesData.every((m: any) => m.status === 'completed') 
-                          ? 'Classificação Final' 
-                          : 'Classificação Parcial'}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-8 text-center">
-                      <Medal className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                        {matchesData.every((m: any) => m.status === 'completed') 
-                          ? 'Pódio e Classificação Final' 
-                          : 'Classificação em Andamento'}
-                      </h3>
-                      <p className="text-gray-600">
-                        {matchesData.every((m: any) => m.status === 'completed')
-                          ? 'A classificação final será exibida aqui após todas as partidas serem concluídas.'
-                          : 'A classificação parcial será atualizada conforme as partidas forem sendo concluídas.'}
-                      </p>
-                    </CardContent>
-                  </Card>
+                  {/* Classificação acima dos jogos - mostra quando há ao menos 1 jogo completo */}
+                  {matchesData.some((m: any) => m.status === 'completed') && (
+                    <Card className="bg-white border shadow-sm">
+                      <CardHeader>
+                        <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
+                          <Medal className="w-6 h-6 text-amber-500" />
+                          {matchesData.every((m: any) => m.status === 'completed') 
+                            ? 'Classificação Final' 
+                            : 'Classificação Parcial'}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-8 text-center">
+                        <Medal className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                          {matchesData.every((m: any) => m.status === 'completed') 
+                            ? 'Pódio e Classificação Final' 
+                            : 'Classificação em Andamento'}
+                        </h3>
+                        <p className="text-gray-600">
+                          {matchesData.every((m: any) => m.status === 'completed')
+                            ? 'A classificação final será exibida aqui após todas as partidas serem concluídas.'
+                            : 'A classificação parcial será atualizada conforme as partidas forem sendo concluídas.'}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Partidas */}
                   <Card className="bg-white border shadow-sm">
