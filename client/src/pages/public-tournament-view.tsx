@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, MapPin, Trophy, Users, Clock, AlertCircle, Filter, Star, Award, Target } from "lucide-react";
+import { Calendar, MapPin, Trophy, Users, Clock, AlertCircle, Filter, Star, Award, Target, Info, Medal } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PublicMatchView from "@/components/public-match-view";
 import { type Athlete } from "@shared/schema";
 
@@ -328,153 +329,184 @@ export default function PublicTournamentView() {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - SISTEMA DE ABAS */}
       <div className="px-6 pb-12">
-        <div className="max-w-7xl mx-auto space-y-8">
-          
-          {/* Statistics Dashboard */}
-          {stats && (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10 overflow-hidden">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-2xl text-white flex items-center gap-3">
-                  <Target className="w-6 h-6 text-purple-400" />
-                  Estatísticas do Torneio
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                  <div className="text-center p-4 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg border border-blue-400/20">
-                    <div className="text-3xl font-bold text-blue-400 mb-1">{stats.total}</div>
-                    <div className="text-sm text-white/70">Total Inscritos</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg border border-green-400/20">
-                    <div className="text-3xl font-bold text-green-400 mb-1">{stats.confirmed}</div>
-                    <div className="text-sm text-white/70">Confirmados</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg border border-purple-400/20">
-                    <div className="text-3xl font-bold text-purple-400 mb-1">{stats.categories}</div>
-                    <div className="text-sm text-white/70">Categorias</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-lg border border-orange-400/20">
-                    <div className="text-3xl font-bold text-orange-400 mb-1">{stats.clubs}</div>
-                    <div className="text-sm text-white/70">Clubes</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 rounded-lg border border-cyan-400/20">
-                    <div className="text-3xl font-bold text-cyan-400 mb-1">{stats.masculine}</div>
-                    <div className="text-sm text-white/70">Masculino</div>
-                  </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-pink-500/20 to-pink-600/20 rounded-lg border border-pink-400/20">
-                    <div className="text-3xl font-bold text-pink-400 mb-1">{stats.feminine}</div>
-                    <div className="text-sm text-white/70">Feminino</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        <div className="max-w-7xl mx-auto">
+          <Tabs defaultValue="informacoes" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 bg-white/5 backdrop-blur-lg border border-white/10 p-1 h-auto" data-testid="tabs-tournament">
+              <TabsTrigger 
+                value="informacoes" 
+                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
+                data-testid="tab-informacoes"
+              >
+                <Info className="w-4 h-4 mr-2" />
+                Informações
+              </TabsTrigger>
+              <TabsTrigger 
+                value="inscritos" 
+                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
+                data-testid="tab-inscritos"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Inscritos
+              </TabsTrigger>
+              <TabsTrigger 
+                value="jogos" 
+                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
+                data-testid="tab-jogos"
+              >
+                <Trophy className="w-4 h-4 mr-2" />
+                Jogos
+              </TabsTrigger>
+              <TabsTrigger 
+                value="classificacao" 
+                className="data-[state=active]:bg-purple-500/30 data-[state=active]:text-white text-white/70 py-3"
+                data-testid="tab-classificacao"
+              >
+                <Medal className="w-4 h-4 mr-2" />
+                Classificação
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Matches Section - SEMPRE MOSTRAR SE EXISTIR */}
-          {matchesData && matchesData.length > 0 ? (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-              <CardHeader>
-                <CardTitle className="text-2xl text-white flex items-center gap-3">
-                  <Trophy className="w-6 h-6 text-yellow-400" />
-                  Partidas e Resultados
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <PublicMatchView 
-                  tournament={tournamentData}
-                  matches={matchesData}
-                  athletes={athletes}
-                  getPlayerName={getPlayerName}
-                  getPlayerFullInfo={getPlayerFullInfo}
-                />
-              </CardContent>
-            </Card>
-          ) : tournamentStarted ? (
-            <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
-              <CardContent className="p-8 text-center">
-                <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-white mb-3">Partidas em Preparação</h3>
-                <p className="text-white/80">
-                  As partidas serão exibidas em breve. Aguarde enquanto organizamos as chaves!
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
-              <CardContent className="p-8 text-center">
-                <Clock className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold text-white mb-3">Torneio Ainda Não Iniciado</h3>
-                <p className="text-white/80 text-lg mb-2">
-                  {tournamentData.status === 'draft' && 'O torneio está em fase de preparação.'}
-                  {tournamentData.status === 'registration_open' && 'As inscrições estão abertas! O torneio será iniciado em breve.'}
-                </p>
-                <p className="text-white/70 text-sm">
-                  Acompanhe esta página para ver os jogos e resultados quando o torneio começar.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+            {/* ABA: INFORMAÇÕES */}
+            <TabsContent value="informacoes" className="mt-6 space-y-6">
+              {/* Statistics Dashboard */}
+              {stats && (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10 overflow-hidden">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-2xl text-white flex items-center gap-3">
+                      <Target className="w-6 h-6 text-purple-400" />
+                      Estatísticas do Torneio
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                      <div className="text-center p-4 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg border border-blue-400/20">
+                        <div className="text-3xl font-bold text-blue-400 mb-1">{stats.total}</div>
+                        <div className="text-sm text-white/70">Total Inscritos</div>
+                      </div>
+                      <div className="text-center p-4 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-lg border border-green-400/20">
+                        <div className="text-3xl font-bold text-green-400 mb-1">{stats.confirmed}</div>
+                        <div className="text-sm text-white/70">Confirmados</div>
+                      </div>
+                      <div className="text-center p-4 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-lg border border-purple-400/20">
+                        <div className="text-3xl font-bold text-purple-400 mb-1">{stats.categories}</div>
+                        <div className="text-sm text-white/70">Categorias</div>
+                      </div>
+                      <div className="text-center p-4 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-lg border border-orange-400/20">
+                        <div className="text-3xl font-bold text-orange-400 mb-1">{stats.clubs}</div>
+                        <div className="text-sm text-white/70">Clubes</div>
+                      </div>
+                      <div className="text-center p-4 bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 rounded-lg border border-cyan-400/20">
+                        <div className="text-3xl font-bold text-cyan-400 mb-1">{stats.masculine}</div>
+                        <div className="text-sm text-white/70">Masculino</div>
+                      </div>
+                      <div className="text-center p-4 bg-gradient-to-br from-pink-500/20 to-pink-600/20 rounded-lg border border-pink-400/20">
+                        <div className="text-3xl font-bold text-pink-400 mb-1">{stats.feminine}</div>
+                        <div className="text-sm text-white/70">Feminino</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-          {/* Filters Section */}
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-            <CardHeader>
-              <CardTitle className="text-xl text-white flex items-center gap-3">
-                <Filter className="w-5 h-5 text-purple-400" />
-                Filtrar Participantes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-white/70 mb-2 block">Categoria</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                      <SelectValue placeholder="Todas as categorias" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-gray-700">
-                      <SelectItem value="all" className="text-white hover:bg-gray-800">Todas as Categorias</SelectItem>
-                      {tournamentData.categories?.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id} className="text-white hover:bg-gray-800">
-                          {category.name}
-                        </SelectItem>
+              {/* Categorias do Torneio */}
+              {tournamentData.categories && tournamentData.categories.length > 0 && (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-2xl text-white flex items-center gap-3">
+                      <Award className="w-6 h-6 text-purple-400" />
+                      Categorias do Torneio
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {tournamentData.categories.map((category: any) => (
+                        <div key={category.id} className="p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-lg border border-purple-400/20">
+                          <h4 className="font-semibold text-white mb-2">{category.name}</h4>
+                          {category.description && (
+                            <p className="text-sm text-white/60">{category.description}</p>
+                          )}
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm text-white/70 mb-2 block">Gênero</label>
-                  <Select value={selectedGender} onValueChange={setSelectedGender}>
-                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                      <SelectValue placeholder="Todos os gêneros" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-gray-700">
-                      <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
-                      <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
-                      <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="mt-4 text-sm text-white/60">
-                Mostrando {filteredParticipants.length} de {tournamentData.participants?.length || 0} participantes
-              </div>
-            </CardContent>
-          </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-          {/* Participants Section */}
-          <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-            <CardHeader>
-              <CardTitle className="text-2xl text-white flex items-center gap-3">
-                <Users className="w-6 h-6 text-purple-400" />
-                Participantes Inscritos
-                <Badge variant="secondary" className="bg-purple-500/20 text-purple-300 border-purple-400/30">
-                  {filteredParticipants.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+              {/* Descrição do Torneio */}
+              {tournamentData.description && (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-white">Sobre o Torneio</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-white/80 whitespace-pre-wrap">{tournamentData.description}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* ABA: INSCRITOS */}
+            <TabsContent value="inscritos" className="mt-6 space-y-6">
+              {/* Filters Section */}
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-xl text-white flex items-center gap-3">
+                    <Filter className="w-5 h-5 text-purple-400" />
+                    Filtrar Participantes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm text-white/70 mb-2 block">Categoria</label>
+                      <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Todas as categorias" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-900 border-gray-700">
+                          <SelectItem value="all" className="text-white hover:bg-gray-800">Todas as Categorias</SelectItem>
+                          {tournamentData.categories?.map((category: any) => (
+                            <SelectItem key={category.id} value={category.id} className="text-white hover:bg-gray-800">
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm text-white/70 mb-2 block">Gênero</label>
+                      <Select value={selectedGender} onValueChange={setSelectedGender}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                          <SelectValue placeholder="Todos os gêneros" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-gray-900 border-gray-700">
+                          <SelectItem value="all" className="text-white hover:bg-gray-800">Todos os Gêneros</SelectItem>
+                          <SelectItem value="masculino" className="text-white hover:bg-gray-800">Masculino</SelectItem>
+                          <SelectItem value="feminino" className="text-white hover:bg-gray-800">Feminino</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-sm text-white/60">
+                    Mostrando {filteredParticipants.length} de {tournamentData.participants?.length || 0} participantes
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Participants Section */}
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-2xl text-white flex items-center gap-3">
+                    <Users className="w-6 h-6 text-purple-400" />
+                    Participantes Inscritos
+                    <Badge variant="secondary" className="bg-purple-500/20 text-purple-300 border-purple-400/30">
+                      {filteredParticipants.length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
               {filteredParticipants.length > 0 ? (
                 <div className="space-y-6">
                   {/* Agrupar por categoria */}
@@ -558,53 +590,76 @@ export default function PublicTournamentView() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          {/* Tournament Description */}
-          {tournamentData.description && (
-            <Card className="bg-white/5 backdrop-blur-lg border-white/10">
-              <CardHeader>
-                <CardTitle className="text-xl text-white">Sobre o Torneio</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-white/80 leading-relaxed">{tournamentData.description}</p>
-              </CardContent>
-            </Card>
-          )}
+            {/* ABA: JOGOS */}
+            <TabsContent value="jogos" className="mt-6 space-y-6">
+              {matchesData && matchesData.length > 0 ? (
+                <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-2xl text-white flex items-center gap-3">
+                      <Trophy className="w-6 h-6 text-yellow-400" />
+                      Partidas e Resultados
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <PublicMatchView 
+                      tournament={tournamentData}
+                      matches={matchesData}
+                      athletes={athletes}
+                      getPlayerName={getPlayerName}
+                      getPlayerFullInfo={getPlayerFullInfo}
+                    />
+                  </CardContent>
+                </Card>
+              ) : tournamentStarted ? (
+                <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
+                  <CardContent className="p-8 text-center">
+                    <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+                    <h3 className="text-2xl font-bold text-white mb-3">Partidas em Preparação</h3>
+                    <p className="text-white/80">
+                      As partidas serão exibidas em breve. Aguarde enquanto organizamos as chaves!
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border-yellow-400/30">
+                  <CardContent className="p-8 text-center">
+                    <Clock className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+                    <h3 className="text-2xl font-bold text-white mb-3">Torneio Ainda Não Iniciado</h3>
+                    <p className="text-white/80 text-lg mb-2">
+                      {tournamentData.status === 'draft' && 'O torneio está em fase de preparação.'}
+                      {tournamentData.status === 'registration_open' && 'As inscrições estão abertas! O torneio será iniciado em breve.'}
+                    </p>
+                    <p className="text-white/70 text-sm">
+                      Acompanhe esta página para ver os jogos e resultados quando o torneio começar.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-          {/* Footer */}
-          <Card className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 backdrop-blur-lg border-purple-400/30">
-            <CardContent className="p-8 text-center">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                  <Trophy className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-white">PingPong Pro</h3>
-              </div>
-              <p className="text-white/70 mb-6 max-w-2xl mx-auto">
-                Plataforma profissional para gerenciamento de torneios de tênis de mesa. 
-                Organização moderna, resultados em tempo real e experiência completa para atletas e espectadores.
-              </p>
-              <div className="flex justify-center gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => window.history.back()}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  ← Voltar
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => window.close()}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  Fechar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
+            {/* ABA: CLASSIFICAÇÃO */}
+            <TabsContent value="classificacao" className="mt-6 space-y-6">
+              <Card className="bg-white/5 backdrop-blur-lg border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-2xl text-white flex items-center gap-3">
+                    <Medal className="w-6 h-6 text-yellow-400" />
+                    Classificação e Pódio
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-8 text-center">
+                  <Medal className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-3">Classificação em Desenvolvimento</h3>
+                  <p className="text-white/80">
+                    A classificação e o pódio serão exibidos aqui conforme as partidas forem sendo concluídas.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
