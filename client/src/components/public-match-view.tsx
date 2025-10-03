@@ -104,6 +104,111 @@ export default function PublicMatchView({
     return categoryMatches.length > 0 && categoryMatches.every(m => m.status === 'completed');
   }, [categoryMatches]);
 
+  // Calcular classificação
+  const standings = useMemo(() => {
+    if (!categoryMatches || categoryMatches.length === 0) return [];
+
+    const playerStats = new Map<string, {
+      playerId: string;
+      playerName: string;
+      wins: number;
+      losses: number;
+      setsWon: number;
+      setsLost: number;
+      pointsScored: number;
+      pointsAgainst: number;
+    }>();
+
+    // Processar apenas partidas completas
+    categoryMatches
+      .filter(m => m.status === 'completed' && m.player2Id !== null)
+      .forEach(match => {
+        const sets = (match.sets ?? []) as Array<{ player1Score: number; player2Score: number }>;
+        
+        let player1Sets = 0;
+        let player2Sets = 0;
+        let player1Points = 0;
+        let player2Points = 0;
+
+        sets.forEach(set => {
+          player1Points += set.player1Score;
+          player2Points += set.player2Score;
+          if (set.player1Score > set.player2Score) player1Sets++;
+          else if (set.player2Score > set.player1Score) player2Sets++;
+        });
+
+        const player1Wins = player1Sets > player2Sets;
+
+        // Estatísticas do jogador 1
+        if (match.player1Id) {
+          const p1Id = String(match.player1Id);
+          if (!playerStats.has(p1Id)) {
+            playerStats.set(p1Id, {
+              playerId: p1Id,
+              playerName: getPlayerName(match.player1Id) || 'Jogador',
+              wins: 0,
+              losses: 0,
+              setsWon: 0,
+              setsLost: 0,
+              pointsScored: 0,
+              pointsAgainst: 0
+            });
+          }
+          const p1 = playerStats.get(p1Id)!;
+          p1.wins += player1Wins ? 1 : 0;
+          p1.losses += player1Wins ? 0 : 1;
+          p1.setsWon += player1Sets;
+          p1.setsLost += player2Sets;
+          p1.pointsScored += player1Points;
+          p1.pointsAgainst += player2Points;
+        }
+
+        // Estatísticas do jogador 2
+        if (match.player2Id) {
+          const p2Id = String(match.player2Id);
+          if (!playerStats.has(p2Id)) {
+            playerStats.set(p2Id, {
+              playerId: p2Id,
+              playerName: getPlayerName(match.player2Id) || 'Jogador',
+              wins: 0,
+              losses: 0,
+              setsWon: 0,
+              setsLost: 0,
+              pointsScored: 0,
+              pointsAgainst: 0
+            });
+          }
+          const p2 = playerStats.get(p2Id)!;
+          p2.wins += player1Wins ? 0 : 1;
+          p2.losses += player1Wins ? 1 : 0;
+          p2.setsWon += player2Sets;
+          p2.setsLost += player1Sets;
+          p2.pointsScored += player2Points;
+          p2.pointsAgainst += player1Points;
+        }
+      });
+
+    // Ordenar por critérios de desempate
+    const sorted = Array.from(playerStats.values()).sort((a, b) => {
+      // 1. Vitórias
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      // 2. Saldo de sets
+      const aSetsBalance = a.setsWon - a.setsLost;
+      const bSetsBalance = b.setsWon - b.setsLost;
+      if (bSetsBalance !== aSetsBalance) return bSetsBalance - aSetsBalance;
+      // 3. Sets ganhos
+      if (b.setsWon !== a.setsWon) return b.setsWon - a.setsWon;
+      // 4. Saldo de pontos
+      const aPointsBalance = a.pointsScored - a.pointsAgainst;
+      const bPointsBalance = b.pointsScored - b.pointsAgainst;
+      if (bPointsBalance !== aPointsBalance) return bPointsBalance - aPointsBalance;
+      // 5. Pontos marcados
+      return b.pointsScored - a.pointsScored;
+    });
+
+    return sorted;
+  }, [categoryMatches, getPlayerName]);
+
   // Grupos disponíveis
   const availableGroups = useMemo(() => {
     if (!selectedCategory || !selectedPhase) return [];
@@ -281,16 +386,69 @@ export default function PublicMatchView({
               {allMatchesCompleted ? 'Classificação Final' : 'Classificação Parcial'}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-8 text-center">
-            <div className="text-amber-500 text-6xl mb-4">🏅</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">
-              {allMatchesCompleted ? 'Pódio e Classificação Final' : 'Classificação em Andamento'}
-            </h3>
-            <p className="text-gray-600">
-              {allMatchesCompleted
-                ? 'A classificação final será exibida aqui após todas as partidas serem concluídas.'
-                : 'A classificação parcial será atualizada conforme as partidas forem sendo concluídas.'}
-            </p>
+          <CardContent className="p-6">
+            {standings.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b-2 border-gray-300">
+                      <th className="p-3 text-left text-sm font-bold text-gray-900">Pos</th>
+                      <th className="p-3 text-left text-sm font-bold text-gray-900">Jogador</th>
+                      <th className="p-3 text-center text-sm font-bold text-gray-900">V</th>
+                      <th className="p-3 text-center text-sm font-bold text-gray-900">D</th>
+                      <th className="p-3 text-center text-sm font-bold text-gray-900">Sets</th>
+                      <th className="p-3 text-center text-sm font-bold text-gray-900">Saldo Sets</th>
+                      <th className="p-3 text-center text-sm font-bold text-gray-900">Pontos</th>
+                      <th className="p-3 text-center text-sm font-bold text-gray-900">Saldo Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {standings.map((player, index) => {
+                      const setsBalance = player.setsWon - player.setsLost;
+                      const pointsBalance = player.pointsScored - player.pointsAgainst;
+                      const isTopThree = index < 3;
+                      const medalEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                      
+                      return (
+                        <tr 
+                          key={player.playerId} 
+                          className={`border-b border-gray-200 hover:bg-gray-50 ${isTopThree ? 'bg-amber-50' : ''}`}
+                        >
+                          <td className="p-3 text-center font-bold text-gray-900">
+                            {medalEmoji} {index + 1}
+                          </td>
+                          <td className="p-3 text-gray-900 font-medium">{player.playerName}</td>
+                          <td className="p-3 text-center text-green-600 font-bold">{player.wins}</td>
+                          <td className="p-3 text-center text-red-600 font-bold">{player.losses}</td>
+                          <td className="p-3 text-center text-gray-900">
+                            {player.setsWon}/{player.setsLost}
+                          </td>
+                          <td className={`p-3 text-center font-bold ${setsBalance > 0 ? 'text-green-600' : setsBalance < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                            {setsBalance > 0 ? '+' : ''}{setsBalance}
+                          </td>
+                          <td className="p-3 text-center text-gray-900">
+                            {player.pointsScored}/{player.pointsAgainst}
+                          </td>
+                          <td className={`p-3 text-center font-bold ${pointsBalance > 0 ? 'text-green-600' : pointsBalance < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                            {pointsBalance > 0 ? '+' : ''}{pointsBalance}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-amber-500 text-6xl mb-4">🏅</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                  Aguardando Resultados
+                </h3>
+                <p className="text-gray-600">
+                  A classificação será exibida assim que houver partidas concluídas nesta categoria.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
