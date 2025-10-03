@@ -77,7 +77,7 @@ export default function PublicMatchView({
 
   // Detectar se fase selecionada é eliminatória
   const isEliminationPhase = useMemo(() => {
-    const eliminationPhases = ['semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32', 'eliminatorias'];
+    const eliminationPhases = ['knockout', 'semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32', 'eliminatorias'];
     return selectedPhase && eliminationPhases.includes(selectedPhase);
   }, [selectedPhase]);
   
@@ -90,7 +90,7 @@ export default function PublicMatchView({
     let hasEliminationPhases = false;
     
     rawPhases.forEach(phase => {
-      if (['semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32'].includes(phase)) {
+      if (['knockout', 'semifinal', 'final', 'quarterfinal', 'round_of_16', 'round_of_32'].includes(phase)) {
         hasEliminationPhases = true;
       } else {
         groupPhases.push(phase);

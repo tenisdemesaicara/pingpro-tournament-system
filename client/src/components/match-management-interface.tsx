@@ -119,15 +119,11 @@ export default function MatchManagementInterface({
     // Primeiro, tentar usar o campo gender se disponível
     if (category && category.gender) {
       const genderLower = category.gender.toLowerCase();
-      const isMixed = genderLower === 'misto' || genderLower === 'mista' || genderLower === 'mixed';
-      console.log(`🔍 isMixedCategory check - Category: ${selectedCategory}, Gender field: ${category.gender}, isMixed: ${isMixed}`);
-      return isMixed;
+      return genderLower === 'misto' || genderLower === 'mista' || genderLower === 'mixed';
     }
     
     // Fallback: usar regex no nome da categoria para cobrir variações
-    const isMixedByName = /\b(misto|mista|mixed)\b/i.test(selectedCategory.toLowerCase());
-    console.log(`🔍 isMixedCategory check - Category: ${selectedCategory}, No gender field, isMixedByName: ${isMixedByName}`);
-    return isMixedByName;
+    return /\b(misto|mista|mixed)\b/i.test(selectedCategory.toLowerCase());
   };
 
   // Obter gêneros baseados na categoria selecionada
@@ -138,13 +134,12 @@ export default function MatchManagementInterface({
     const category = tournament.categories.find(c => c.name === selectedCategory);
     if (!category) return [];
     
-    // CRÍTICO: Se categoria é mista (verificação dupla), NUNCA mostrar filtro de gênero
+    // CRÍTICO: Se categoria é mista (verificação tripla), NUNCA mostrar filtro de gênero
     const categoryNameLower = selectedCategory.toLowerCase();
     const isMixedByName = /\b(misto|mista|mixed)\b/i.test(categoryNameLower);
     const isMixedByField = category.gender && (category.gender.toLowerCase() === 'misto' || category.gender.toLowerCase() === 'mista' || category.gender.toLowerCase() === 'mixed');
     
     if (isMixedByName || isMixedByField || isMixedCategory()) {
-      console.log(`🚫 getAvailableGenders - Categoria mista detectada, NÃO mostrar filtro de gênero`);
       return [];
     }
     
@@ -167,7 +162,6 @@ export default function MatchManagementInterface({
     // Se há apenas um gênero na categoria, não mostrar filtro
     if (uniqueGenders.length <= 1) return [];
     
-    console.log(`✅ getAvailableGenders - Categoria "${selectedCategory}" tem múltiplos gêneros: ${uniqueGenders.join(', ')}`);
     return uniqueGenders;
   };
 
@@ -561,9 +555,7 @@ export default function MatchManagementInterface({
     if (selectedCategory) {
       const category = tournament.categories?.find(c => c.name === selectedCategory);
       if (category) {
-        filtered = filtered.filter(match => 
-          match.categoryId === category.id
-        );
+        filtered = filtered.filter(match => match.categoryId === category.id);
       }
     }
 
@@ -571,15 +563,11 @@ export default function MatchManagementInterface({
     if (selectedPhase) {
       if (selectedPhase === 'knockout') {
         // Se "Eliminatórias" selecionada, mostrar todas as fases eliminatórias
-        const eliminationPhases = ['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'];
-        filtered = filtered.filter(match => 
-          eliminationPhases.includes(match.phase || '')
-        );
+        const eliminationPhases = ['knockout', 'round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'];
+        filtered = filtered.filter(match => eliminationPhases.includes(match.phase || ''));
       } else {
         // Fase específica selecionada
-        filtered = filtered.filter(match => 
-          match.phase === selectedPhase
-        );
+        filtered = filtered.filter(match => match.phase === selectedPhase);
       }
     }
 

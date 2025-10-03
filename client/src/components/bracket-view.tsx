@@ -337,7 +337,7 @@ export default function BracketView({ tournamentId, categoryId, className = "" }
   } : null;
   
   // SEMPRE calcular estas variáveis para manter hooks consistentes
-  const eliminationPhases: PhaseType[] = ['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final', 'third_place'];
+  const eliminationPhases: PhaseType[] = ['knockout', 'round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final', 'third_place'];
   const hasGroupData = normalizedBracketData?.group && normalizedBracketData.group.length > 0;
   const hasEliminationData = eliminationPhases.some(phase => 
     normalizedBracketData?.[phase] && normalizedBracketData[phase].length > 0

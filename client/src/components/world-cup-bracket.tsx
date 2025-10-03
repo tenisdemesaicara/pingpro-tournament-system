@@ -124,7 +124,7 @@ export function WorldCupBracket({ tournamentId, categoryId }: WorldCupBracketPro
   const bracketData = React.useMemo(() => {
     if (!rawBracketData) return null;
     
-    const eliminationPhases = ['round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'];
+    const eliminationPhases = ['knockout', 'round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final'];
     const filteredBracket: BracketData = {};
     
     // Copiar apenas fases eliminatórias
