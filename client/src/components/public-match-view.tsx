@@ -315,40 +315,38 @@ export default function PublicMatchView({
       </div>
 
       {/* Lista de Partidas */}
-      {filteredMatches && filteredMatches.length > 0 && (
+      {filteredMatches && filteredMatches.length > 0 ? (
         <div className="space-y-4">
           {selectedPhase === 'group' ? (
             // VISUALIZAÇÃO POR GRUPOS - FASE DE GRUPOS
-            (() => {
-              // Agrupar partidas por grupo
-              const matchesByGroup = new Map<string, typeof filteredMatches>();
-              filteredMatches.forEach(match => {
-                const group = match.groupName || 'Sem Grupo';
-                if (!matchesByGroup.has(group)) {
-                  matchesByGroup.set(group, []);
-                }
-                matchesByGroup.get(group)!.push(match);
-              });
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-gray-900">Partidas por Grupo</h3>
+              {(() => {
+                // Agrupar partidas por grupo
+                const matchesByGroup = new Map<string, Match[]>();
+                filteredMatches.forEach(match => {
+                  const group = match.groupName || 'Sem Grupo';
+                  if (!matchesByGroup.has(group)) {
+                    matchesByGroup.set(group, []);
+                  }
+                  matchesByGroup.get(group)!.push(match);
+                });
 
-              // Ordenar grupos alfabeticamente
-              const sortedGroups = Array.from(matchesByGroup.keys()).sort();
+                // Ordenar grupos alfabeticamente
+                const sortedGroups = Array.from(matchesByGroup.keys()).sort();
 
-              return (
-                <div className="space-y-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Partidas por Grupo</h3>
-                  {sortedGroups.map(group => (
-                    <div key={group} className="space-y-3">
-                      <h4 className="text-md font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-2 rounded-lg shadow-sm">
-                        📊 Grupo {group}
-                      </h4>
-                      <div className="grid gap-3">
-                        {matchesByGroup.get(group)!.map(match => renderMatchCard(match))}
-                      </div>
+                return sortedGroups.map(group => (
+                  <div key={group} className="space-y-3">
+                    <h4 className="text-md font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-2 rounded-lg shadow-sm">
+                      📊 Grupo {group}
+                    </h4>
+                    <div className="grid gap-3">
+                      {matchesByGroup.get(group)!.map(match => renderMatchCard(match))}
                     </div>
-                  ))}
-                </div>
-              );
-            })()
+                  </div>
+                ));
+              })()}
+            </div>
           ) : (
             // VISUALIZAÇÃO ÚNICA - OUTRAS FASES
             <div className="space-y-4">
@@ -359,7 +357,7 @@ export default function PublicMatchView({
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Mensagem quando NÃO há categoria selecionada */}
       {!selectedCategory && (
