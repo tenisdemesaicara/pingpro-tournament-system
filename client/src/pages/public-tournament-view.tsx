@@ -14,11 +14,15 @@ export default function PublicTournamentView() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedGender, setSelectedGender] = useState<string>("all");
 
+  console.log('🎬 PublicTournamentView renderizado! ID do torneio:', id);
+
   // Buscar dados do torneio (APENAS LEITURA - endpoint público)
-  const { data: tournament, isLoading } = useQuery({
+  const { data: tournament, isLoading, error } = useQuery({
     queryKey: ['/api/public/tournaments', id],
     enabled: !!id
   });
+
+  console.log('📊 Query state:', { isLoading, hasData: !!tournament, error });
 
   const tournamentData = tournament as any;
 

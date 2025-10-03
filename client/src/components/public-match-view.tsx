@@ -38,34 +38,11 @@ export default function PublicMatchView({
     });
   }, [tournament, matches]);
 
-  // Inicializar categoria na primeira renderização
+  // Resetar fase quando categoria muda
   useEffect(() => {
-    if (!selectedCategory && tournament?.categories && tournament.categories.length > 0) {
-      const firstCategory = tournament.categories[0];
-      console.log('📋 Inicializando categoria:', firstCategory.name, 'ID:', firstCategory.id);
-      setSelectedCategory(firstCategory.id);
-    }
-  }, [tournament?.categories]);
-
-  // Inicializar fase quando categoria muda
-  useEffect(() => {
-    if (!selectedCategory) {
-      setSelectedPhase("");
-      return;
-    }
-    
-    const phases = getAvailablePhases(selectedCategory);
-    console.log('🎯 Fases disponíveis para categoria', selectedCategory, ':', phases);
-    
-    // Auto-selecionar SOMENTE se houver apenas uma fase
-    if (phases.length === 1) {
-      console.log('✅ Auto-selecionando fase única:', phases[0]);
-      setSelectedPhase(phases[0]);
-    } else {
-      // Resetar fase para forçar usuário a escolher
-      setSelectedPhase("");
-    }
-  }, [selectedCategory, getAvailablePhases]);
+    setSelectedPhase("");
+    setSelectedGroup("");
+  }, [selectedCategory]);
 
   // Filtrar partidas
   const filteredMatches = useMemo(() => {
@@ -384,11 +361,23 @@ export default function PublicMatchView({
         </div>
       )}
 
-      {/* Mensagem quando precisa selecionar fase */}
-      {selectedCategory && !selectedPhase && getAvailablePhases(selectedCategory).length > 1 && (
+      {/* Mensagem quando NÃO há categoria selecionada */}
+      {!selectedCategory && (
         <div className="text-center py-12 px-4">
           <div className="inline-block bg-purple-500/20 border border-purple-400/30 rounded-lg p-6 max-w-md">
-            <p className="text-white text-lg font-semibold mb-2">👆 Selecione uma Fase</p>
+            <p className="text-white text-lg font-semibold mb-2">📋 Selecione uma Categoria</p>
+            <p className="text-white/70">
+              Escolha a categoria acima para começar a visualizar as partidas.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Mensagem quando precisa selecionar fase */}
+      {selectedCategory && !selectedPhase && (
+        <div className="text-center py-12 px-4">
+          <div className="inline-block bg-purple-500/20 border border-purple-400/30 rounded-lg p-6 max-w-md">
+            <p className="text-white text-lg font-semibold mb-2">🎯 Selecione uma Fase</p>
             <p className="text-white/70">
               Escolha a fase acima para visualizar as partidas e resultados.
             </p>

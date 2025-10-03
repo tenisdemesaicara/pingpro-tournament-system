@@ -56,20 +56,20 @@ function Router() {
           {() => <Consent type="associado" />}
         </Route>
         
-        {/* Rotas de torneios públicos */}
-        <Route path="/tournament/:id" component={TournamentPublic} />
+        {/* Rotas de torneios públicos - MAIS ESPECÍFICAS PRIMEIRO! */}
+        <Route path="/tournament/:id/view">
+          {(params) => <PublicTournamentView />}
+        </Route>
         <Route path="/tournament/:id/register">
           {(params) => <PublicTournamentRegister tournamentId={params.id} />}
-        </Route>
-        <Route path="/simple-register/:id">
-          {(params) => <SimpleRegister tournamentId={params.id} />}
         </Route>
         <Route path="/tournament/:id/success">
           {(params) => <PublicTournamentSuccess tournamentId={params.id} />}
         </Route>
-        <Route path="/tournament/:id/view">
-          {(params) => <PublicTournamentView />}
+        <Route path="/simple-register/:id">
+          {(params) => <SimpleRegister tournamentId={params.id} />}
         </Route>
+        <Route path="/tournament/:id" component={TournamentPublic} />
         
         {/* NOVA ROTA - Página pública simples */}
         <Route path="/public-tournament/:id" component={SimplePublicTournament} />
