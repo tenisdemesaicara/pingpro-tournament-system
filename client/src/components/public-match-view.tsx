@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { Match, Athlete } from "@shared/schema";
@@ -72,6 +72,36 @@ export default function PublicMatchView({
     
     return filtered;
   }, [matches, selectedCategory, selectedPhase, selectedGroup, selectedRound]);
+
+  // Agrupar partidas por grupo
+  const matchesByGroup = useMemo(() => {
+    if (!filteredMatches || filteredMatches.length === 0) return new Map();
+    
+    const grouped = new Map<string, Match[]>();
+    filteredMatches.forEach(match => {
+      const group = match.groupName || 'Sem Grupo';
+      if (!grouped.has(group)) {
+        grouped.set(group, []);
+      }
+      grouped.get(group)!.push(match);
+    });
+    
+    return grouped;
+  }, [filteredMatches]);
+
+  // Verificar se há jogos completos na categoria selecionada
+  const categoryMatches = useMemo(() => {
+    if (!matches || !selectedCategory) return [];
+    return matches.filter(m => m.categoryId === selectedCategory);
+  }, [matches, selectedCategory]);
+
+  const hasCompletedMatches = useMemo(() => {
+    return categoryMatches.some(m => m.status === 'completed');
+  }, [categoryMatches]);
+
+  const allMatchesCompleted = useMemo(() => {
+    return categoryMatches.length > 0 && categoryMatches.every(m => m.status === 'completed');
+  }, [categoryMatches]);
 
   // Grupos disponíveis
   const availableGroups = useMemo(() => {
@@ -241,6 +271,29 @@ export default function PublicMatchView({
 
   return (
     <div className="space-y-6">
+      {/* Classificação - Aparece quando há jogos completos na categoria */}
+      {selectedCategory && hasCompletedMatches && (
+        <Card className="bg-white border shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-2xl text-gray-900 flex items-center gap-3">
+              <span className="text-amber-500">🏅</span>
+              {allMatchesCompleted ? 'Classificação Final' : 'Classificação Parcial'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-8 text-center">
+            <div className="text-amber-500 text-6xl mb-4">🏅</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              {allMatchesCompleted ? 'Pódio e Classificação Final' : 'Classificação em Andamento'}
+            </h3>
+            <p className="text-gray-600">
+              {allMatchesCompleted
+                ? 'A classificação final será exibida aqui após todas as partidas serem concluídas.'
+                : 'A classificação parcial será atualizada conforme as partidas forem sendo concluídas.'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filtros */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Categoria */}
@@ -317,35 +370,20 @@ export default function PublicMatchView({
       {/* Lista de Partidas */}
       {filteredMatches && filteredMatches.length > 0 ? (
         <div className="space-y-4">
-          {selectedPhase === 'group' ? (
+          {selectedPhase === 'group' && matchesByGroup.size > 0 ? (
             // VISUALIZAÇÃO POR GRUPOS - FASE DE GRUPOS
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900">Partidas por Grupo</h3>
-              {(() => {
-                // Agrupar partidas por grupo
-                const matchesByGroup = new Map<string, Match[]>();
-                filteredMatches.forEach(match => {
-                  const group = match.groupName || 'Sem Grupo';
-                  if (!matchesByGroup.has(group)) {
-                    matchesByGroup.set(group, []);
-                  }
-                  matchesByGroup.get(group)!.push(match);
-                });
-
-                // Ordenar grupos alfabeticamente
-                const sortedGroups = Array.from(matchesByGroup.keys()).sort();
-
-                return sortedGroups.map(group => (
-                  <div key={group} className="space-y-3">
-                    <h4 className="text-md font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-2 rounded-lg shadow-sm">
-                      📊 Grupo {group}
-                    </h4>
-                    <div className="grid gap-3">
-                      {matchesByGroup.get(group)!.map(match => renderMatchCard(match))}
-                    </div>
+              {Array.from(matchesByGroup.keys()).sort().map(group => (
+                <div key={group} className="space-y-3">
+                  <h4 className="text-md font-medium bg-gradient-to-r from-blue-600 to-blue-500 text-white px-4 py-2 rounded-lg shadow-sm">
+                    📊 Grupo {group}
+                  </h4>
+                  <div className="grid gap-3">
+                    {matchesByGroup.get(group)!.map(match => renderMatchCard(match))}
                   </div>
-                ));
-              })()}
+                </div>
+              ))}
             </div>
           ) : (
             // VISUALIZAÇÃO ÚNICA - OUTRAS FASES
