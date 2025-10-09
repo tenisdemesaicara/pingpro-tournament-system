@@ -1109,8 +1109,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         points: 0
       };
       
-      const athlete = await storage.createAthlete(athleteData);
-      console.log("✅ Atleta salvo no banco:", athlete.id);
+      // Verificar se existe atleta rejeitado com mesmo CPF ou Email para reutilizar
+      const existingAthletes = await storage.getAllAthletes();
+      let rejectedAthleteToReuse: any = null;
+      
+      if (req.body.cpf) {
+        const existingCpf = existingAthletes.find(a => a.cpf === req.body.cpf);
+        if (existingCpf && existingCpf.status === 'rejected') {
+          console.log(`♻️ [Self-Register] Encontrado cadastro rejeitado para reutilizar - CPF: ${req.body.cpf}`);
+          rejectedAthleteToReuse = existingCpf;
+        }
+      }
+      
+      if (!rejectedAthleteToReuse && email) {
+        const existingEmail = existingAthletes.find(a => a.email === email);
+        if (existingEmail && existingEmail.status === 'rejected') {
+          console.log(`♻️ [Self-Register] Encontrado cadastro rejeitado para reutilizar - Email: ${email}`);
+          rejectedAthleteToReuse = existingEmail;
+        }
+      }
+      
+      let athlete;
+      if (rejectedAthleteToReuse) {
+        console.log(`♻️ [Self-Register] Atualizando cadastro rejeitado ${rejectedAthleteToReuse.id} com novos dados`);
+        athlete = await storage.updateAthlete(rejectedAthleteToReuse.id, athleteData);
+        console.log("✅ Atleta rejeitado reutilizado e atualizado:", athlete.id);
+      } else {
+        athlete = await storage.createAthlete(athleteData);
+        console.log("✅ Atleta salvo no banco:", athlete.id);
+      }
       
       // Salvar consentimento LGPD se fornecido
       if (req.body.consentData && req.body.consentData.signature) {
@@ -1297,7 +1324,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check CPF (if provided)
       if (validatedData.cpf) {
         const existingCpf = existingAthletes.find(a => a.cpf === validatedData.cpf);
+        
         if (existingCpf) {
+          // Se o cadastro foi rejeitado, permitir atualização com novos dados
+          if (existingCpf.status === 'rejected') {
+            console.log(`♻️ Reaproveitando cadastro rejeitado para CPF: ${validatedData.cpf}`);
+            const updatedAthlete = await storage.updateAthlete(existingCpf.id, {
+              ...validatedData,
+              status: 'pending' // Resetar para pending para nova aprovação
+            });
+            
+            // Se há dados de consentimento, salvar na tabela de consentimentos
+            if (req.body.consentData && req.body.consentData.signature) {
+              try {
+                await storage.saveAthleteConsent({
+                  athleteId: existingCpf.id,
+                  birthDate: req.body.consentData.birthDate,
+                  isMinor: req.body.consentData.isMinor,
+                  lgpdConsent: req.body.consentData.lgpdConsent,
+                  imageRightsConsent: req.body.consentData.imageRightsConsent,
+                  termsConsent: req.body.consentData.termsConsent,
+                  signature: req.body.consentData.signature,
+                  signerName: req.body.consentData.isMinor ? req.body.consentData.signerName : validatedData.name,
+                  parentName: req.body.consentData.parentalData?.parentName || null,
+                  parentCpf: req.body.consentData.parentalData?.parentCpf || null,
+                  parentEmail: req.body.consentData.parentalData?.parentEmail || null,
+                  parentPhone: req.body.consentData.parentalData?.parentPhone || null,
+                  parentRelationship: req.body.consentData.parentalData?.parentRelationship || null
+                });
+              } catch (consentError) {
+                console.error("⚠️ Erro ao salvar consentimento:", consentError);
+              }
+            }
+            
+            return res.status(201).json(updatedAthlete);
+          }
+          
+          // Se não foi rejeitado, é um CPF realmente duplicado
           return res.status(400).json({ 
             error: "CPF já cadastrado", 
             message: "Este CPF já está cadastrado no sistema. Se você já tem cadastro, entre em contato com os administradores para verificar sua situação." 
@@ -1308,7 +1371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check RG (if provided)
       if (validatedData.rg) {
         const existingRg = existingAthletes.find(a => a.rg === validatedData.rg);
-        if (existingRg) {
+        if (existingRg && existingRg.status !== 'rejected') {
           return res.status(400).json({ 
             error: "RG já cadastrado", 
             message: "Este RG já está cadastrado no sistema. Se você já tem cadastro, entre em contato com os administradores para verificar sua situação." 
@@ -1319,7 +1382,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check Email
       if (validatedData.email) {
         const existingEmail = existingAthletes.find(a => a.email === validatedData.email);
+        
         if (existingEmail) {
+          // Se o cadastro foi rejeitado, permitir atualização com novos dados
+          if (existingEmail.status === 'rejected') {
+            console.log(`♻️ Reaproveitando cadastro rejeitado para Email: ${validatedData.email}`);
+            const updatedAthlete = await storage.updateAthlete(existingEmail.id, {
+              ...validatedData,
+              status: 'pending'
+            });
+            
+            // Se há dados de consentimento, salvar
+            if (req.body.consentData && req.body.consentData.signature) {
+              try {
+                await storage.saveAthleteConsent({
+                  athleteId: existingEmail.id,
+                  birthDate: req.body.consentData.birthDate,
+                  isMinor: req.body.consentData.isMinor,
+                  lgpdConsent: req.body.consentData.lgpdConsent,
+                  imageRightsConsent: req.body.consentData.imageRightsConsent,
+                  termsConsent: req.body.consentData.termsConsent,
+                  signature: req.body.consentData.signature,
+                  signerName: req.body.consentData.isMinor ? req.body.consentData.signerName : validatedData.name,
+                  parentName: req.body.consentData.parentalData?.parentName || null,
+                  parentCpf: req.body.consentData.parentalData?.parentCpf || null,
+                  parentEmail: req.body.consentData.parentalData?.parentEmail || null,
+                  parentPhone: req.body.consentData.parentalData?.parentPhone || null,
+                  parentRelationship: req.body.consentData.parentalData?.parentRelationship || null
+                });
+              } catch (consentError) {
+                console.error("⚠️ Erro ao salvar consentimento:", consentError);
+              }
+            }
+            
+            return res.status(201).json(updatedAthlete);
+          }
+          
           return res.status(400).json({ 
             error: "Email já cadastrado", 
             message: "Este email já está em uso no sistema. Por favor, use um email diferente ou entre em contato conosco se este é seu email." 
@@ -1358,12 +1456,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(201).json(athlete);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: error.errors });
       }
+      
+      // Verificar se é erro de constraint única do banco
+      if (error.message && error.message.includes('athletes_cpf_unique')) {
+        console.log("⚠️ [POST /api/athletes] Constraint violation - CPF já cadastrado detectado no catch");
+        return res.status(400).json({
+          error: "CPF já cadastrado",
+          message: "CPF já cadastrado. Este CPF já está cadastrado no sistema. Se você já tem cadastro, entre em contato com os administradores para verificar sua situação."
+        });
+      }
+      
+      if (error.message && error.message.includes('athletes_email_unique')) {
+        console.log("⚠️ [POST /api/athletes] Constraint violation - Email já cadastrado detectado no catch");
+        return res.status(400).json({
+          error: "Email já cadastrado",
+          message: "Email já cadastrado. Este email já está em uso no sistema. Por favor, use um email diferente ou entre em contato conosco se este é seu email."
+        });
+      }
+      
+      if (error.message && error.message.includes('athletes_rg_unique')) {
+        console.log("⚠️ [POST /api/athletes] Constraint violation - RG já cadastrado detectado no catch");
+        return res.status(400).json({
+          error: "RG já cadastrado",
+          message: "RG já cadastrado. Este RG já está cadastrado no sistema. Se você já tem cadastro, entre em contato com os administradores para verificar sua situação."
+        });
+      }
+      
       console.error("Error creating athlete:", error);
-      res.status(500).json({ error: "Failed to create athlete" });
+      res.status(500).json({ 
+        error: "Failed to create athlete",
+        message: "Ocorreu um erro inesperado ao cadastrar o atleta."
+      });
     }
   });
 
@@ -1987,28 +2114,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Check for existing athlete with same CPF or email
           const existingAthletes = await storage.getAllAthletes();
           
+          let rejectedAthleteToReuse: any = null;
+          
           if (athleteData.cpf) {
             const existingCpf = existingAthletes.find(a => a.cpf === athleteData.cpf);
             if (existingCpf) {
-              throw new Error(`Este CPF já está cadastrado para o atleta "${existingCpf.name}". Se você já tem uma conta, use a opção "Buscar Atleta" na página de inscrição.`);
+              if (existingCpf.status === 'rejected') {
+                console.log(`♻️ Encontrado cadastro rejeitado para reutilizar - CPF: ${athleteData.cpf}`);
+                rejectedAthleteToReuse = existingCpf;
+              } else {
+                throw new Error(`Este CPF já está cadastrado para o atleta "${existingCpf.name}". Se você já tem uma conta, use a opção "Buscar Atleta" na página de inscrição.`);
+              }
             }
           }
           
-          const existingEmail = existingAthletes.find(a => a.email === athleteData.email);
-          if (existingEmail) {
-            throw new Error(`Este email já está cadastrado para o atleta "${existingEmail.name}".`);
+          if (!rejectedAthleteToReuse && athleteData.email) {
+            const existingEmail = existingAthletes.find(a => a.email === athleteData.email);
+            if (existingEmail) {
+              if (existingEmail.status === 'rejected') {
+                console.log(`♻️ Encontrado cadastro rejeitado para reutilizar - Email: ${athleteData.email}`);
+                rejectedAthleteToReuse = existingEmail;
+              } else {
+                throw new Error(`Este email já está cadastrado para o atleta "${existingEmail.name}".`);
+              }
+            }
           }
           
-          // Create new athlete
-          const newAthlete = await storage.createAthlete({
-            ...athleteData,
-            photoUrl: athleteData.photoUrl || '',
-            status: 'pending' // New athletes need approval
-          });
-          
-          finalAthleteId = newAthlete.id;
-          createdNewAthlete = true;
-          console.log(`✅ New athlete created: ${finalAthleteId}`);
+          // Se encontrou um atleta rejeitado, reutilizar atualizando os dados
+          if (rejectedAthleteToReuse) {
+            console.log(`♻️ Atualizando cadastro rejeitado ${rejectedAthleteToReuse.id} com novos dados`);
+            const updatedAthlete = await storage.updateAthlete(rejectedAthleteToReuse.id, {
+              ...athleteData,
+              photoUrl: athleteData.photoUrl || '',
+              status: 'pending' // Resetar para pending para nova aprovação
+            });
+            
+            finalAthleteId = rejectedAthleteToReuse.id;
+            createdNewAthlete = true; // Considerar como novo para o fluxo
+            console.log(`✅ Athlete reused and updated: ${finalAthleteId}`);
+          } else {
+            // Create new athlete
+            const newAthlete = await storage.createAthlete({
+              ...athleteData,
+              photoUrl: athleteData.photoUrl || '',
+              status: 'pending' // New athletes need approval
+            });
+            
+            finalAthleteId = newAthlete.id;
+            createdNewAthlete = true;
+            console.log(`✅ New athlete created: ${finalAthleteId}`);
+          }
           
           // Save consent data if provided
           if (consentData?.signature) {
