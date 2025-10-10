@@ -46,7 +46,7 @@ function ReportsSection({ assets }: { assets: Asset[] }) {
   // Calcular estatísticas dos assets
   const assetSummary: AssetSummary = {
     totalAssets: assets.length,
-    totalValue: assets.reduce((sum, asset) => sum + (parseFloat(asset.acquisitionValue) || 0), 0),
+    totalValue: assets.reduce((sum, asset) => sum + ((asset.quantity || 1) * parseFloat(asset.acquisitionValue) || 0), 0),
     activeAssets: assets.filter(asset => asset.isActive).length,
     categoriesCount: new Set(assets.map(asset => asset.category)).size,
     averageAge: assets.length > 0 ? 
@@ -55,9 +55,11 @@ function ReportsSection({ assets }: { assets: Asset[] }) {
         const ageInYears = (Date.now() - acquisitionDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
         return sum + ageInYears;
       }, 0) / assets.length : 0,
-    mostExpensiveAsset: assets.reduce((prev, current) => 
-      (parseFloat(current.acquisitionValue) || 0) > (parseFloat(prev?.acquisitionValue || '0')) ? current : prev
-    , null as Asset | null)
+    mostExpensiveAsset: assets.reduce((prev, current) => {
+      const currentTotal = ((current.quantity || 1) * parseFloat(current.acquisitionValue)) || 0;
+      const prevTotal = prev ? ((prev.quantity || 1) * parseFloat(prev.acquisitionValue)) || 0 : 0;
+      return currentTotal > prevTotal ? current : prev;
+    }, null as Asset | null)
   };
 
   // Filtrar assets baseado nos filtros
@@ -176,13 +178,13 @@ function ReportsSection({ assets }: { assets: Asset[] }) {
     // Tabela com dados
     const tableData = filteredAssets.map(asset => [
       asset.assetCode,
-      asset.name.length > 28 ? asset.name.substring(0, 28) + '...' : asset.name,
-      getCategoryLabel(asset.category).length > 18 ? getCategoryLabel(asset.category).substring(0, 18) + '...' : getCategoryLabel(asset.category),
+      asset.name.length > 25 ? asset.name.substring(0, 25) + '...' : asset.name,
+      getCategoryLabel(asset.category).length > 15 ? getCategoryLabel(asset.category).substring(0, 15) + '...' : getCategoryLabel(asset.category),
       getSituationLabel(asset.situation),
-      format(new Date(asset.acquisitionDate), 'dd/MM/yyyy'),
+      asset.quantity || 1,
       parseFloat(asset.acquisitionValue).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}),
-      asset.location.length > 22 ? asset.location.substring(0, 22) + '...' : asset.location,
-      asset.responsible.length > 20 ? asset.responsible.substring(0, 20) + '...' : asset.responsible
+      ((asset.quantity || 1) * parseFloat(asset.acquisitionValue)).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}),
+      asset.location.length > 18 ? asset.location.substring(0, 18) + '...' : asset.location
     ]);
     
     // Calcular largura disponível para a tabela
@@ -191,12 +193,12 @@ function ReportsSection({ assets }: { assets: Asset[] }) {
     const availableWidth = pageWidth - marginLeft - marginRight;
     
     autoTable(doc, {
-      head: [['Código', 'Nome', 'Categoria', 'Situação', 'Data Aquisição', 'Valor', 'Localização', 'Responsável']],
+      head: [['Código', 'Nome', 'Categoria', 'Situação', 'Qtd', 'Valor Unit.', 'Valor Total', 'Localização']],
       body: tableData,
       startY: yPosition,
       styles: { 
-        fontSize: 9,
-        cellPadding: 2.5,
+        fontSize: 8,
+        cellPadding: 2,
         lineColor: [200, 200, 200],
         lineWidth: 0.1,
         overflow: 'linebreak'
@@ -205,20 +207,21 @@ function ReportsSection({ assets }: { assets: Asset[] }) {
         fillColor: [41, 128, 185],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        halign: 'center'
+        halign: 'center',
+        fontSize: 8
       },
       alternateRowStyles: {
         fillColor: [248, 249, 250]
       },
       columnStyles: {
-        0: { cellWidth: 18 },  // Código - 9%
-        1: { cellWidth: 38 },  // Nome - 19%
-        2: { cellWidth: 24 },  // Categoria - 12%
-        3: { cellWidth: 20 },  // Situação - 10%
-        4: { cellWidth: 22 },  // Data - 11%
-        5: { cellWidth: 26 },  // Valor - 13%
-        6: { cellWidth: 28 },  // Localização - 14%
-        7: { cellWidth: 24 }   // Responsável - 12%
+        0: { cellWidth: 18 },  // Código
+        1: { cellWidth: 35 },  // Nome
+        2: { cellWidth: 22 },  // Categoria
+        3: { cellWidth: 20 },  // Situação
+        4: { cellWidth: 12, halign: 'center' },  // Quantidade
+        5: { cellWidth: 24 },  // Valor Unitário
+        6: { cellWidth: 26 },  // Valor Total
+        7: { cellWidth: 25 }   // Localização
       },
       margin: { left: marginLeft, right: marginRight },
       tableWidth: availableWidth,
@@ -470,6 +473,7 @@ export default function Patrimonio() {
       acquisitionDate: "",
       supplier: "",
       invoiceNumber: "",
+      quantity: 1,
       acquisitionValue: "0",
       acquisitionMethod: "compra",
       location: "",
@@ -583,6 +587,7 @@ export default function Patrimonio() {
       acquisitionDate: asset.acquisitionDate,
       supplier: asset.supplier || "",
       invoiceNumber: asset.invoiceNumber || "",
+      quantity: asset.quantity || 1,
       acquisitionValue: asset.acquisitionValue.toString(),
       acquisitionMethod: asset.acquisitionMethod as any,
       location: asset.location,
@@ -783,7 +788,9 @@ export default function Patrimonio() {
                     <TableHead>Categoria</TableHead>
                     <TableHead>Situação</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Valor</TableHead>
+                    <TableHead>Qtd</TableHead>
+                    <TableHead>Valor Unit.</TableHead>
+                    <TableHead>Valor Total</TableHead>
                     <TableHead>Local</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
@@ -811,8 +818,14 @@ export default function Patrimonio() {
                           {asset.condition === 'poor' && 'Ruim'}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-center font-medium">
+                        {asset.quantity || 1}
+                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         {formatCurrency(asset.acquisitionValue)}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm font-medium text-blue-600">
+                        {formatCurrency(((asset.quantity || 1) * parseFloat(asset.acquisitionValue)).toString())}
                       </TableCell>
                       <TableCell className="text-sm">{asset.location}</TableCell>
                       <TableCell>
@@ -1084,25 +1097,61 @@ export default function Patrimonio() {
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="acquisitionValue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Valor de Aquisição *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="0.00" 
-                            {...field} 
-                            data-testid="input-value"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantidade *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              step="1" 
+                              placeholder="1" 
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                              data-testid="input-quantity"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="acquisitionValue"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Valor Unitário *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder="0.00" 
+                              {...field} 
+                              data-testid="input-value"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex flex-col justify-end">
+                      <FormLabel>Valor Total</FormLabel>
+                      <div className="h-10 px-3 py-2 border border-gray-200 rounded-md bg-gray-50 flex items-center font-mono text-sm">
+                        {(() => {
+                          const quantity = form.watch("quantity") || 1;
+                          const unitValue = parseFloat(form.watch("acquisitionValue") || "0");
+                          const totalValue = quantity * unitValue;
+                          return totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        })()}
+                      </div>
+                    </div>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="management" className="space-y-4">
@@ -1328,15 +1377,26 @@ export default function Patrimonio() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Valor de Aquisição</Label>
+                  <Label className="text-sm font-medium text-gray-500">Quantidade</Label>
+                  <p className="font-semibold text-lg">{selectedAsset.quantity || 1}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Valor Unitário</Label>
                   <p className="font-semibold text-lg">{formatCurrency(selectedAsset.acquisitionValue)}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Data de Aquisição</Label>
-                  <p>{new Date(selectedAsset.acquisitionDate).toLocaleDateString('pt-BR')}</p>
+                  <Label className="text-sm font-medium text-gray-500">Valor Total</Label>
+                  <p className="font-semibold text-lg text-blue-600">
+                    {formatCurrency(((selectedAsset.quantity || 1) * parseFloat(selectedAsset.acquisitionValue)).toString())}
+                  </p>
                 </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Data de Aquisição</Label>
+                <p>{new Date(selectedAsset.acquisitionDate).toLocaleDateString('pt-BR')}</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

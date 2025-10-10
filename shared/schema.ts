@@ -1010,7 +1010,8 @@ export const assets = pgTable("assets", {
   acquisitionDate: date("acquisition_date").notNull(),
   supplier: text("supplier"),
   invoiceNumber: text("invoice_number"),
-  acquisitionValue: decimal("acquisition_value", { precision: 12, scale: 2 }).notNull(),
+  quantity: integer("quantity").notNull().default(1), // quantidade de itens
+  acquisitionValue: decimal("acquisition_value", { precision: 12, scale: 2 }).notNull(), // valor unitário
   acquisitionMethod: text("acquisition_method").notNull(), // compra, doação, patrocínio, etc.
   
   // Localização e responsável
@@ -1085,9 +1086,10 @@ export const insertAssetSchema = createInsertSchema(assets).omit({
     "declining_balance", 
     "none"
   ]).optional(),
+  quantity: z.coerce.number().int().min(1, "A quantidade deve ser no mínimo 1").default(1),
   acquisitionValue: z.union([z.string(), z.number()]).transform((val) => typeof val === 'string' ? parseFloat(val) : val),
   residualValue: z.string().transform((val) => val ? parseFloat(val) : null).optional(),
-  lifeYears: z.number().min(1).max(100).optional(),
+  lifeYears: z.coerce.number().min(1).max(100).optional(),
   photoUrls: z.array(z.string()).optional(),
   documentUrls: z.array(z.string()).optional(),
 });
