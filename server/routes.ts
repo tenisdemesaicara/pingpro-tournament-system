@@ -192,10 +192,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/auth/me", (req, res) => {
-    if (req.session && req.session.user) {
-      res.json(req.session.user);
-    } else {
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      // Primeiro verificar JWT token
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-jwt-secret') as any;
+          const userId = decoded.userId;
+          
+          // Buscar usuário completo
+          const { getUserWithRoles } = await import('./auth.js');
+          const userWithRoles = await getUserWithRoles(userId);
+          
+          if (userWithRoles && userWithRoles.isActive) {
+            console.log('✅ [/api/auth/me] JWT auth OK - User:', userWithRoles.username);
+            return res.json({ ...userWithRoles, token }); // Retornar com token
+          }
+        } catch (jwtError) {
+          console.log('❌ [/api/auth/me] JWT inválido:', jwtError);
+        }
+      }
+      
+      // Fallback: verificar sessão (desenvolvimento)
+      if (req.session && req.session.user) {
+        return res.json(req.session.user);
+      }
+      
+      res.status(401).json({ message: "Não autenticado" });
+    } catch (error) {
+      console.error('[/api/auth/me] Erro:', error);
       res.status(401).json({ message: "Não autenticado" });
     }
   });
