@@ -205,18 +205,16 @@ export async function authenticateUser(usernameOrEmail: string, password: string
       effectivePermissions: userWithRoles.effectivePermissions
     };
 
-    // CORREÇÃO CRÍTICA: Usar JWT para cross-domain em vez de session
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction) {
-      const token = jwt.sign(
-        { userId: sessionUser.id, timestamp: Date.now() },
-        process.env.JWT_SECRET || 'dev-jwt-secret',
-        { expiresIn: '24h' }
-      );
-      return { ...sessionUser, token };
-    }
-
-    return sessionUser;
+    // CORREÇÃO CRÍTICA: SEMPRE gerar JWT token para funcionar cross-domain
+    // Token funciona melhor que sessions para domínios customizados
+    const token = jwt.sign(
+      { userId: sessionUser.id, timestamp: Date.now() },
+      process.env.JWT_SECRET || 'dev-jwt-secret',
+      { expiresIn: '24h' }
+    );
+    
+    console.log('🔑 DEBUG LOGIN: Token JWT gerado com sucesso');
+    return { ...sessionUser, token };
   } catch (error) {
     console.error('Erro na autenticação:', error);
     return null;

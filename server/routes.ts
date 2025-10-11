@@ -170,7 +170,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('✅ Authentication successful for:', username);
+      console.log('✅ Token presente na resposta?', !!user.token);
+      
+      // Salvar na sessão
       req.session.user = user;
+      
+      // SEMPRE retornar o token para funcionar cross-domain
       res.json(user);
     } catch (error) {
       console.error("Login error:", error);
