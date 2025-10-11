@@ -36,13 +36,22 @@ const corsOptions = {
   origin: [
     'https://tenisdemesaicara.com.br',
     'https://www.tenisdemesaicara.com.br',
-    'https://pingpro.onrender.com'
+    'https://pingpro-node.onrender.com', // Domínio Render correto
+    'http://localhost:5000' // Dev local
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   optionsSuccessStatus: 200
 };
+
+// Log CORS para debug
+app.use((req, res, next) => {
+  if (req.path.includes('/api/')) {
+    console.log(`🌐 CORS: ${req.method} ${req.path} from origin: ${req.headers.origin || 'NO ORIGIN'}`);
+  }
+  next();
+});
 
 app.use(cors(corsOptions));
 
