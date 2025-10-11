@@ -31,6 +31,9 @@ const app = express();
 // CRÍTICO: Trust proxy para funcionar com Render (sessões funcionarem)
 app.set('trust proxy', 1);
 
+// Verificar ambiente
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Configuração CORS específica e segura - 100% SEM REPLIT
 const corsOptions = {
   origin: [
@@ -45,10 +48,16 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// Log CORS para debug
+// Log detalhado para debug cross-domain
 app.use((req, res, next) => {
   if (req.path.includes('/api/')) {
-    console.log(`🌐 CORS: ${req.method} ${req.path} from origin: ${req.headers.origin || 'NO ORIGIN'}`);
+    const proto = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'HTTPS' : 'HTTP';
+    const hasAuth = !!req.headers.authorization;
+    console.log(`🌐 [${proto}] ${req.method} ${req.path} | Auth: ${hasAuth ? '✅' : '❌'} | Origin: ${req.headers.origin || 'NO ORIGIN'}`);
+    
+    if (!hasAuth && req.path !== '/api/auth/login' && req.path !== '/api/auth/me') {
+      console.log(`⚠️  Headers recebidos:`, Object.keys(req.headers).join(', '));
+    }
   }
   next();
 });
@@ -59,8 +68,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Configuração de sessão
-const isProduction = process.env.NODE_ENV === 'production';
-
 // Configure session store based on environment
 const sessionConfig: any = {
   secret: process.env.SESSION_SECRET || 'dev-secret-key-change-in-production',

@@ -42,6 +42,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Helper: Garantir URL absoluta HTTPS em produção para evitar perda de headers
+function ensureHttpsUrl(path: string): string {
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && path.startsWith('/')) {
+    return window.location.origin + path;
+  }
+  return path;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch(ensureHttpsUrl('/api/auth/me'), {
         headers,
         credentials: 'include' // Manter para development
       });
@@ -99,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(ensureHttpsUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -132,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      await fetch('/api/auth/logout', { 
+      await fetch(ensureHttpsUrl('/api/auth/logout'), { 
         method: 'POST',
         headers,
         credentials: 'include'

@@ -25,7 +25,13 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, {
+  // CORREÇÃO CRÍTICA: Garantir HTTPS em produção para evitar perda de headers
+  let finalUrl = url;
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('/')) {
+    finalUrl = window.location.origin + url;
+  }
+
+  const res = await fetch(finalUrl, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
@@ -50,7 +56,13 @@ export const getQueryFn: <T>(options: {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(queryKey.join("/") as string, {
+    // CORREÇÃO CRÍTICA: Garantir HTTPS em produção para evitar perda de headers
+    let url = queryKey.join("/") as string;
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('/')) {
+      url = window.location.origin + url;
+    }
+
+    const res = await fetch(url, {
       headers,
       credentials: "include", // Manter para development
     });
