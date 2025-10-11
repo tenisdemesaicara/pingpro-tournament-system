@@ -228,41 +228,58 @@ export async function authenticateUser(usernameOrEmail: string, password: string
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
+    console.log(`🔐 [requireAuth] ${req.method} ${req.path} - Verificando autenticação...`);
+    
     // Primeiro, verificar JWT token se disponível
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
+      console.log(`🔐 [requireAuth] JWT token encontrado no header`);
       const token = authHeader.substring(7);
       
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-jwt-secret') as any;
         const userId = decoded.userId;
+        console.log(`🔐 [requireAuth] JWT válido para userId: ${userId}`);
         
         // Buscar usuário completo com roles e permissões
         const userWithRoles = await getUserWithRoles(userId);
         if (userWithRoles && userWithRoles.isActive) {
+          console.log(`✅ [requireAuth] JWT auth OK - User: ${userWithRoles.username}`);
           // Adicionar usuário ao request para uso nas rotas
           (req as any).user = userWithRoles;
           return next();
+        } else {
+          console.log(`❌ [requireAuth] JWT válido mas usuário não encontrado ou inativo`);
         }
       } catch (jwtError) {
+        console.log(`❌ [requireAuth] JWT inválido ou expirado:`, jwtError instanceof Error ? jwtError.message : String(jwtError));
         // Token inválido, continuar para verificar session
       }
+    } else {
+      console.log(`🔐 [requireAuth] Nenhum JWT token no header`);
     }
     
     // Fallback para session-based auth (development)
     if (req.session && req.session.user) {
+      console.log(`🔐 [requireAuth] Session encontrada para user: ${req.session.user.username}`);
+      
       if (!req.session.user.isActive) {
+        console.log(`❌ [requireAuth] Usuário inativo na session`);
         return res.status(401).json({ message: 'Usuário inativo.' });
       }
       
+      console.log(`✅ [requireAuth] Session auth OK - User: ${req.session.user.username}`);
       // Adicionar usuário ao request
       (req as any).user = req.session.user;
       return next();
+    } else {
+      console.log(`❌ [requireAuth] Nenhuma session encontrada`);
     }
     
+    console.log(`❌ [requireAuth] Autenticação FALHOU - Retornando 401`);
     return res.status(401).json({ message: 'Não autenticado' });
   } catch (error) {
-    console.error('Erro na autenticação:', error);
+    console.error('❌ [requireAuth] Erro na autenticação:', error);
     return res.status(401).json({ message: 'Erro de autenticação' });
   }
 }

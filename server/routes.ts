@@ -45,21 +45,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Debug logs endpoint (TEMPORÁRIO - remover após diagnóstico)
+  app.get("/api/debug/logs", (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Debug Logs - PingPro</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { 
+            font-family: monospace; 
+            padding: 10px; 
+            background: #1a1a1a; 
+            color: #00ff00;
+            font-size: 12px;
+            line-height: 1.4;
+          }
+          h1 { color: #00ff00; font-size: 16px; }
+          .log { 
+            margin: 5px 0; 
+            padding: 8px; 
+            background: #2a2a2a; 
+            border-left: 3px solid #00ff00;
+            word-wrap: break-word;
+          }
+          .error { border-left-color: #ff0000; color: #ff6666; }
+          .success { border-left-color: #00ff00; }
+          .info { border-left-color: #00aaff; color: #66ccff; }
+          .refresh { 
+            position: fixed; 
+            top: 10px; 
+            right: 10px; 
+            background: #00ff00; 
+            color: #000; 
+            padding: 10px; 
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+          }
+        </style>
+      </head>
+      <body>
+        <button class="refresh" onclick="location.reload()">🔄 Atualizar</button>
+        <h1>🔍 Debug Logs - Últimos ${debugLogs.length} registros</h1>
+        <p style="color: #888;">Atualizado: ${new Date().toLocaleString('pt-BR')}</p>
+        ${debugLogs.length === 0 ? '<p>Nenhum log capturado ainda.</p>' : debugLogs.map(log => {
+          const className = log.includes('❌') ? 'error' : log.includes('✅') ? 'success' : 'info';
+          return `<div class="log ${className}">${log}</div>`;
+        }).join('')}
+        <script>
+          // Auto-refresh a cada 5 segundos
+          setTimeout(() => location.reload(), 5000);
+        </script>
+      </body>
+      </html>
+    `;
+    res.send(html);
+  });
+
   // Log storage in memory for debugging
   const debugLogs: string[] = [];
-  const maxLogs = 50;
+  const maxLogs = 100;
   
   // Interceptar console.log para salvar logs de debug
   const originalLog = console.log;
+  const originalError = console.error;
+  
   console.log = (...args) => {
     const message = args.join(' ');
-    if (message.includes('DEBUG LOGIN')) {
+    // Capturar logs com emojis de debug ou mensagens importantes
+    if (message.includes('🔍') || message.includes('✅') || message.includes('❌') || 
+        message.includes('[/api/athletes') || message.includes('[Storage.') || 
+        message.includes('[requireAuth]') || message.includes('[/api/dashboard')) {
       debugLogs.push(`${new Date().toISOString()}: ${message}`);
       if (debugLogs.length > maxLogs) {
         debugLogs.shift();
       }
     }
     originalLog(...args);
+  };
+  
+  console.error = (...args) => {
+    const message = args.join(' ');
+    debugLogs.push(`${new Date().toISOString()}: ❌ ERROR: ${message}`);
+    if (debugLogs.length > maxLogs) {
+      debugLogs.shift();
+    }
+    originalError(...args);
   };
 
 
@@ -787,11 +862,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint para buscar TODOS os atletas (incluindo pendentes/rejeitados) - PROTEGIDO
   app.get("/api/athletes/all", requireAuth, async (req, res) => {
     try {
+      console.log("🔍 [/api/athletes/all] Iniciando busca de atletas...");
+      console.log("🔍 [/api/athletes/all] User autenticado:", req.user ? `${req.user.username} (ID: ${req.user.id})` : "NENHUM");
+      
+      console.log("🔍 [/api/athletes/all] Chamando storage.getAllAthletes()...");
       const athletes = await storage.getAllAthletes();
+      
+      console.log(`✅ [/api/athletes/all] Sucesso! Encontrados ${athletes.length} atletas`);
+      console.log(`✅ [/api/athletes/all] Primeiros 3 atletas:`, athletes.slice(0, 3).map(a => ({ id: a.id, name: a.name, status: a.status })));
+      
       res.json(athletes);
     } catch (error) {
-      console.error("Error fetching all athletes:", error);
-      res.status(500).json({ error: "Failed to fetch all athletes" });
+      console.error("❌ [/api/athletes/all] ERRO CAPTURADO:", error);
+      console.error("❌ [/api/athletes/all] Tipo do erro:", typeof error);
+      console.error("❌ [/api/athletes/all] Stack trace:", error instanceof Error ? error.stack : "N/A");
+      res.status(500).json({ error: "Failed to fetch all athletes", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -1205,6 +1290,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard statistics endpoint
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
+      console.log("🔍 [/api/dashboard/stats] Iniciando busca de estatísticas...");
+      console.log("🔍 [/api/dashboard/stats] User autenticado:", req.user ? `${req.user.username} (ID: ${req.user.id})` : "NENHUM");
+      
       const statsResult = await db.execute(sql`
         SELECT 
           (SELECT COUNT(*) FROM athletes WHERE status = 'approved') as total_athletes,
@@ -1220,6 +1308,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const stats = statsResult.rows[0];
       
+      console.log(`✅ [/api/dashboard/stats] Estatísticas obtidas:`, {
+        totalAthletes: stats.total_athletes,
+        totalUsers: stats.total_users,
+        activeTournaments: stats.active_tournaments
+      });
+      
       res.json({
         totalAthletes: parseInt(stats.total_athletes as string) || 0,
         maleAthletes: parseInt(stats.male_athletes as string) || 0,
@@ -1232,7 +1326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthlyRevenue: parseFloat(stats.monthly_revenue as string) || 0,
       });
     } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
+      console.error("❌ [/api/dashboard/stats] ERRO:", error);
       res.status(500).json({ message: "Erro ao buscar estatísticas", error: error instanceof Error ? error.message : String(error) });
     }
   });

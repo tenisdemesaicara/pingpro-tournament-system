@@ -166,7 +166,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllAthletes(): Promise<Athlete[]> {
-    return await db.select().from(athletes).orderBy(asc(athletes.name));
+    console.log("🔍 [Storage.getAllAthletes] Iniciando query no banco...");
+    try {
+      const result = await db.select().from(athletes).orderBy(asc(athletes.name));
+      console.log(`✅ [Storage.getAllAthletes] Query executada com sucesso! Total: ${result.length} atletas`);
+      return result;
+    } catch (error) {
+      console.error("❌ [Storage.getAllAthletes] ERRO NA QUERY:", error);
+      throw error;
+    }
   }
 
   async createAthlete(athlete: InsertAthlete): Promise<Athlete> {
