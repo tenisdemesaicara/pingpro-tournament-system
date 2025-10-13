@@ -1180,6 +1180,12 @@ export default function FinanceiroSimples() {
   // Criar mapa de atletas para acesso rápido (otimização de performance)
   const athleteMap = useMemo(() => {
     const map = new Map<string, Athlete>();
+    console.log('🏃 CRIANDO ATHLETE MAP:', {
+      athletesArray: athletes,
+      athletesLength: athletes?.length || 0,
+      isArray: Array.isArray(athletes),
+      firstAthlete: athletes?.[0]
+    });
     athletes?.forEach(athlete => {
       map.set(athlete.id, athlete);
     });
