@@ -1177,12 +1177,24 @@ export default function FinanceiroSimples() {
       .replace(/[\u0300-\u036f]/g, ''); // Remove acentos
   };
 
+  // Criar mapa de atletas para acesso rápido (otimização de performance)
+  const athleteMap = useMemo(() => {
+    const map = new Map<string, Athlete>();
+    athletes?.forEach(athlete => {
+      map.set(athlete.id, athlete);
+    });
+    return map;
+  }, [athletes]);
+
   // Filtrar pagamentos
   const filteredPayments = useMemo(() => {
-    return payments?.filter(payment => {
+    if (!payments) return [];
+    
+    return payments.filter(payment => {
+      // Filtro de status
       const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
-      const matchesAthlete = filterAthlete === "all" || payment.athleteId === filterAthlete;
       
+      // Filtro de data
       let matchesDateRange = true;
       if (filterStartDate && filterEndDate) {
         const paymentDate = payment.dueDate;
@@ -1193,7 +1205,7 @@ export default function FinanceiroSimples() {
       let matchesSearch = true;
       if (filterSearchText.trim()) {
         const searchNormalized = normalizeText(filterSearchText);
-        const athlete = athletes?.find(a => a.id === payment.athleteId);
+        const athlete = athleteMap.get(payment.athleteId);
         const athleteName = athlete ? normalizeText(`${athlete.firstName} ${athlete.lastName}`) : '';
         const amount = payment.amount.toString();
         const description = normalizeText(payment.description || '');
@@ -1206,9 +1218,14 @@ export default function FinanceiroSimples() {
           reference.includes(searchNormalized);
       }
       
+      // Filtro de atleta específico (apenas se não houver busca textual)
+      const matchesAthlete = filterSearchText.trim() 
+        ? true // Ignora filtro de atleta quando há busca textual
+        : (filterAthlete === "all" || payment.athleteId === filterAthlete);
+      
       return matchesStatus && matchesAthlete && matchesDateRange && matchesSearch;
-    }) || [];
-  }, [payments, athletes, filterSearchText, filterStatus, filterAthlete, filterStartDate, filterEndDate]);
+    });
+  }, [payments, athleteMap, filterSearchText, filterStatus, filterAthlete, filterStartDate, filterEndDate]);
 
   // Filtrar receitas
   const filteredRevenues = useMemo(() => {
