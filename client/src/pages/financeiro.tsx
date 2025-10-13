@@ -1190,7 +1190,17 @@ export default function FinanceiroSimples() {
   const filteredPayments = useMemo(() => {
     if (!payments) return [];
     
-    return payments.filter(payment => {
+    // Log de debug
+    if (filterSearchText.trim()) {
+      console.log('🔍 BUSCA COBRANÇAS:', {
+        searchText: filterSearchText,
+        searchNormalized: normalizeText(filterSearchText),
+        totalPayments: payments.length,
+        athleteMapSize: athleteMap.size
+      });
+    }
+    
+    const result = payments.filter(payment => {
       // Filtro de status
       const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
       
@@ -1211,6 +1221,17 @@ export default function FinanceiroSimples() {
         const description = normalizeText(payment.description || '');
         const reference = normalizeText(payment.reference || '');
         
+        if (filterSearchText.trim() && payments.indexOf(payment) === 0) {
+          console.log('🔍 Primeiro pagamento:', {
+            athleteId: payment.athleteId,
+            athleteName,
+            athleteFound: !!athlete,
+            amount,
+            description,
+            reference
+          });
+        }
+        
         matchesSearch = 
           athleteName.includes(searchNormalized) ||
           amount.includes(searchNormalized) ||
@@ -1225,6 +1246,12 @@ export default function FinanceiroSimples() {
       
       return matchesStatus && matchesAthlete && matchesDateRange && matchesSearch;
     });
+    
+    if (filterSearchText.trim()) {
+      console.log('✅ Resultados encontrados:', result.length);
+    }
+    
+    return result;
   }, [payments, athleteMap, filterSearchText, filterStatus, filterAthlete, filterStartDate, filterEndDate]);
 
   // Filtrar receitas
