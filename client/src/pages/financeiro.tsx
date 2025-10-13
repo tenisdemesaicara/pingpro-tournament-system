@@ -1229,9 +1229,12 @@ export default function FinanceiroSimples() {
         
         if (filterSearchText.trim() && payments.indexOf(payment) === 0) {
           console.log('🔍 Primeiro pagamento:', {
-            athleteId: payment.athleteId,
+            paymentAthleteId: payment.athleteId,
+            paymentAthleteIdType: typeof payment.athleteId,
             athleteName,
             athleteFound: !!athlete,
+            athleteFromMap: athlete,
+            mapKeys: Array.from(athleteMap.keys()).slice(0, 3),
             amount,
             description,
             reference
