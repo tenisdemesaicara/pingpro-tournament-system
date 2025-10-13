@@ -61,6 +61,7 @@ export default function FinanceiroSimples() {
   });
   const [revenueFilterCategory, setRevenueFilterCategory] = useState("all");
   const [revenueFilterPaymentMethod, setRevenueFilterPaymentMethod] = useState("all");
+  const [revenueFilterSearchText, setRevenueFilterSearchText] = useState("");
   const [revenueFilterStartDate, setRevenueFilterStartDate] = useState(currentMonthDates.start);
   const [revenueFilterEndDate, setRevenueFilterEndDate] = useState(currentMonthDates.end);
 
@@ -79,6 +80,7 @@ export default function FinanceiroSimples() {
   });
   const [expenseFilterCategory, setExpenseFilterCategory] = useState("all");
   const [expenseFilterPaymentMethod, setExpenseFilterPaymentMethod] = useState("all");
+  const [expenseFilterSearchText, setExpenseFilterSearchText] = useState("");
   const [expenseFilterStartDate, setExpenseFilterStartDate] = useState(currentMonthDates.start);
   const [expenseFilterEndDate, setExpenseFilterEndDate] = useState(currentMonthDates.end);
   const [paymentData, setPaymentData] = useState({
@@ -1209,32 +1211,64 @@ export default function FinanceiroSimples() {
   }, [payments, athletes, filterSearchText, filterStatus, filterAthlete, filterStartDate, filterEndDate]);
 
   // Filtrar receitas
-  const filteredRevenues = revenues?.filter(revenue => {
-    const matchesCategory = revenueFilterCategory === "all" || revenue.category === revenueFilterCategory;
-    const matchesPaymentMethod = revenueFilterPaymentMethod === "all" || revenue.paymentMethod === revenueFilterPaymentMethod;
-    
-    let matchesDateRange = true;
-    if (revenueFilterStartDate && revenueFilterEndDate) {
-      const revenueDate = revenue.date;
-      matchesDateRange = revenueDate >= revenueFilterStartDate && revenueDate <= revenueFilterEndDate;
-    }
-    
-    return matchesCategory && matchesPaymentMethod && matchesDateRange;
-  }) || [];
+  const filteredRevenues = useMemo(() => {
+    return revenues?.filter(revenue => {
+      const matchesCategory = revenueFilterCategory === "all" || revenue.category === revenueFilterCategory;
+      const matchesPaymentMethod = revenueFilterPaymentMethod === "all" || revenue.paymentMethod === revenueFilterPaymentMethod;
+      
+      let matchesDateRange = true;
+      if (revenueFilterStartDate && revenueFilterEndDate) {
+        const revenueDate = revenue.date;
+        matchesDateRange = revenueDate >= revenueFilterStartDate && revenueDate <= revenueFilterEndDate;
+      }
+      
+      // Filtro de busca textual (insensível a acentos e maiúsculas)
+      let matchesSearch = true;
+      if (revenueFilterSearchText.trim()) {
+        const searchNormalized = normalizeText(revenueFilterSearchText);
+        const amount = revenue.amount.toString();
+        const description = normalizeText(revenue.description || '');
+        const category = normalizeText(revenue.category || '');
+        
+        matchesSearch = 
+          amount.includes(searchNormalized) ||
+          description.includes(searchNormalized) ||
+          category.includes(searchNormalized);
+      }
+      
+      return matchesCategory && matchesPaymentMethod && matchesDateRange && matchesSearch;
+    }) || [];
+  }, [revenues, revenueFilterSearchText, revenueFilterCategory, revenueFilterPaymentMethod, revenueFilterStartDate, revenueFilterEndDate]);
 
   // Filtrar despesas
-  const filteredExpenses = expenses?.filter(expense => {
-    const matchesCategory = expenseFilterCategory === "all" || expense.category === expenseFilterCategory;
-    const matchesPaymentMethod = expenseFilterPaymentMethod === "all" || expense.paymentMethod === expenseFilterPaymentMethod;
-    
-    let matchesDateRange = true;
-    if (expenseFilterStartDate && expenseFilterEndDate) {
-      const expenseDate = expense.date;
-      matchesDateRange = expenseDate >= expenseFilterStartDate && expenseDate <= expenseFilterEndDate;
-    }
-    
-    return matchesCategory && matchesPaymentMethod && matchesDateRange;
-  }) || [];
+  const filteredExpenses = useMemo(() => {
+    return expenses?.filter(expense => {
+      const matchesCategory = expenseFilterCategory === "all" || expense.category === expenseFilterCategory;
+      const matchesPaymentMethod = expenseFilterPaymentMethod === "all" || expense.paymentMethod === expenseFilterPaymentMethod;
+      
+      let matchesDateRange = true;
+      if (expenseFilterStartDate && expenseFilterEndDate) {
+        const expenseDate = expense.date;
+        matchesDateRange = expenseDate >= expenseFilterStartDate && expenseDate <= expenseFilterEndDate;
+      }
+      
+      // Filtro de busca textual (insensível a acentos e maiúsculas)
+      let matchesSearch = true;
+      if (expenseFilterSearchText.trim()) {
+        const searchNormalized = normalizeText(expenseFilterSearchText);
+        const amount = expense.amount.toString();
+        const description = normalizeText(expense.description || '');
+        const category = normalizeText(expense.category || '');
+        
+        matchesSearch = 
+          amount.includes(searchNormalized) ||
+          description.includes(searchNormalized) ||
+          category.includes(searchNormalized);
+      }
+      
+      return matchesCategory && matchesPaymentMethod && matchesDateRange && matchesSearch;
+    }) || [];
+  }, [expenses, expenseFilterSearchText, expenseFilterCategory, expenseFilterPaymentMethod, expenseFilterStartDate, expenseFilterEndDate]);
 
   // Calcular totais
   const totalPendente = filteredPayments
@@ -1782,9 +1816,21 @@ export default function FinanceiroSimples() {
                 <CardTitle>Filtros</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-4">
+                  {/* Campo de busca textual */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Categoria</label>
+                    <label className="text-sm font-medium mb-2 block">Buscar</label>
+                    <Input
+                      placeholder="Pesquisar por valor, descrição ou categoria..."
+                      value={revenueFilterSearchText}
+                      onChange={(e) => setRevenueFilterSearchText(e.target.value)}
+                      data-testid="input-search-revenue-filter"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Categoria</label>
                     <Select value={revenueFilterCategory} onValueChange={setRevenueFilterCategory}>
                       <SelectTrigger>
                         <SelectValue />
@@ -1832,6 +1878,7 @@ export default function FinanceiroSimples() {
                       onChange={(e) => setRevenueFilterEndDate(e.target.value)}
                     />
                   </div>
+                </div>
                 </div>
               </CardContent>
             </Card>
@@ -2083,9 +2130,21 @@ export default function FinanceiroSimples() {
                 <CardTitle>Filtros</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-4">
+                  {/* Campo de busca textual */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Categoria</label>
+                    <label className="text-sm font-medium mb-2 block">Buscar</label>
+                    <Input
+                      placeholder="Pesquisar por valor, descrição ou categoria..."
+                      value={expenseFilterSearchText}
+                      onChange={(e) => setExpenseFilterSearchText(e.target.value)}
+                      data-testid="input-search-expense-filter"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Categoria</label>
                     <Select value={expenseFilterCategory} onValueChange={setExpenseFilterCategory}>
                       <SelectTrigger>
                         <SelectValue />
@@ -2135,6 +2194,7 @@ export default function FinanceiroSimples() {
                       onChange={(e) => setExpenseFilterEndDate(e.target.value)}
                     />
                   </div>
+                </div>
                 </div>
               </CardContent>
             </Card>
