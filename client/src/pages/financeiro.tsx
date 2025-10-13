@@ -122,8 +122,9 @@ export default function FinanceiroSimples() {
     queryKey: ['/api/payments'],
   });
 
-  const { data: athletes } = useQuery({
-    queryKey: ['/api/athletes'],
+  // Usar endpoint otimizado para seletores (apenas id, name, type)
+  const { data: athletes, isLoading: athletesLoading } = useQuery({
+    queryKey: ['/api/athletes/minimal'],
   });
 
   const { data: revenues } = useQuery({
@@ -1810,9 +1811,9 @@ export default function FinanceiroSimples() {
 
                     <div>
                       <label className="text-sm font-medium mb-2 block">Atleta/Associado</label>
-                      <Select value={filterAthlete} onValueChange={setFilterAthlete}>
+                      <Select value={filterAthlete} onValueChange={setFilterAthlete} disabled={athletesLoading}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Todos" />
+                          <SelectValue placeholder={athletesLoading ? "Carregando..." : "Todos"} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todos</SelectItem>
@@ -2637,9 +2638,9 @@ export default function FinanceiroSimples() {
 
                   <div>
                     <label className="text-sm font-medium">Atleta/Associado</label>
-                    <Select value={reportFilterAthlete} onValueChange={setReportFilterAthlete}>
+                    <Select value={reportFilterAthlete} onValueChange={setReportFilterAthlete} disabled={athletesLoading}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
+                        <SelectValue placeholder={athletesLoading ? "Carregando..." : "Todos"} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>

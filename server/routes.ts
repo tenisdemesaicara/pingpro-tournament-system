@@ -880,6 +880,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Athletes routes - rotas específicas primeiro (PROTEGIDAS)
+  
+  // Endpoint otimizado para seletores (apenas id, name, type) - MUITO RÁPIDO
+  app.get("/api/athletes/minimal", requireAuth, async (req, res) => {
+    try {
+      const athletes = await storage.getAllAthletes();
+      // Retornar apenas campos essenciais para seletores
+      const minimalAthletes = athletes
+        .filter(athlete => athlete.status === "approved")
+        .map(athlete => ({
+          id: athlete.id,
+          name: athlete.name,
+          type: athlete.type
+        }));
+      res.json(minimalAthletes);
+    } catch (error) {
+      console.error("Error fetching minimal athletes:", error);
+      res.status(500).json({ error: "Failed to fetch athletes" });
+    }
+  });
+  
   app.get("/api/athletes", requireAuth, async (req, res) => {
     try {
       const athletes = await storage.getAllAthletes();
