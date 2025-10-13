@@ -664,7 +664,8 @@ export default function FinanceiroSimples() {
     try {
       // Filtrar cobranças baseado nos filtros da aba Relatórios
       const filteredReportPayments = payments.filter((payment: any) => {
-        const matchesStatus = reportFilterStatus === "all" || payment.status === reportFilterStatus;
+        const realStatus = getPaymentRealStatus(payment);
+        const matchesStatus = reportFilterStatus === "all" || realStatus === reportFilterStatus;
         const matchesAthlete = reportFilterAthlete === "all" || payment.athleteId === reportFilterAthlete;
         
         let matchesDateRange = true;
@@ -729,9 +730,9 @@ export default function FinanceiroSimples() {
       // Calcular totais gerais usando dados filtrados
       const totalReceitas = filteredReportRevenues.reduce((sum: number, r: any) => sum + parseFloat(r.amount.toString()), 0);
       const totalDespesas = filteredReportExpenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount.toString()), 0);
-      const totalCobrancasPagas = filteredReportPayments.filter((p: any) => p.status === "paid").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const totalCobrancasPendentes = filteredReportPayments.filter((p: any) => p.status === "pending").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const totalCobrancasVencidas = filteredReportPayments.filter((p: any) => p.status === "overdue").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalCobrancasPagas = filteredReportPayments.filter((p: any) => getPaymentRealStatus(p) === "paid").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalCobrancasPendentes = filteredReportPayments.filter((p: any) => getPaymentRealStatus(p) === "pending").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalCobrancasVencidas = filteredReportPayments.filter((p: any) => getPaymentRealStatus(p) === "overdue").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
       const saldoLiquido = (totalReceitas + totalCobrancasPagas) - totalDespesas;
 
       // Resumo Executivo
@@ -1017,9 +1018,9 @@ export default function FinanceiroSimples() {
       currentY += 10;
 
       // Calcular totais de cobranças
-      const totalPagas = filteredPayments.filter((p: any) => p.status === "paid").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const totalPendentes = filteredPayments.filter((p: any) => p.status === "pending").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const totalVencidas = filteredPayments.filter((p: any) => p.status === "overdue").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalPagas = filteredPayments.filter((p: any) => getPaymentRealStatus(p) === "paid").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalPendentes = filteredPayments.filter((p: any) => getPaymentRealStatus(p) === "pending").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalVencidas = filteredPayments.filter((p: any) => getPaymentRealStatus(p) === "overdue").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
       const totalGeral = totalPagas + totalPendentes + totalVencidas;
 
       // Resumo de cobranças
@@ -1031,9 +1032,9 @@ export default function FinanceiroSimples() {
       doc.setFontSize(10);
       const resumoData = [
         ['TOTAL DE COBRANÇAS', filteredPayments.length.toString()],
-        ['COBRANÇAS PAGAS', `${filteredPayments.filter((p: any) => p.status === "paid").length} - R$ ${totalPagas.toFixed(2)}`],
-        ['COBRANÇAS PENDENTES', `${filteredPayments.filter((p: any) => p.status === "pending").length} - R$ ${totalPendentes.toFixed(2)}`],
-        ['COBRANÇAS VENCIDAS', `${filteredPayments.filter((p: any) => p.status === "overdue").length} - R$ ${totalVencidas.toFixed(2)}`],
+        ['COBRANÇAS PAGAS', `${filteredPayments.filter((p: any) => getPaymentRealStatus(p) === "paid").length} - R$ ${totalPagas.toFixed(2)}`],
+        ['COBRANÇAS PENDENTES', `${filteredPayments.filter((p: any) => getPaymentRealStatus(p) === "pending").length} - R$ ${totalPendentes.toFixed(2)}`],
+        ['COBRANÇAS VENCIDAS', `${filteredPayments.filter((p: any) => getPaymentRealStatus(p) === "overdue").length} - R$ ${totalVencidas.toFixed(2)}`],
         ['VALOR TOTAL', `R$ ${totalGeral.toFixed(2)}`]
       ];
 
@@ -1061,14 +1062,15 @@ export default function FinanceiroSimples() {
 
       const paymentsTableData = filteredPayments.map((payment: any) => {
         const athlete = athleteMap.get(payment.athleteId);
+        const realStatus = getPaymentRealStatus(payment);
         return [
           new Date(payment.dueDate + 'T00:00:00').toLocaleDateString('pt-BR'),
           athlete?.name || 'Atleta não encontrado',
           `R$ ${parseFloat(payment.amount).toFixed(2)}`,
           payment.reference || '-',
           payment.description || '-',
-          payment.status === 'paid' ? '✓ Pago' :
-          payment.status === 'pending' ? 'Pendente' : 'Vencido',
+          realStatus === 'paid' ? '✓ Pago' :
+          realStatus === 'pending' ? 'Pendente' : 'Vencido',
           payment.paymentDate ? new Date(payment.paymentDate + 'T00:00:00').toLocaleDateString('pt-BR') : '-'
         ];
       });
@@ -1395,6 +1397,20 @@ export default function FinanceiroSimples() {
     return labels[category] || category;
   };
 
+  // Função para calcular o status real de um pagamento (considera data de vencimento)
+  const getPaymentRealStatus = (payment: any) => {
+    if (payment.status === 'paid') return 'paid';
+    
+    const today = new Date().toISOString().split('T')[0];
+    const dueDate = payment.dueDate;
+    
+    if (dueDate < today) {
+      return 'overdue'; // Vencido
+    }
+    
+    return 'pending'; // Pendente
+  };
+
   // Criar mapa de atletas para acesso rápido (otimização de performance)
   const athleteMap = useMemo(() => {
     const map = new Map<string, Athlete>();
@@ -1409,8 +1425,11 @@ export default function FinanceiroSimples() {
     if (!payments) return [];
     
     return payments.filter(payment => {
+      // Calcular status real baseado na data de vencimento
+      const realStatus = getPaymentRealStatus(payment);
+      
       // Filtro de status
-      const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
+      const matchesStatus = filterStatus === "all" || realStatus === filterStatus;
       
       // Filtro de data
       let matchesDateRange = true;
@@ -1505,16 +1524,20 @@ export default function FinanceiroSimples() {
     }) || [];
   }, [expenses, expenseFilterSearchText, expenseFilterCategory, expenseFilterPaymentMethod, expenseFilterStartDate, expenseFilterEndDate]);
 
-  // Calcular totais
+  // Calcular totais com status real (baseado em data de vencimento)
   const totalPendente = filteredPayments
-    .filter(p => p.status === 'pending')
+    .filter(p => getPaymentRealStatus(p) === 'pending')
     .reduce((sum, p) => sum + parseFloat(p.amount), 0);
   
   const totalPago = filteredPayments
-    .filter(p => p.status === 'paid')
+    .filter(p => getPaymentRealStatus(p) === 'paid')
     .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
-  const totalGeral = totalPendente + totalPago;
+  const totalVencido = filteredPayments
+    .filter(p => getPaymentRealStatus(p) === 'overdue')
+    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+  const totalGeral = totalPendente + totalPago + totalVencido;
 
   const totalReceitas = filteredRevenues.reduce((sum, r) => sum + parseFloat(r.amount), 0);
   const totalDespesas = filteredExpenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
@@ -1544,7 +1567,7 @@ export default function FinanceiroSimples() {
           {/* Tab de Cobranças */}
           <TabsContent value="cobrancas" className="space-y-6 mt-6">
             {/* Cards de Resumo */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-green-600">
@@ -1567,6 +1590,19 @@ export default function FinanceiroSimples() {
                 <CardContent>
                   <div className="text-2xl font-bold text-orange-600">
                     R$ {totalPendente.toFixed(2)}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-red-600">
+                    Total Vencido
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">
+                    R$ {totalVencido.toFixed(2)}
                   </div>
                 </CardContent>
               </Card>
@@ -1857,11 +1893,11 @@ export default function FinanceiroSimples() {
                               <TableCell>{new Date(payment.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}</TableCell>
                               <TableCell>
                                 <Badge variant={
-                                  payment.status === 'paid' ? 'default' :
-                                  payment.status === 'overdue' ? 'destructive' : 'secondary'
+                                  getPaymentRealStatus(payment) === 'paid' ? 'default' :
+                                  getPaymentRealStatus(payment) === 'overdue' ? 'destructive' : 'secondary'
                                 }>
-                                  {payment.status === 'paid' ? 'Pago' : 
-                                   payment.status === 'overdue' ? 'Vencido' : 'Pendente'}
+                                  {getPaymentRealStatus(payment) === 'paid' ? 'Pago' : 
+                                   getPaymentRealStatus(payment) === 'overdue' ? 'Vencido' : 'Pendente'}
                                 </Badge>
                               </TableCell>
                               <TableCell>{payment.reference || 'N/A'}</TableCell>
