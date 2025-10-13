@@ -1167,6 +1167,14 @@ export default function FinanceiroSimples() {
     }
   };
 
+  // Função para normalizar texto (remove acentos e converte para lowercase)
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, ''); // Remove acentos
+  };
+
   // Filtrar pagamentos
   const filteredPayments = payments?.filter(payment => {
     const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
@@ -1178,21 +1186,21 @@ export default function FinanceiroSimples() {
       matchesDateRange = paymentDate >= filterStartDate && paymentDate <= filterEndDate;
     }
     
-    // Filtro de busca textual
+    // Filtro de busca textual (insensível a acentos e maiúsculas)
     let matchesSearch = true;
     if (filterSearchText.trim()) {
-      const searchLower = filterSearchText.toLowerCase();
+      const searchNormalized = normalizeText(filterSearchText);
       const athlete = athletes?.find(a => a.id === payment.athleteId);
-      const athleteName = athlete ? `${athlete.firstName} ${athlete.lastName}`.toLowerCase() : '';
+      const athleteName = athlete ? normalizeText(`${athlete.firstName} ${athlete.lastName}`) : '';
       const amount = payment.amount.toString();
-      const description = (payment.description || '').toLowerCase();
-      const reference = (payment.reference || '').toLowerCase();
+      const description = normalizeText(payment.description || '');
+      const reference = normalizeText(payment.reference || '');
       
       matchesSearch = 
-        athleteName.includes(searchLower) ||
-        amount.includes(searchLower) ||
-        description.includes(searchLower) ||
-        reference.includes(searchLower);
+        athleteName.includes(searchNormalized) ||
+        amount.includes(searchNormalized) ||
+        description.includes(searchNormalized) ||
+        reference.includes(searchNormalized);
     }
     
     return matchesStatus && matchesAthlete && matchesDateRange && matchesSearch;
