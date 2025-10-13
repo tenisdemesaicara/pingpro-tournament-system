@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1176,35 +1176,37 @@ export default function FinanceiroSimples() {
   };
 
   // Filtrar pagamentos
-  const filteredPayments = payments?.filter(payment => {
-    const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
-    const matchesAthlete = filterAthlete === "all" || payment.athleteId === filterAthlete;
-    
-    let matchesDateRange = true;
-    if (filterStartDate && filterEndDate) {
-      const paymentDate = payment.dueDate;
-      matchesDateRange = paymentDate >= filterStartDate && paymentDate <= filterEndDate;
-    }
-    
-    // Filtro de busca textual (insensível a acentos e maiúsculas)
-    let matchesSearch = true;
-    if (filterSearchText.trim()) {
-      const searchNormalized = normalizeText(filterSearchText);
-      const athlete = athletes?.find(a => a.id === payment.athleteId);
-      const athleteName = athlete ? normalizeText(`${athlete.firstName} ${athlete.lastName}`) : '';
-      const amount = payment.amount.toString();
-      const description = normalizeText(payment.description || '');
-      const reference = normalizeText(payment.reference || '');
+  const filteredPayments = useMemo(() => {
+    return payments?.filter(payment => {
+      const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
+      const matchesAthlete = filterAthlete === "all" || payment.athleteId === filterAthlete;
       
-      matchesSearch = 
-        athleteName.includes(searchNormalized) ||
-        amount.includes(searchNormalized) ||
-        description.includes(searchNormalized) ||
-        reference.includes(searchNormalized);
-    }
-    
-    return matchesStatus && matchesAthlete && matchesDateRange && matchesSearch;
-  }) || [];
+      let matchesDateRange = true;
+      if (filterStartDate && filterEndDate) {
+        const paymentDate = payment.dueDate;
+        matchesDateRange = paymentDate >= filterStartDate && paymentDate <= filterEndDate;
+      }
+      
+      // Filtro de busca textual (insensível a acentos e maiúsculas)
+      let matchesSearch = true;
+      if (filterSearchText.trim()) {
+        const searchNormalized = normalizeText(filterSearchText);
+        const athlete = athletes?.find(a => a.id === payment.athleteId);
+        const athleteName = athlete ? normalizeText(`${athlete.firstName} ${athlete.lastName}`) : '';
+        const amount = payment.amount.toString();
+        const description = normalizeText(payment.description || '');
+        const reference = normalizeText(payment.reference || '');
+        
+        matchesSearch = 
+          athleteName.includes(searchNormalized) ||
+          amount.includes(searchNormalized) ||
+          description.includes(searchNormalized) ||
+          reference.includes(searchNormalized);
+      }
+      
+      return matchesStatus && matchesAthlete && matchesDateRange && matchesSearch;
+    }) || [];
+  }, [payments, athletes, filterSearchText, filterStatus, filterAthlete, filterStartDate, filterEndDate]);
 
   // Filtrar receitas
   const filteredRevenues = revenues?.filter(revenue => {
