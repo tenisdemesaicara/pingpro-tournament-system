@@ -42,6 +42,7 @@ export default function FinanceiroSimples() {
   const [selectedAthletes, setSelectedAthletes] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterAthlete, setFilterAthlete] = useState("all");
+  const [filterSearchText, setFilterSearchText] = useState("");
   const [filterStartDate, setFilterStartDate] = useState(currentMonthDates.start);
   const [filterEndDate, setFilterEndDate] = useState(currentMonthDates.end);
 
@@ -250,7 +251,7 @@ export default function FinanceiroSimples() {
   // Mutation para editar pagamento
   const editPaymentMutation = useMutation({
     mutationFn: async ({ paymentId, data }: { paymentId: string, data: Partial<InsertPayment> }) => {
-      const response = await apiRequest('PUT', `/api/payments/${paymentId}`, data);
+      const response = await apiRequest('PATCH', `/api/payments/${paymentId}`, data);
       return response.json();
     },
     onSuccess: () => {
@@ -1177,7 +1178,24 @@ export default function FinanceiroSimples() {
       matchesDateRange = paymentDate >= filterStartDate && paymentDate <= filterEndDate;
     }
     
-    return matchesStatus && matchesAthlete && matchesDateRange;
+    // Filtro de busca textual
+    let matchesSearch = true;
+    if (filterSearchText.trim()) {
+      const searchLower = filterSearchText.toLowerCase();
+      const athlete = athletes?.find(a => a.id === payment.athleteId);
+      const athleteName = athlete ? `${athlete.firstName} ${athlete.lastName}`.toLowerCase() : '';
+      const amount = payment.amount.toString();
+      const description = (payment.description || '').toLowerCase();
+      const reference = (payment.reference || '').toLowerCase();
+      
+      matchesSearch = 
+        athleteName.includes(searchLower) ||
+        amount.includes(searchLower) ||
+        description.includes(searchLower) ||
+        reference.includes(searchLower);
+    }
+    
+    return matchesStatus && matchesAthlete && matchesDateRange && matchesSearch;
   }) || [];
 
   // Filtrar receitas
@@ -1446,55 +1464,69 @@ export default function FinanceiroSimples() {
                 <CardTitle>Filtros</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-4">
+                  {/* Campo de busca textual */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Status</label>
-                    <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="pending">Pendente</SelectItem>
-                        <SelectItem value="paid">Pago</SelectItem>
-                        <SelectItem value="overdue">Vencido</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Atleta/Associado</label>
-                    <Select value={filterAthlete} onValueChange={setFilterAthlete}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {athletes?.map((athlete) => (
-                          <SelectItem key={athlete.id} value={athlete.id}>
-                            {athlete.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Data Início</label>
+                    <label className="text-sm font-medium mb-2 block">Buscar</label>
                     <Input
-                      type="date"
-                      value={filterStartDate}
-                      onChange={(e) => setFilterStartDate(e.target.value)}
+                      placeholder="Pesquisar por nome, valor, descrição ou referência..."
+                      value={filterSearchText}
+                      onChange={(e) => setFilterSearchText(e.target.value)}
+                      data-testid="input-search-filter"
                     />
                   </div>
 
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Data Fim</label>
-                    <Input
-                      type="date"
-                      value={filterEndDate}
-                      onChange={(e) => setFilterEndDate(e.target.value)}
-                    />
+                  {/* Filtros de status, atleta e data */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Status</label>
+                      <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="paid">Pago</SelectItem>
+                          <SelectItem value="overdue">Vencido</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Atleta/Associado</label>
+                      <Select value={filterAthlete} onValueChange={setFilterAthlete}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {athletes?.map((athlete) => (
+                            <SelectItem key={athlete.id} value={athlete.id}>
+                              {athlete.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Data Início</label>
+                      <Input
+                        type="date"
+                        value={filterStartDate}
+                        onChange={(e) => setFilterStartDate(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Data Fim</label>
+                      <Input
+                        type="date"
+                        value={filterEndDate}
+                        onChange={(e) => setFilterEndDate(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1503,7 +1535,14 @@ export default function FinanceiroSimples() {
             {/* Lista de Pagamentos */}
             <Card>
               <CardHeader>
-                <CardTitle>Pagamentos ({filteredPayments.length})</CardTitle>
+                <CardTitle>
+                  Pagamentos ({filteredPayments.length})
+                  {filteredPayments.length > 30 && (
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      (mostrando os 30 primeiros)
+                    </span>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {filteredPayments.length === 0 ? (
@@ -1525,7 +1564,7 @@ export default function FinanceiroSimples() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredPayments.map((payment) => {
+                        {filteredPayments.slice(0, 30).map((payment) => {
                           const athlete = athletes?.find(a => a.id === payment.athleteId);
                           return (
                             <TableRow key={payment.id}>
@@ -1790,7 +1829,14 @@ export default function FinanceiroSimples() {
             {/* Lista de Receitas */}
             <Card>
               <CardHeader>
-                <CardTitle>Receitas ({filteredRevenues.length})</CardTitle>
+                <CardTitle>
+                  Receitas ({filteredRevenues.length})
+                  {filteredRevenues.length > 30 && (
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      (mostrando as 30 primeiras)
+                    </span>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {filteredRevenues.length === 0 ? (
@@ -1812,7 +1858,7 @@ export default function FinanceiroSimples() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredRevenues.map((revenue) => (
+                        {filteredRevenues.slice(0, 30).map((revenue) => (
                           <TableRow key={revenue.id}>
                             <TableCell>{new Date(revenue.date + 'T00:00:00').toLocaleDateString('pt-BR')}</TableCell>
                             <TableCell>R$ {parseFloat(revenue.amount).toFixed(2)}</TableCell>
@@ -2086,7 +2132,14 @@ export default function FinanceiroSimples() {
             {/* Lista de Despesas */}
             <Card>
               <CardHeader>
-                <CardTitle>Despesas ({filteredExpenses.length})</CardTitle>
+                <CardTitle>
+                  Despesas ({filteredExpenses.length})
+                  {filteredExpenses.length > 30 && (
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      (mostrando as 30 primeiras)
+                    </span>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {filteredExpenses.length === 0 ? (
@@ -2108,7 +2161,7 @@ export default function FinanceiroSimples() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredExpenses.map((expense) => (
+                        {filteredExpenses.slice(0, 30).map((expense) => (
                           <TableRow key={expense.id}>
                             <TableCell>{new Date(expense.date + 'T00:00:00').toLocaleDateString('pt-BR')}</TableCell>
                             <TableCell>R$ {parseFloat(expense.amount).toFixed(2)}</TableCell>
