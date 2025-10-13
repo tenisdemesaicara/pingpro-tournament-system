@@ -1180,15 +1180,6 @@ export default function FinanceiroSimples() {
   // Criar mapa de atletas para acesso rápido (otimização de performance)
   const athleteMap = useMemo(() => {
     const map = new Map<string, Athlete>();
-    if (athletes && athletes.length > 0) {
-      console.log('🏃 ESTRUTURA DO PRIMEIRO ATLETA:', {
-        athlete: athletes[0],
-        keys: Object.keys(athletes[0]),
-        firstName: athletes[0].firstName,
-        lastName: athletes[0].lastName,
-        name: athletes[0].name
-      });
-    }
     athletes?.forEach(athlete => {
       map.set(athlete.id, athlete);
     });
@@ -1199,17 +1190,7 @@ export default function FinanceiroSimples() {
   const filteredPayments = useMemo(() => {
     if (!payments) return [];
     
-    // Log de debug
-    if (filterSearchText.trim()) {
-      console.log('🔍 BUSCA COBRANÇAS:', {
-        searchText: filterSearchText,
-        searchNormalized: normalizeText(filterSearchText),
-        totalPayments: payments.length,
-        athleteMapSize: athleteMap.size
-      });
-    }
-    
-    const result = payments.filter(payment => {
+    return payments.filter(payment => {
       // Filtro de status
       const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
       
@@ -1225,24 +1206,10 @@ export default function FinanceiroSimples() {
       if (filterSearchText.trim()) {
         const searchNormalized = normalizeText(filterSearchText);
         const athlete = athleteMap.get(payment.athleteId);
-        const athleteName = athlete ? normalizeText(`${athlete.firstName} ${athlete.lastName}`) : '';
+        const athleteName = athlete ? normalizeText(athlete.name || '') : '';
         const amount = payment.amount.toString();
         const description = normalizeText(payment.description || '');
         const reference = normalizeText(payment.reference || '');
-        
-        if (filterSearchText.trim() && payments.indexOf(payment) === 0) {
-          console.log('🔍 Primeiro pagamento:', {
-            paymentAthleteId: payment.athleteId,
-            paymentAthleteIdType: typeof payment.athleteId,
-            athleteName,
-            athleteFound: !!athlete,
-            athleteFromMap: athlete,
-            mapKeys: Array.from(athleteMap.keys()).slice(0, 3),
-            amount,
-            description,
-            reference
-          });
-        }
         
         matchesSearch = 
           athleteName.includes(searchNormalized) ||
@@ -1258,12 +1225,6 @@ export default function FinanceiroSimples() {
       
       return matchesStatus && matchesAthlete && matchesDateRange && matchesSearch;
     });
-    
-    if (filterSearchText.trim()) {
-      console.log('✅ Resultados encontrados:', result.length);
-    }
-    
-    return result;
   }, [payments, athleteMap, filterSearchText, filterStatus, filterAthlete, filterStartDate, filterEndDate]);
 
   // Filtrar receitas
