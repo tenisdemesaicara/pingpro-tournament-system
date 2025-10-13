@@ -1732,8 +1732,8 @@ export default function FinanceiroSimples() {
                 </DialogContent>
               </Dialog>
 
-              <Button onClick={generateReport} variant="outline" data-testid="button-generate-report">
-                Gerar Relatório PDF
+              <Button onClick={generatePaymentsReport} variant="outline" data-testid="button-generate-payments-report">
+                Gerar Relatório de Cobranças
               </Button>
             </div>
 
