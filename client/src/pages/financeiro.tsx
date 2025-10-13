@@ -83,6 +83,13 @@ export default function FinanceiroSimples() {
   const [expenseFilterSearchText, setExpenseFilterSearchText] = useState("");
   const [expenseFilterStartDate, setExpenseFilterStartDate] = useState(currentMonthDates.start);
   const [expenseFilterEndDate, setExpenseFilterEndDate] = useState(currentMonthDates.end);
+  
+  // States para Relatórios
+  const [reportFilterStartDate, setReportFilterStartDate] = useState(currentMonthDates.start);
+  const [reportFilterEndDate, setReportFilterEndDate] = useState(currentMonthDates.end);
+  const [reportFilterStatus, setReportFilterStatus] = useState("all");
+  const [reportFilterAthlete, setReportFilterAthlete] = useState("all");
+  
   const [paymentData, setPaymentData] = useState({
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: "pix",
@@ -655,6 +662,38 @@ export default function FinanceiroSimples() {
     }
 
     try {
+      // Filtrar cobranças baseado nos filtros da aba Relatórios
+      const filteredReportPayments = payments.filter((payment: any) => {
+        const matchesStatus = reportFilterStatus === "all" || payment.status === reportFilterStatus;
+        const matchesAthlete = reportFilterAthlete === "all" || payment.athleteId === reportFilterAthlete;
+        
+        let matchesDateRange = true;
+        if (reportFilterStartDate && reportFilterEndDate) {
+          const paymentDate = payment.dueDate;
+          matchesDateRange = paymentDate >= reportFilterStartDate && paymentDate <= reportFilterEndDate;
+        }
+        
+        return matchesStatus && matchesAthlete && matchesDateRange;
+      });
+      
+      // Filtrar receitas por período
+      const filteredReportRevenues = revenues.filter((revenue: any) => {
+        if (reportFilterStartDate && reportFilterEndDate) {
+          const revenueDate = revenue.date;
+          return revenueDate >= reportFilterStartDate && revenueDate <= reportFilterEndDate;
+        }
+        return true;
+      });
+      
+      // Filtrar despesas por período
+      const filteredReportExpenses = expenses.filter((expense: any) => {
+        if (reportFilterStartDate && reportFilterEndDate) {
+          const expenseDate = expense.date;
+          return expenseDate >= reportFilterStartDate && expenseDate <= reportFilterEndDate;
+        }
+        return true;
+      });
+      
       // Importar jsPDF e autoTable dinamicamente
       const jsPDF = (await import('jspdf')).default;
       const autoTable = (await import('jspdf-autotable')).default;
@@ -677,14 +716,22 @@ export default function FinanceiroSimples() {
       doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 20, currentY);
       currentY += 5;
       doc.text(`Contato: contato@tenisdemesa.biz`, 20, currentY);
-      currentY += 15;
+      currentY += 5;
+      
+      // Período do filtro
+      if (reportFilterStartDate && reportFilterEndDate) {
+        doc.text(`Período: ${new Date(reportFilterStartDate + 'T00:00:00').toLocaleDateString('pt-BR')} a ${new Date(reportFilterEndDate + 'T00:00:00').toLocaleDateString('pt-BR')}`, 20, currentY);
+        currentY += 5;
+      }
+      
+      currentY += 10;
 
-      // Calcular totais gerais
-      const totalReceitas = revenues.reduce((sum: number, r: any) => sum + parseFloat(r.amount.toString()), 0);
-      const totalDespesas = expenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount.toString()), 0);
-      const totalCobrancasPagas = payments.filter((p: any) => p.status === "paid").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const totalCobrancasPendentes = payments.filter((p: any) => p.status === "pending").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const totalCobrancasVencidas = payments.filter((p: any) => p.status === "overdue").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      // Calcular totais gerais usando dados filtrados
+      const totalReceitas = filteredReportRevenues.reduce((sum: number, r: any) => sum + parseFloat(r.amount.toString()), 0);
+      const totalDespesas = filteredReportExpenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount.toString()), 0);
+      const totalCobrancasPagas = filteredReportPayments.filter((p: any) => p.status === "paid").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalCobrancasPendentes = filteredReportPayments.filter((p: any) => p.status === "pending").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalCobrancasVencidas = filteredReportPayments.filter((p: any) => p.status === "overdue").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
       const saldoLiquido = (totalReceitas + totalCobrancasPagas) - totalDespesas;
 
       // Resumo Executivo
@@ -726,7 +773,7 @@ export default function FinanceiroSimples() {
       currentY += 8;
 
       // Receitas por categoria
-      const receitasPorCategoria = revenues.reduce((acc: Record<string, number>, r: any) => {
+      const receitasPorCategoria = filteredReportRevenues.reduce((acc: Record<string, number>, r: any) => {
         const categoria = r.category === 'mensalidades' ? 'Mensalidades' :
                          r.category === 'torneios' ? 'Torneios' :
                          r.category === 'equipamentos' ? 'Equipamentos' : 'Outros';
@@ -739,10 +786,8 @@ export default function FinanceiroSimples() {
       );
 
       // Despesas por categoria  
-      const despesasPorCategoria = expenses.reduce((acc: Record<string, number>, e: any) => {
-        const categoria = e.category === 'aluguel' ? 'Aluguel' :
-                         e.category === 'equipamentos' ? 'Equipamentos' :
-                         e.category === 'marketing' ? 'Marketing' : 'Outros';
+      const despesasPorCategoria = filteredReportExpenses.reduce((acc: Record<string, number>, e: any) => {
+        const categoria = getCategoryLabel(e.category);
         acc[categoria] = (acc[categoria] || 0) + parseFloat(e.amount.toString());
         return acc;
       }, {} as Record<string, number>);
@@ -817,7 +862,7 @@ export default function FinanceiroSimples() {
       doc.text("DETALHAMENTO DE RECEITAS", 20, currentY);
       currentY += 10;
 
-      const receitasTableData = revenues.map((revenue: any) => [
+      const receitasTableData = filteredReportRevenues.map((revenue: any) => [
         new Date(revenue.date + 'T00:00:00').toLocaleDateString('pt-BR'),
         `R$ ${parseFloat(revenue.amount.toString()).toFixed(2)}`,
         revenue.description,
@@ -864,15 +909,11 @@ export default function FinanceiroSimples() {
       doc.text("DETALHAMENTO DE DESPESAS", 20, currentY);
       currentY += 10;
 
-      const despesasTableData = expenses.map((expense: any) => [
+      const despesasTableData = filteredReportExpenses.map((expense: any) => [
         new Date(expense.date + 'T00:00:00').toLocaleDateString('pt-BR'),
         `R$ ${parseFloat(expense.amount.toString()).toFixed(2)}`,
         expense.description,
-        expense.category === 'material' ? 'Material' :
-        expense.category === 'equipamento' ? 'Equipamento' :
-        expense.category === 'local' ? 'Local' :
-        expense.category === 'alimentacao' ? 'Alimentação' :
-        expense.category === 'transporte' ? 'Transporte' : 'Outros',
+        getCategoryLabel(expense.category),
         expense.paymentMethod === 'pix' ? 'PIX' :
         expense.paymentMethod === 'dinheiro' ? 'Dinheiro' :
         expense.paymentMethod === 'cartao' ? 'Cartão' :
@@ -919,10 +960,167 @@ export default function FinanceiroSimples() {
 
       toast({
         title: "Sucesso!",
-        description: `Relatório financeiro completo gerado com ${payments?.length || 0} cobranças, ${revenues?.length || 0} receitas e ${expenses?.length || 0} despesas.`,
+        description: `Relatório financeiro completo gerado com ${filteredReportPayments.length} cobranças, ${filteredReportRevenues.length} receitas e ${filteredReportExpenses.length} despesas.`,
       });
     } catch (error) {
       console.error("Erro ao gerar relatório:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar relatório PDF. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para gerar relatório específico de cobranças
+  const generatePaymentsReport = async () => {
+    if (!filteredPayments || !athletes || !Array.isArray(filteredPayments) || !Array.isArray(athletes)) {
+      toast({
+        title: "Erro",
+        description: "Dados não carregados ainda.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Importar jsPDF e autoTable dinamicamente
+      const jsPDF = (await import('jspdf')).default;
+      const autoTable = (await import('jspdf-autotable')).default;
+
+      const doc = new jsPDF();
+      let currentY = 20;
+    
+      // Configurar fonte
+      doc.setFont("helvetica");
+    
+      // Cabeçalho do relatório
+      doc.setFontSize(18);
+      doc.setTextColor(255, 102, 0); // Cor laranja
+      doc.text("PONG PRO - RELATÓRIO DE COBRANÇAS", 20, currentY);
+      currentY += 10;
+    
+      // Data de geração
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 20, currentY);
+      currentY += 5;
+      doc.text(`Contato: contato@tenisdemesa.biz`, 20, currentY);
+      currentY += 5;
+      
+      // Período do filtro
+      if (filterStartDate && filterEndDate) {
+        doc.text(`Período: ${new Date(filterStartDate + 'T00:00:00').toLocaleDateString('pt-BR')} a ${new Date(filterEndDate + 'T00:00:00').toLocaleDateString('pt-BR')}`, 20, currentY);
+        currentY += 5;
+      }
+      
+      currentY += 10;
+
+      // Calcular totais de cobranças
+      const totalPagas = filteredPayments.filter((p: any) => p.status === "paid").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalPendentes = filteredPayments.filter((p: any) => p.status === "pending").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalVencidas = filteredPayments.filter((p: any) => p.status === "overdue").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalGeral = totalPagas + totalPendentes + totalVencidas;
+
+      // Resumo de cobranças
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text("RESUMO DE COBRANÇAS", 20, currentY);
+      currentY += 10;
+
+      doc.setFontSize(10);
+      const resumoData = [
+        ['TOTAL DE COBRANÇAS', filteredPayments.length.toString()],
+        ['COBRANÇAS PAGAS', `${filteredPayments.filter((p: any) => p.status === "paid").length} - R$ ${totalPagas.toFixed(2)}`],
+        ['COBRANÇAS PENDENTES', `${filteredPayments.filter((p: any) => p.status === "pending").length} - R$ ${totalPendentes.toFixed(2)}`],
+        ['COBRANÇAS VENCIDAS', `${filteredPayments.filter((p: any) => p.status === "overdue").length} - R$ ${totalVencidas.toFixed(2)}`],
+        ['VALOR TOTAL', `R$ ${totalGeral.toFixed(2)}`]
+      ];
+
+      autoTable(doc, {
+        startY: currentY,
+        body: resumoData,
+        theme: 'grid',
+        styles: {
+          fontSize: 10,
+          cellPadding: 3
+        },
+        columnStyles: {
+          0: { fontStyle: 'bold', fillColor: [248, 249, 250] },
+          1: { halign: 'right', fontStyle: 'bold' }
+        },
+        margin: { left: 20, right: 20 }
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+
+      // Lista detalhada de cobranças
+      doc.setFontSize(12);
+      doc.text("DETALHAMENTO DAS COBRANÇAS", 20, currentY);
+      currentY += 8;
+
+      const paymentsTableData = filteredPayments.map((payment: any) => {
+        const athlete = athleteMap.get(payment.athleteId);
+        return [
+          new Date(payment.dueDate + 'T00:00:00').toLocaleDateString('pt-BR'),
+          athlete?.name || 'Atleta não encontrado',
+          `R$ ${parseFloat(payment.amount).toFixed(2)}`,
+          payment.reference || '-',
+          payment.description || '-',
+          payment.status === 'paid' ? '✓ Pago' :
+          payment.status === 'pending' ? 'Pendente' : 'Vencido',
+          payment.paymentDate ? new Date(payment.paymentDate + 'T00:00:00').toLocaleDateString('pt-BR') : '-'
+        ];
+      });
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Vencimento', 'Atleta', 'Valor', 'Referência', 'Descrição', 'Status', 'Pago em']],
+        body: paymentsTableData,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [255, 102, 0],
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          cellPadding: 2
+        },
+        columnStyles: {
+          2: { halign: 'right' },
+          5: { 
+            cellWidth: 20,
+            fontStyle: 'bold'
+          }
+        },
+        margin: { left: 10, right: 10 }
+      });
+
+      // Rodapé profissional
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(`Pong Pro - Sistema de Gestão de Tênis de Mesa`, 20, doc.internal.pageSize.height - 15);
+        doc.text(`contato@tenisdemesa.biz`, 20, doc.internal.pageSize.height - 10);
+        doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 50, doc.internal.pageSize.height - 10);
+      }
+
+      // Nome do arquivo
+      const fileName = `relatorio-cobrancas-${new Date().toISOString().split('T')[0]}.pdf`;
+
+      // Salvar o PDF
+      doc.save(fileName);
+
+      toast({
+        title: "Sucesso!",
+        description: `Relatório de cobranças gerado com ${filteredPayments.length} cobranças.`,
+      });
+    } catch (error) {
+      console.error("Erro ao gerar relatório de cobranças:", error);
       toast({
         title: "Erro",
         description: "Erro ao gerar relatório PDF. Tente novamente.",
@@ -1175,6 +1373,26 @@ export default function FinanceiroSimples() {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, ''); // Remove acentos
+  };
+
+  // Função para traduzir categoria de despesa
+  const getCategoryLabel = (category: string): string => {
+    const labels: Record<string, string> = {
+      'material': 'Material',
+      'equipamento': 'Equipamento',
+      'local': 'Local',
+      'alimentacao': 'Alimentação',
+      'transporte': 'Transporte',
+      'contabilidade': 'Contabilidade',
+      'servico_terceiros': 'Serviço de terceiros',
+      'publicidade': 'Publicidade e Propaganda',
+      'viagem': 'Despesas de Viagem',
+      'taxas_inscricoes': 'Taxas e inscrições',
+      'hospedagem': 'Hospedagem',
+      'limpeza': 'Material de limpeza',
+      'outros': 'Outros'
+    };
+    return labels[category] || category;
   };
 
   // Criar mapa de atletas para acesso rápido (otimização de performance)
@@ -2098,6 +2316,13 @@ export default function FinanceiroSimples() {
                           <SelectItem value="local">Local</SelectItem>
                           <SelectItem value="alimentacao">Alimentação</SelectItem>
                           <SelectItem value="transporte">Transporte</SelectItem>
+                          <SelectItem value="contabilidade">Contabilidade</SelectItem>
+                          <SelectItem value="servico_terceiros">Serviço de terceiros</SelectItem>
+                          <SelectItem value="publicidade">Publicidade e Propaganda</SelectItem>
+                          <SelectItem value="viagem">Despesas de Viagem</SelectItem>
+                          <SelectItem value="taxas_inscricoes">Taxas e inscrições</SelectItem>
+                          <SelectItem value="hospedagem">Hospedagem</SelectItem>
+                          <SelectItem value="limpeza">Material de limpeza</SelectItem>
                           <SelectItem value="outros">Outros</SelectItem>
                         </SelectContent>
                       </Select>
@@ -2173,6 +2398,13 @@ export default function FinanceiroSimples() {
                         <SelectItem value="local">Local</SelectItem>
                         <SelectItem value="alimentacao">Alimentação</SelectItem>
                         <SelectItem value="transporte">Transporte</SelectItem>
+                        <SelectItem value="contabilidade">Contabilidade</SelectItem>
+                        <SelectItem value="servico_terceiros">Serviço de terceiros</SelectItem>
+                        <SelectItem value="publicidade">Publicidade e Propaganda</SelectItem>
+                        <SelectItem value="viagem">Despesas de Viagem</SelectItem>
+                        <SelectItem value="taxas_inscricoes">Taxas e inscrições</SelectItem>
+                        <SelectItem value="hospedagem">Hospedagem</SelectItem>
+                        <SelectItem value="limpeza">Material de limpeza</SelectItem>
                         <SelectItem value="outros">Outros</SelectItem>
                       </SelectContent>
                     </Select>
@@ -2255,11 +2487,7 @@ export default function FinanceiroSimples() {
                             <TableCell>{expense.description}</TableCell>
                             <TableCell>
                               <Badge variant="outline">
-                                {expense.category === 'material' ? 'Material' :
-                                 expense.category === 'equipamento' ? 'Equipamento' :
-                                 expense.category === 'local' ? 'Local' :
-                                 expense.category === 'alimentacao' ? 'Alimentação' :
-                                 expense.category === 'transporte' ? 'Transporte' : 'Outros'}
+                                {getCategoryLabel(expense.category)}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -2331,6 +2559,66 @@ export default function FinanceiroSimples() {
 
           {/* Tab de Relatórios */}
           <TabsContent value="relatorios" className="space-y-6 mt-6">
+            {/* Filtros do Relatório */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Filtros do Relatório</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Data Início</label>
+                    <Input
+                      type="date"
+                      value={reportFilterStartDate}
+                      onChange={(e) => setReportFilterStartDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Data Fim</label>
+                    <Input
+                      type="date"
+                      value={reportFilterEndDate}
+                      onChange={(e) => setReportFilterEndDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Status Cobrança</label>
+                    <Select value={reportFilterStatus} onValueChange={setReportFilterStatus}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="paid">Pago</SelectItem>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="overdue">Vencido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Atleta/Associado</label>
+                    <Select value={reportFilterAthlete} onValueChange={setReportFilterAthlete}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {athletes?.map((athlete) => (
+                          <SelectItem key={athlete.id} value={athlete.id}>
+                            {athlete.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Dashboard Geral */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Card>
@@ -2388,16 +2676,16 @@ export default function FinanceiroSimples() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Relatórios Disponíveis</CardTitle>
+                <CardTitle>Gerar Relatório</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <h4 className="font-medium">Relatório de Cobranças</h4>
+                  <h4 className="font-medium">Relatório Financeiro Completo</h4>
                   <p className="text-sm text-muted-foreground">
-                    Gera um relatório PDF completo com todas as cobranças filtradas, incluindo resumos financeiros.
+                    Gera um relatório PDF completo com receitas, despesas e cobranças de acordo com os filtros selecionados.
                   </p>
-                  <Button onClick={generateReport} className="mt-2">
-                    Gerar Relatório de Cobranças
+                  <Button onClick={generateReport} className="mt-2" data-testid="button-generate-report">
+                    Gerar Relatório PDF
                   </Button>
                 </div>
               </CardContent>
@@ -2669,6 +2957,13 @@ export default function FinanceiroSimples() {
                     <SelectItem value="local">Local</SelectItem>
                     <SelectItem value="alimentacao">Alimentação</SelectItem>
                     <SelectItem value="transporte">Transporte</SelectItem>
+                    <SelectItem value="contabilidade">Contabilidade</SelectItem>
+                    <SelectItem value="servico_terceiros">Serviço de terceiros</SelectItem>
+                    <SelectItem value="publicidade">Publicidade e Propaganda</SelectItem>
+                    <SelectItem value="viagem">Despesas de Viagem</SelectItem>
+                    <SelectItem value="taxas_inscricoes">Taxas e inscrições</SelectItem>
+                    <SelectItem value="hospedagem">Hospedagem</SelectItem>
+                    <SelectItem value="limpeza">Material de limpeza</SelectItem>
                     <SelectItem value="outros">Outros</SelectItem>
                   </SelectContent>
                 </Select>
