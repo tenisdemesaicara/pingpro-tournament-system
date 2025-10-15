@@ -8,6 +8,50 @@ PingPong Pro is a comprehensive table tennis tournament management platform desi
 
 Preferred communication style: Simple, everyday language.
 
+## Deployment Documentation
+
+### Manual Técnico Completo de Deploy Autônomo
+
+O sistema possui documentação completa do processo de deploy autônomo via GitHub + Render, replicável em qualquer projeto Replit:
+
+**📚 Documentos Criados (57KB total):**
+
+1. **🚀-COMECE-AQUI.md** (9.8KB) - ⭐ LEIA PRIMEIRO
+   - Resumo visual completo do sistema
+   - Guia rápido de uso
+   - Fluxo de deploy ilustrado
+
+2. **COMO-REPLICAR.md** (9.9KB) - Guia Executivo
+   - Instruções em português
+   - Casos de uso práticos
+   - Fluxo visual detalhado
+
+3. **TEMPLATE-INSTRUCAO-AGENTE.md** (3.6KB) - ⭐ COPIAR/COLAR
+   - Template pronto para outros projetos
+   - Instruções completas para agente
+   - Apenas trocar 2 variáveis
+
+4. **QUICK-DEPLOY-SETUP.md** (7.3KB) - Setup Manual
+   - Passo a passo detalhado
+   - Comandos prontos
+   - Troubleshooting rápido
+
+5. **DEPLOYMENT-GUIDE.md** (19KB) - Referência Técnica
+   - Arquitetura completa do sistema
+   - Código explicado linha por linha
+   - Troubleshooting avançado
+
+6. **INDICE-DOCUMENTACAO.md** (8KB) - Navegação
+   - Guia de navegação completo
+   - Comparação de documentos
+   - Fluxos de uso
+
+**Sistema de Deploy:**
+- Script: `smart-deploy.js` (detecção inteligente de mudanças via SHA)
+- Comando: `npm run deploy` (30 segundos + 3-5min rebuild)
+- Fluxo: Replit → GitHub (API) → Render (webhook) → Produção
+- Autonomia: App funciona 100% sem Replit em produção
+
 ## System Architecture
 
 ### Frontend Architecture
